@@ -24,6 +24,8 @@ from controllers.system_controller import system_router
 from controllers.files_controller import files_router
 # 导入配置
 from config import settings
+# 导入数据库管理器
+from database import DatabaseManager
 
 # 导入公共工具
 from commons import create_response
@@ -38,6 +40,16 @@ app = FastAPI(
     description="桌面端RAG文档整理程序后端服务",
     version="1.0.0"
 )
+
+# 全局数据库管理器实例
+db_manager = None
+
+def get_db_manager() -> DatabaseManager:
+    """获取数据库管理器实例"""
+    global db_manager
+    if db_manager is None:
+        raise RuntimeError("Database manager not initialized. Call init_directories() first.")
+    return db_manager
 
 # CORS配置，允许前端访问
 app.add_middleware(
@@ -106,12 +118,17 @@ async def internal_error_handler(request, exc):
 
 def init_directories():
     """初始化必要的目录和配置文件"""
+    global db_manager
     try:
         # 确保 .env 文件存在
         settings.ensure_env_file()
         
         # 使用设置中的路径创建目录
         settings.create_directories()
+        
+        # 初始化数据库连接
+        db_manager = DatabaseManager()
+        logger.info("Database initialized successfully")
         
         logger.info(f"工作目录: {settings.workdir_path}")
         logger.info(f"数据库目录: {settings.database_path}")

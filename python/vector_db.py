@@ -7,7 +7,7 @@ import pickle
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 import numpy as np
-
+import faiss
 from loguru import logger
 
 
@@ -236,80 +236,3 @@ class VectorDatabase:
             logger.error(f"重建索引失败: {e}")
 
 
-class ChromaVectorDatabase:
-    """基于Chroma的向量数据库实现"""
-    
-    def __init__(self, database_path: Path, collection_name: str = "documents"):
-        self.database_path = database_path
-        self.collection_name = collection_name
-        self.client = None
-        self.collection = None
-        self.is_loaded = False
-    
-    def initialize(self):
-        """初始化Chroma数据库"""
-        try:
-            # TODO: 实际初始化Chroma
-            # import chromadb
-            # from chromadb.config import Settings
-            # 
-            # self.client = chromadb.PersistentClient(
-            #     path=str(self.database_path),
-            #     settings=Settings(allow_reset=True)
-            # )
-            # self.collection = self.client.get_or_create_collection(
-            #     name=self.collection_name
-            # )
-            
-            self.is_loaded = True
-            logger.info("Chroma向量数据库初始化完成")
-            return True
-            
-        except Exception as e:
-            logger.error(f"初始化Chroma数据库失败: {e}")
-            return False
-    
-    def add_documents(self, documents: List[str], metadatas: List[Dict], ids: List[str]):
-        """添加文档到Chroma"""
-        try:
-            if not self.is_loaded:
-                if not self.initialize():
-                    return False
-            
-            # TODO: 实际添加到Chroma
-            # self.collection.add(
-            #     documents=documents,
-            #     metadatas=metadatas,
-            #     ids=ids
-            # )
-            
-            logger.info(f"添加 {len(documents)} 个文档到Chroma")
-            return True
-            
-        except Exception as e:
-            logger.error(f"添加文档到Chroma失败: {e}")
-            return False
-    
-    def query_documents(self, query_texts: List[str], n_results: int = 10) -> Dict[str, Any]:
-        """查询相似文档"""
-        try:
-            if not self.is_loaded:
-                return {"documents": [], "metadatas": [], "distances": []}
-            
-            # TODO: 实际查询Chroma
-            # results = self.collection.query(
-            #     query_texts=query_texts,
-            #     n_results=n_results
-            # )
-            # return results
-            
-            # 返回模拟结果
-            return {
-                "documents": [[]],
-                "metadatas": [[]],
-                "distances": [[]]
-            }
-            
-        except Exception as e:
-            logger.error(f"查询Chroma失败: {e}")
-            return {"documents": [], "metadatas": [], "distances": []}

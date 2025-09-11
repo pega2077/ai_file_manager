@@ -462,6 +462,10 @@ class FileImportRequestBody(BaseModel):
 async def import_file(request: FileImportRequestBody):
     """Import file from local path to workspace with automatic categorization"""
     try:
+        # 获取数据库管理器实例（避免循环导入）
+        from database import DatabaseManager
+        db_manager = DatabaseManager()
+        
         # Validate file path
         source_file_path = Path(request.file_path)
         if not source_file_path.exists():
@@ -549,6 +553,28 @@ async def import_file(request: FileImportRequestBody):
             processed=True
         )
         
+        # Save file record to database
+        try:
+            file_db_info = {
+                'file_id': file_info.file_id,
+                'path': file_info.path,
+                'name': file_info.name,
+                'type': file_info.type,
+                'category': file_info.category,
+                'summary': file_info.summary,
+                'tags': file_info.tags,
+                'size': file_info.size,
+                'added_at': file_info.added_at,
+                'processed': file_info.processed
+            }
+            
+            db_id = db_manager.insert_file(file_db_info)
+            logger.info(f"File record saved to database with ID: {db_id}")
+            
+        except Exception as db_error:
+            logger.error(f"Failed to save file record to database: {db_error}")
+            # Continue execution - don't fail the entire import due to database error
+        
         logger.info(f"File imported and converted successfully: {filename} -> {final_category}/{final_file_path.name}")
         
         return create_success_response(
@@ -586,62 +612,47 @@ class FileListRequest(BaseModel):
 async def list_files(request: FileListRequest):
     """Get file list with filtering and pagination"""
     try:
+        # 获取数据库管理器实例
+        from database import DatabaseManager
+        db_manager = DatabaseManager()
+        
         page = request.page
         limit = request.limit
         category_filter = request.category
-        type_filter = request.type
-        search_query = request.search.lower() if request.search else ""
-        tags_filter = request.tags
+        search_query = request.search
         
-        # Get all files from workdir
-        all_files = []
+        # Get files from database with filtering and pagination
+        files_data, total_count = db_manager.list_files(
+            page=page,
+            limit=limit,
+            category=category_filter,
+            search=search_query
+        )
         
-        for category_dir in settings.workdir_path.iterdir():
-            if category_dir.is_dir() and category_dir.name != "temp":
-                for file_path in category_dir.rglob("*"):
-                    if file_path.is_file():
-                        # Create file info
-                        try:
-                            stat = file_path.stat()
-                            file_info = {
-                                "id": str(uuid.uuid4()),
-                                "name": file_path.name,
-                                "path": str(file_path.relative_to(settings.workdir_path)),
-                                "type": mimetypes.guess_type(file_path.name)[0] or "application/octet-stream",
-                                "category": category_dir.name,
-                                "summary": f"File in {category_dir.name} category",
-                                "tags": [],
-                                "size": stat.st_size,
-                                "added_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
-                                "updated_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
-                            }
-                            
-                            # Apply filters
-                            if category_filter and file_info["category"] != category_filter:
-                                continue
-                            if type_filter and type_filter not in file_info["type"]:
-                                continue
-                            if search_query and search_query not in file_info["name"].lower():
-                                continue
-                            
-                            all_files.append(file_info)
-                            
-                        except Exception as e:
-                            logger.warning(f"Error processing file {file_path}: {e}")
-                            continue
-        
-        # Pagination
-        total_count = len(all_files)
-        start_idx = (page - 1) * limit
-        end_idx = start_idx + limit
-        files_page = all_files[start_idx:end_idx]
+        # Convert database format to API response format
+        files_response = []
+        for file_data in files_data:
+            file_info = {
+                "file_id": file_data["file_id"],
+                "name": file_data["name"],
+                "path": file_data["path"],
+                "type": file_data["type"],
+                "category": file_data["category"],
+                "summary": file_data["summary"],
+                "tags": file_data["tags"],  # Already parsed from JSON by DatabaseManager
+                "size": file_data["size"],
+                "added_at": file_data["added_at"],
+                "updated_at": file_data.get("updated_at"),
+                "processed": file_data["processed"]
+            }
+            files_response.append(file_info)
         
         total_pages = (total_count + limit - 1) // limit
         
         return create_success_response(
             message="File list retrieved successfully",
             data={
-                "files": files_page,
+                "files": files_response,
                 "pagination": {
                     "current_page": page,
                     "total_pages": total_pages,
@@ -655,6 +666,58 @@ async def list_files(request: FileListRequest):
         logger.error(f"Error listing files: {e}")
         return create_error_response(
             message="Failed to list files",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )
+
+@files_router.get("/{file_id}",
+    summary="Get file details by ID",
+    description="Retrieve detailed information about a specific file by its file_id",
+    responses={
+        200: {"description": "File details retrieved successfully"},
+        404: {"description": "File not found"},
+        500: {"description": "Server error during file retrieval"}
+    }
+)
+async def get_file_by_id(file_id: str):
+    """Get file details by file_id"""
+    try:
+        # 获取数据库管理器实例
+        from database import DatabaseManager
+        db_manager = DatabaseManager()
+        
+        # Get file from database
+        file_data = db_manager.get_file_by_id(file_id)
+        
+        if not file_data:
+            raise HTTPException(status_code=404, detail=f"File not found: {file_id}")
+        
+        # Convert database format to API response format
+        file_info = {
+            "file_id": file_data["file_id"],
+            "name": file_data["name"],
+            "path": file_data["path"],
+            "type": file_data["type"],
+            "category": file_data["category"],
+            "summary": file_data["summary"],
+            "tags": file_data["tags"],  # Already parsed from JSON
+            "size": file_data["size"],
+            "added_at": file_data["added_at"],
+            "updated_at": file_data.get("updated_at"),
+            "processed": file_data["processed"]
+        }
+        
+        return create_success_response(
+            message="File details retrieved successfully",
+            data=file_info
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting file by ID {file_id}: {e}")
+        return create_error_response(
+            message="Failed to get file details",
             error_code="INTERNAL_ERROR",
             error_details=str(e)
         )
