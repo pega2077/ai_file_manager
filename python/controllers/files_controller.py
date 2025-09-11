@@ -858,3 +858,144 @@ async def get_file_by_id(file_id: str):
             error_code="INTERNAL_ERROR",
             error_details=str(e)
         )
+
+# 请求模型
+class FileDeleteRequest(BaseModel):
+    file_id: str = Field(..., description="ID of the file to delete")
+
+class FileUpdateRequest(BaseModel):
+    file_id: str = Field(..., description="ID of the file to update")
+    category: Optional[str] = Field(None, description="New category for the file")
+    tags: Optional[List[str]] = Field(None, description="New tags for the file")
+    summary: Optional[str] = Field(None, description="New summary for the file")
+
+@files_router.post("/delete",
+    summary="Delete file",
+    description="Delete a file and all its associated chunks and embeddings",
+    responses={
+        200: {"description": "File deleted successfully"},
+        404: {"description": "File not found"},
+        500: {"description": "Server error during file deletion"}
+    }
+)
+async def delete_file(request: FileDeleteRequest):
+    """Delete file by file_id"""
+    try:
+        file_id = request.file_id
+        
+        # 获取数据库管理器实例
+        from database import DatabaseManager
+        db_manager = DatabaseManager()
+        
+        # 获取向量数据库管理器实例
+        from vector_db import VectorDatabase
+        vector_db_manager = VectorDatabase(settings.database_path)
+        
+        # 检查文件是否存在
+        file_data = db_manager.get_file_by_id(file_id)
+        if not file_data:
+            raise HTTPException(status_code=404, detail=f"File not found: {file_id}")
+        
+        # 删除向量数据库中的embeddings
+        deleted_embeddings = vector_db_manager.delete_embeddings_by_file(file_id)
+        
+        # 删除数据库中的文件记录
+        deleted_from_db = db_manager.delete_file(file_id)
+        
+        if deleted_from_db:
+            return create_success_response(
+                message="File deleted successfully",
+                data={
+                    "deleted_file_id": file_id,
+                    "deleted_chunks_count": deleted_embeddings,
+                    "file_name": file_data["name"]
+                }
+            )
+        else:
+            return create_error_response(
+                message="Failed to delete file from database",
+                error_code="INTERNAL_ERROR"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting file {request.file_id}: {e}")
+        return create_error_response(
+            message="Failed to delete file",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )
+
+@files_router.post("/update",
+    summary="Update file metadata",
+    description="Update file category, tags, and summary",
+    responses={
+        200: {"description": "File updated successfully"},
+        400: {"description": "Invalid request parameters"},
+        404: {"description": "File not found"},
+        500: {"description": "Server error during file update"}
+    }
+)
+async def update_file(request: FileUpdateRequest):
+    """Update file metadata"""
+    try:
+        file_id = request.file_id
+        
+        # 验证至少提供了一个更新字段
+        updates = {}
+        if request.category is not None:
+            updates["category"] = request.category
+        if request.tags is not None:
+            updates["tags"] = request.tags
+        if request.summary is not None:
+            updates["summary"] = request.summary
+        
+        if not updates:
+            return create_error_response(
+                message="At least one field must be provided for update",
+                error_code="INVALID_REQUEST"
+            )
+        
+        # 获取数据库管理器实例
+        from database import DatabaseManager
+        db_manager = DatabaseManager()
+        
+        # 检查文件是否存在
+        file_data = db_manager.get_file_by_id(file_id)
+        if not file_data:
+            raise HTTPException(status_code=404, detail=f"File not found: {file_id}")
+        
+        # 更新文件信息
+        updated = db_manager.update_file(file_id, updates)
+        
+        if updated:
+            # 获取更新后的文件信息
+            updated_file_data = db_manager.get_file_by_id(file_id)
+            
+            return create_success_response(
+                message="File updated successfully",
+                data={
+                    "file_id": updated_file_data["file_id"],
+                    "name": updated_file_data["name"],
+                    "category": updated_file_data["category"],
+                    "tags": updated_file_data["tags"],
+                    "summary": updated_file_data["summary"],
+                    "updated_at": updated_file_data.get("updated_at")
+                }
+            )
+        else:
+            return create_error_response(
+                message="Failed to update file",
+                error_code="INTERNAL_ERROR"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating file {request.file_id}: {e}")
+        return create_error_response(
+            message="Failed to update file",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )

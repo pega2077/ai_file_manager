@@ -294,6 +294,59 @@ class DatabaseManager:
             logger.error(f"Failed to delete file: {e}")
             return False
     
+    def update_file(self, file_id: str, updates: Dict[str, Any]) -> bool:
+        """Update file metadata"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Build update query dynamically
+                update_fields = []
+                values = []
+                
+                if "category" in updates:
+                    update_fields.append("category = ?")
+                    values.append(updates["category"])
+                
+                if "summary" in updates:
+                    update_fields.append("summary = ?")
+                    values.append(updates["summary"])
+                
+                if "tags" in updates:
+                    update_fields.append("tags = ?")
+                    values.append(json.dumps(updates["tags"]))
+                
+                if not update_fields:
+                    logger.warning(f"No valid fields to update for file {file_id}")
+                    return False
+                
+                # Add updated_at timestamp
+                update_fields.append("updated_at = ?")
+                values.append(datetime.now().isoformat())
+                
+                # Add file_id for WHERE clause
+                values.append(file_id)
+                
+                query = f"""
+                    UPDATE files 
+                    SET {', '.join(update_fields)}
+                    WHERE file_id = ?
+                """
+                
+                cursor.execute(query, values)
+                conn.commit()
+                
+                if cursor.rowcount > 0:
+                    logger.info(f"Updated file {file_id} with fields: {list(updates.keys())}")
+                    return True
+                else:
+                    logger.warning(f"File {file_id} not found for update")
+                    return False
+                
+        except Exception as e:
+            logger.error(f"Failed to update file: {e}")
+            return False
+    
     def get_statistics(self) -> Dict[str, Any]:
         """Get database statistics"""
         try:
