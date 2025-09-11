@@ -1,1 +1,7 @@
 .github
+logs
+.vscode
+python/__pycache__
+python/venv
+workdir
+database
