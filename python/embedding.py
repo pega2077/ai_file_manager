@@ -3,6 +3,7 @@ Embedding 生成模块
 负责文本向量化处理和LLM交互
 """
 import os
+import re
 import json
 import aiohttp
 from typing import List, Dict, Any, Optional
@@ -58,8 +59,8 @@ class EmbeddingGenerator:
             
             # 设置 Hugging Face 镜像源
             import os
-            os.environ["HF_ENDPOINT"] = settings.huggingface_hub_url
-            logger.info(f"使用 Hugging Face 镜像源: {settings.huggingface_hub_url}")
+            os.environ["HF_ENDPOINT"] = settings.hf_endpoint
+            logger.info(f"使用 Hugging Face 镜像源: {settings.hf_endpoint}")
             
             from sentence_transformers import SentenceTransformer
             
@@ -131,8 +132,8 @@ class EmbeddingGenerator:
             # Fallback到随机向量
             return np.random.rand(self.dimension).tolist()
     
-    def generate_embeddings_batch(self, texts: List[str]) -> List[Optional[List[float]]]:
-        """批量生成embeddings - 更高效的批处理"""
+    def generate_embeddings_batch(self, texts: List[str]) -> List[Optional[np.ndarray]]:
+        """批量生成embeddings - 更高效的批处理，返回numpy数组"""
         if not texts:
             return []
             
@@ -140,36 +141,84 @@ class EmbeddingGenerator:
             if not self.is_model_loaded():
                 if not self.load_model():
                     logger.warning("模型未加载，使用随机向量作为fallback")
-                    return [np.random.rand(self.dimension).tolist() for _ in texts]
+                    return [np.random.rand(self.dimension).astype(np.float32) for _ in texts]
             
-            # 过滤空文本
-            valid_texts = [text.strip() for text in texts if text.strip()]
+            # 预处理文本
+            processed_texts = [self.normalize_chinese_text(text) for text in texts]
+            
+            # 过滤空文本并记录索引
+            valid_texts = []
+            valid_indices = []
+            for i, text in enumerate(processed_texts):
+                if text.strip():
+                    valid_texts.append(text)
+                    valid_indices.append(i)
+            
             if not valid_texts:
+                logger.warning("No valid texts provided for batch embedding generation")
                 return [None] * len(texts)
             
             # 批量生成embeddings（更高效）
-            embeddings = self.model.encode(valid_texts, convert_to_tensor=False, batch_size=32)
+            logger.info(f"Generating embeddings for {len(valid_texts)} texts")
+            embeddings = self.model.encode(
+                valid_texts, 
+                convert_to_tensor=False, 
+                batch_size=32,
+                show_progress_bar=False,
+                normalize_embeddings=True
+            )
             
-            # 转换为 Python list 格式
-            result = []
-            valid_idx = 0
-            for text in texts:
-                if text.strip():
-                    embedding = embeddings[valid_idx]
-                    if hasattr(embedding, 'tolist'):
-                        result.append(embedding.tolist())
-                    else:
-                        result.append(embedding.astype(float).tolist())
-                    valid_idx += 1
-                else:
-                    result.append(None)
+            # 创建结果数组，为无效文本插入None
+            results = [None] * len(texts)
+            for i, valid_idx in enumerate(valid_indices):
+                # 确保返回 numpy 数组格式
+                embedding = embeddings[i]
+                if not isinstance(embedding, np.ndarray):
+                    embedding = np.array(embedding)
+                results[valid_idx] = embedding.astype(np.float32)
             
-            return result
+            logger.info(f"Successfully generated {len(valid_texts)} embeddings")
+            return results
             
         except Exception as e:
             logger.error(f"批量生成embedding失败: {e}")
             # Fallback到随机向量
-            return [np.random.rand(self.dimension).tolist() if text.strip() else None for text in texts]
+            return [np.random.rand(self.dimension).astype(np.float32) if text.strip() else None for text in texts]
+
+    def normalize_chinese_text(self, text: str) -> str:
+        """Normalize Chinese text for better embedding quality"""
+        if not text:
+            return ""
+        
+        # Basic text cleaning
+        text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+        text = text.strip()
+        
+        # Handle Chinese punctuation normalization
+        chinese_punct_map = {
+            '，': ', ',
+            '。': '. ',
+            '！': '! ',
+            '？': '? ',
+            '；': '; ',
+            '：': ': ',
+            '"': '"',
+            '"': '"',
+            ''': "'",
+            ''': "'",
+            '（': ' (',
+            '）': ') ',
+            '【': ' [',
+            '】': '] '
+        }
+        
+        for chinese, english in chinese_punct_map.items():
+            text = text.replace(chinese, english)
+        
+        # Clean up extra spaces
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        return text
     
     def compute_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
         """计算两个embedding的相似度（余弦相似度）"""
@@ -217,8 +266,8 @@ class EmbeddingGenerator:
             
             # 设置 Hugging Face 镜像源
             import os
-            os.environ["HF_ENDPOINT"] = settings.huggingface_hub_url
-            logger.info(f"使用 Hugging Face 镜像源: {settings.huggingface_hub_url}")
+            os.environ["HF_ENDPOINT"] = settings.hf_endpoint
+            logger.info(f"使用 Hugging Face 镜像源: {settings.hf_endpoint}")
             
             from sentence_transformers import SentenceTransformer
             

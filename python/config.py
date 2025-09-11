@@ -9,10 +9,7 @@ from pydantic_settings import BaseSettings
 from loguru import logger
 from dotenv import load_dotenv
 
-# 显式加载 .env 文件
-env_path = Path(__file__).parent / ".env"
-load_dotenv(dotenv_path=env_path)
-
+load_dotenv()
 
 class Settings(BaseSettings):
     """应用配置"""
@@ -42,7 +39,7 @@ class Settings(BaseSettings):
     embedding_dimension: int = Field(default=384, env="EMBEDDING_DIMENSION")
     embedding_local_path: Optional[str] = Field(default=None, env="EMBEDDING_LOCAL_PATH")
     embedding_cache_dir: Optional[str] = Field(default=None, env="EMBEDDING_CACHE_DIR")
-    huggingface_hub_url: str = Field(default="https://hf-mirror.com", env="HF_ENDPOINT")
+    hf_endpoint: str = Field(default="https://hf-mirror.com", env="HF_ENDPOINT")
     
     # 搜索配置
     similarity_threshold: float = Field(default=0.7, env="SIMILARITY_THRESHOLD")
@@ -64,6 +61,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

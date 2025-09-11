@@ -377,6 +377,128 @@ Example response format:
 # Initialize file manager
 file_manager = FileManager()
 
+async def process_file_embeddings(file_id: str, content: str, file_path: str, category: str):
+    """Process file content to generate embeddings and store in vector database"""
+    try:
+        # Import embedding and vector database modules
+        from embedding import get_embedding_generator
+        from vector_db import VectorDatabase
+        from config import settings
+        
+        # Initialize components
+        embedding_gen = get_embedding_generator()
+        vector_db = VectorDatabase(settings.database_path / "vectors")
+        
+        # Initialize vector database if not loaded
+        if not vector_db.initialize():
+            raise Exception("Failed to initialize vector database")
+        
+        # Split content into chunks for better embedding quality
+        chunks = split_text_into_chunks(content, max_length=512, overlap=50)
+        
+        if not chunks:
+            logger.warning(f"No content chunks generated for file: {file_id}")
+            return
+        
+        logger.info(f"Processing {len(chunks)} chunks for file: {file_id}")
+        
+        # Generate embeddings for all chunks
+        chunk_texts = [chunk['text'] for chunk in chunks]
+        embeddings = embedding_gen.generate_embeddings_batch(chunk_texts)
+        
+        if not embeddings or all(emb is None for emb in embeddings):
+            raise Exception("Failed to generate embeddings for file content")
+        
+        # Prepare embedding data for vector database
+        embeddings_data = []
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+            if embedding is not None:
+                embedding_id = f"{file_id}_chunk_{i}"
+                metadata = {
+                    "file_id": file_id,
+                    "chunk_id": embedding_id,
+                    "chunk_index": i,
+                    "content": chunk['text'][:200],  # Store preview of content
+                    "full_content": chunk['text'],
+                    "file_path": file_path,
+                    "category": category,
+                    "start_pos": chunk['start'],
+                    "end_pos": chunk['end'],
+                    "char_count": len(chunk['text']),
+                    "created_at": datetime.now().isoformat()
+                }
+                
+                embeddings_data.append({
+                    "embedding_id": embedding_id,
+                    "embedding": embedding,
+                    "metadata": metadata
+                })
+        
+        # Store embeddings in vector database
+        success_count = vector_db.add_embeddings_batch(embeddings_data)
+        
+        logger.info(f"Successfully stored {success_count}/{len(embeddings_data)} embeddings for file: {file_id}")
+        
+        # Update file record to mark as processed
+        try:
+            from database import DatabaseManager
+            db_manager = DatabaseManager()
+            
+            # You might want to add an update method to DatabaseManager
+            # For now, we'll just log that processing is complete
+            logger.info(f"File embedding processing completed for: {file_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to update file processing status: {e}")
+        
+    except Exception as e:
+        logger.error(f"Error processing file embeddings: {e}")
+        raise
+
+def split_text_into_chunks(text: str, max_length: int = 512, overlap: int = 50) -> List[Dict[str, Any]]:
+    """Split text into overlapping chunks for embedding processing"""
+    if not text or len(text) <= max_length:
+        return [{"text": text, "start": 0, "end": len(text)}] if text else []
+    
+    chunks = []
+    start = 0
+    
+    while start < len(text):
+        # Calculate end position
+        end = min(start + max_length, len(text))
+        
+        # Try to break at sentence or paragraph boundaries if possible
+        if end < len(text):
+            # Look for sentence endings within the last 100 characters
+            search_start = max(start, end - 100)
+            sentence_endings = ['。', '！', '？', '.', '!', '?', '\n\n']
+            
+            best_break = -1
+            for ending in sentence_endings:
+                pos = text.rfind(ending, search_start, end)
+                if pos > best_break:
+                    best_break = pos + 1
+            
+            if best_break > start:
+                end = best_break
+        
+        chunk_text = text[start:end].strip()
+        if chunk_text:
+            chunks.append({
+                "text": chunk_text,
+                "start": start,
+                "end": end
+            })
+        
+        # Move start position with overlap
+        start = max(start + 1, end - overlap)
+        
+        # Prevent infinite loop
+        if start >= len(text):
+            break
+    
+    return chunks
+
 @files_router.get("/")
 async def files_root():
     """Files API root - show available endpoints"""
@@ -574,6 +696,21 @@ async def import_file(request: FileImportRequestBody):
         except Exception as db_error:
             logger.error(f"Failed to save file record to database: {db_error}")
             # Continue execution - don't fail the entire import due to database error
+        
+        # Auto process: Generate embeddings and store in vector database
+        if request.auto_process and full_markdown_content:
+            try:
+                await process_file_embeddings(
+                    file_id=file_info.file_id,
+                    content=full_markdown_content,
+                    file_path=str(final_file_path),
+                    category=final_category
+                )
+                logger.info(f"File embeddings processed successfully: {file_info.file_id}")
+                
+            except Exception as embed_error:
+                logger.error(f"Failed to process file embeddings: {embed_error}")
+                # Continue execution - don't fail the entire import due to embedding error
         
         logger.info(f"File imported and converted successfully: {filename} -> {final_category}/{final_file_path.name}")
         
