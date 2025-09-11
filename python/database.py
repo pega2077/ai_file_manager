@@ -64,11 +64,28 @@ class DatabaseManager:
                     )
                 """)
                 
+                # Create conversations table for chat history
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS conversations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        conversation_id TEXT UNIQUE NOT NULL,
+                        session_id TEXT NOT NULL,
+                        question TEXT NOT NULL,
+                        answer TEXT NOT NULL,
+                        sources_count INTEGER DEFAULT 0,
+                        confidence REAL DEFAULT 0.0,
+                        created_at TEXT NOT NULL,
+                        metadata TEXT  -- JSON string for additional metadata
+                    )
+                """)
+                
                 # Create indexes for better performance
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_file_id ON files(file_id)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_category ON files(category)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_chunks_file_id ON chunks(file_id)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_chunks_embedding_id ON chunks(embedding_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_conversations_session_id ON conversations(session_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)")
                 
                 conn.commit()
                 logger.info(f"Database initialized: {self.db_path}")
@@ -486,6 +503,123 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Failed to get statistics: {e}")
             return {}
+
+    def save_conversation(self, conversation_data: Dict[str, Any]) -> bool:
+        """Save conversation to database"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                cursor.execute("""
+                    INSERT INTO conversations (
+                        conversation_id, session_id, question, answer,
+                        sources_count, confidence, created_at, metadata
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    conversation_data['id'],
+                    conversation_data['session_id'],
+                    conversation_data['question'],
+                    conversation_data['answer'],
+                    conversation_data.get('sources_count', 0),
+                    conversation_data.get('confidence', 0.0),
+                    conversation_data.get('created_at', datetime.now().isoformat()),
+                    json.dumps(conversation_data.get('metadata', {}))
+                ))
+
+                conn.commit()
+                logger.info(f"Conversation saved: {conversation_data['id']}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Failed to save conversation: {e}")
+            return False
+
+    def get_conversations(self,
+                         page: int = 1,
+                         limit: int = 20,
+                         session_id: str = None) -> Tuple[List[Dict[str, Any]], int]:
+        """Get conversations with pagination and filtering"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Build query
+                conditions = []
+                params = []
+
+                if session_id:
+                    conditions.append("session_id = ?")
+                    params.append(session_id)
+
+                where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+
+                # Get total count
+                count_query = f"SELECT COUNT(*) FROM conversations{where_clause}"
+                cursor.execute(count_query, params)
+                total_count = cursor.fetchone()[0]
+
+                # Get paginated results
+                offset = (page - 1) * limit
+                query = f"""
+                    SELECT * FROM conversations{where_clause}
+                    ORDER BY created_at DESC
+                    LIMIT ? OFFSET ?
+                """
+                params.extend([limit, offset])
+
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+
+                conversations = []
+                for row in rows:
+                    conv_data = dict(row)
+                    conv_data['metadata'] = json.loads(conv_data['metadata'] or '{}')
+                    conversations.append(conv_data)
+
+                return conversations, total_count
+
+        except Exception as e:
+            logger.error(f"Failed to get conversations: {e}")
+            return [], 0
+
+    def get_conversation_by_id(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific conversation by ID"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM conversations WHERE conversation_id = ?", (conversation_id,))
+
+                row = cursor.fetchone()
+                if row:
+                    conv_data = dict(row)
+                    conv_data['metadata'] = json.loads(conv_data['metadata'] or '{}')
+                    return conv_data
+
+                return None
+
+        except Exception as e:
+            logger.error(f"Failed to get conversation by ID: {e}")
+            return None
+
+    def delete_conversation(self, conversation_id: str) -> bool:
+        """Delete a conversation by ID"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM conversations WHERE conversation_id = ?", (conversation_id,))
+                conn.commit()
+
+                deleted_count = cursor.rowcount
+                if deleted_count > 0:
+                    logger.info(f"Conversation deleted: {conversation_id}")
+                    return True
+                else:
+                    logger.warning(f"Conversation not found: {conversation_id}")
+                    return False
+
+        except Exception as e:
+            logger.error(f"Failed to delete conversation: {e}")
+            return False
 
 
 # Global database manager instance

@@ -392,6 +392,7 @@ class LLMClient:
         
     async def generate_response(self, prompt: str, temperature: float = 0.7, max_tokens: int = 1000) -> str:
         """Generate response from LLM"""
+        logger.debug(f"Generating response using {self.llm_type} model")
         try:
             if self.llm_type == "ollama":
                 return await self._call_ollama(prompt, temperature, max_tokens)
@@ -425,12 +426,14 @@ class LLMClient:
             },
             "think": False
         }
-        
+
+        # logger.debug(f"Calling Ollama API with payload: {payload}")
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=payload) as response:
                     if response.status == 200:
                         result = await response.json()
+                        # logger.debug(f"Ollama response: {result}")
                         return result.get("response", "")
                     else:
                         logger.error(f"Ollama API error: {response.status}")

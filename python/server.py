@@ -23,6 +23,7 @@ from loguru import logger
 from controllers.system_controller import system_router
 from controllers.files_controller import files_router
 from controllers.search_controller import search_router
+from controllers.chat_controller import chat_router
 # 导入配置
 from config import settings
 # 导入数据库管理器
@@ -74,6 +75,7 @@ class APIResponse(BaseModel):
 app.include_router(system_router)
 app.include_router(files_router)
 app.include_router(search_router)
+app.include_router(chat_router)
 
 @app.get("/")
 async def root():
