@@ -34,6 +34,7 @@ class ConfigUpdateRequest(BaseModel):
     chunk_overlap: Optional[int] = None
     similarity_threshold: Optional[float] = None
     max_file_size_mb: Optional[int] = None
+    pandoc_path: Optional[str] = None
 
 @system_router.get("/status")
 async def get_system_status():
@@ -111,6 +112,9 @@ async def get_system_status():
 async def get_system_config():
     """获取系统配置信息"""
     try:
+        # 计算默认 pandoc 路径
+        default_pandoc_path = str(PROJECT_ROOT / "bin" / "pandoc.exe")
+        
         config = {
             "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
             "llm_model": "not_configured",
@@ -121,6 +125,7 @@ async def get_system_config():
             "chunk_overlap": 200,
             "similarity_threshold": 0.7,
             "max_file_size_mb": 50,
+            "pandoc_path": default_pandoc_path,
             "supported_file_types": [
                 ".txt", ".md", ".pdf", ".docx", ".doc", 
                 ".html", ".htm", ".rtf", ".odt"
@@ -151,6 +156,7 @@ async def update_system_config(request: ConfigUpdateRequest):
     """更新系统配置"""
     try:
         # 获取当前配置
+        default_pandoc_path = str(PROJECT_ROOT / "bin" / "pandoc.exe")
         current_config = {
             "llm_type": "local",
             "llm_endpoint": "http://localhost:11434",
@@ -158,7 +164,8 @@ async def update_system_config(request: ConfigUpdateRequest):
             "chunk_size": 1000,
             "chunk_overlap": 200,
             "similarity_threshold": 0.7,
-            "max_file_size_mb": 50
+            "max_file_size_mb": 50,
+            "pandoc_path": default_pandoc_path
         }
         
         # 更新配置
@@ -166,7 +173,7 @@ async def update_system_config(request: ConfigUpdateRequest):
         restart_required = False
         
         # 定义需要重启的配置项
-        restart_required_fields = {"llm_type", "llm_endpoint", "chunk_size"}
+        restart_required_fields = {"llm_type", "llm_endpoint", "chunk_size", "pandoc_path"}
         
         for field, value in request.dict(exclude_unset=True).items():
             if value is not None:

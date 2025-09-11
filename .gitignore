@@ -6,3 +6,4 @@ python/venv
 workdir
 database
 __pycache__
+bin

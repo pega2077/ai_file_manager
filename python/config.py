@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     chunk_size: int = Field(default=1000, env="CHUNK_SIZE")
     chunk_overlap: int = Field(default=200, env="CHUNK_OVERLAP")
     max_file_size_mb: int = Field(default=50, env="MAX_FILE_SIZE_MB")
+    pandoc_path: str = Field(default="", env="PANDOC_PATH")  # 将在 __init__ 中设置默认路径
     
     # Embedding配置
     embedding_model: str = Field(
@@ -69,6 +70,9 @@ class Settings(BaseSettings):
         
         if self.logs_path is None:
             self.logs_path = self.project_root / "logs"
+        
+        if not self.pandoc_path:  # 如果 pandoc_path 为空，设置默认路径
+            self.pandoc_path = str(self.project_root / "bin" / "pandoc.exe")
     
     def create_directories(self):
         """创建必要的目录"""
@@ -93,6 +97,7 @@ class Settings(BaseSettings):
             "chunk_overlap": self.chunk_overlap,
             "similarity_threshold": self.similarity_threshold,
             "max_file_size_mb": self.max_file_size_mb,
+            "pandoc_path": self.pandoc_path,
             "supported_file_types": self.supported_file_types,
             "workdir_path": str(self.workdir_path),
             "database_path": str(self.database_path)
@@ -106,7 +111,7 @@ class Settings(BaseSettings):
         # 定义需要重启的配置项
         restart_required_fields = {
             "embedding_model", "llm_type", "llm_endpoint", 
-            "database_path", "workdir_path"
+            "database_path", "workdir_path", "pandoc_path"
         }
         
         for key, value in updates.items():
