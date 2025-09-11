@@ -13,6 +13,8 @@ from loguru import logger
 
 # 导入公共工具
 from commons import create_response
+# 导入配置
+from config import settings
 
 # 项目配置
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -41,8 +43,8 @@ async def get_system_status():
     """获取系统运行状态"""
     try:
         # 检查目录是否存在
-        workdir_exists = WORKDIR_PATH.exists()
-        database_dir_exists = DATABASE_PATH.exists()
+        workdir_exists = settings.workdir_path.exists()
+        database_dir_exists = settings.database_path.exists()
         
         # 计算运行时间
         uptime_seconds = int(time.time() - START_TIME)
@@ -78,7 +80,7 @@ async def get_system_status():
         # 如果workdir存在，统计文件数量
         if workdir_exists:
             try:
-                file_count = len([f for f in WORKDIR_PATH.rglob("*") if f.is_file()])
+                file_count = len([f for f in settings.workdir_path.rglob("*") if f.is_file()])
                 statistics["total_files"] = file_count
             except Exception as e:
                 logger.warning(f"Unable to count files: {e}")
@@ -112,27 +114,8 @@ async def get_system_status():
 async def get_system_config():
     """获取系统配置信息"""
     try:
-        # 计算默认 pandoc 路径
-        default_pandoc_path = str(PROJECT_ROOT / "bin" / "pandoc.exe")
-        
-        config = {
-            "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
-            "llm_model": "not_configured",
-            "llm_type": "local",
-            "llm_endpoint": "http://localhost:11434",
-            "llm_api_key": "",
-            "chunk_size": 1000,
-            "chunk_overlap": 200,
-            "similarity_threshold": 0.7,
-            "max_file_size_mb": 50,
-            "pandoc_path": default_pandoc_path,
-            "supported_file_types": [
-                ".txt", ".md", ".pdf", ".docx", ".doc", 
-                ".html", ".htm", ".rtf", ".odt"
-            ],
-            "workdir_path": str(WORKDIR_PATH),
-            "database_path": str(DATABASE_PATH)
-        }
+        # 使用配置文件中的数据
+        config = settings.get_config_dict()
         
         return create_response(
             message="System configuration retrieved successfully",
@@ -155,41 +138,21 @@ async def get_system_config():
 async def update_system_config(request: ConfigUpdateRequest):
     """更新系统配置"""
     try:
-        # 获取当前配置
-        default_pandoc_path = str(PROJECT_ROOT / "bin" / "pandoc.exe")
-        current_config = {
-            "llm_type": "local",
-            "llm_endpoint": "http://localhost:11434",
-            "llm_api_key": "",
-            "chunk_size": 1000,
-            "chunk_overlap": 200,
-            "similarity_threshold": 0.7,
-            "max_file_size_mb": 50,
-            "pandoc_path": default_pandoc_path
-        }
+        # 准备更新数据
+        updates = request.dict(exclude_unset=True)
         
-        # 更新配置
-        updated_config = current_config.copy()
-        restart_required = False
+        # 使用配置文件的更新方法
+        result = settings.update_config(updates)
         
-        # 定义需要重启的配置项
-        restart_required_fields = {"llm_type", "llm_endpoint", "chunk_size", "pandoc_path"}
-        
-        for field, value in request.dict(exclude_unset=True).items():
-            if value is not None:
-                old_value = updated_config.get(field)
-                updated_config[field] = value
-                
-                if field in restart_required_fields and old_value != value:
-                    restart_required = True
-                
-                logger.info(f"Configuration updated: {field} = {value}")
+        # 获取更新后的配置
+        updated_config = settings.get_config_dict()
         
         return create_response(
             message="System configuration updated successfully",
             data={
                 "updated_config": updated_config,
-                "restart_required": restart_required
+                "updated_fields": result["updated_fields"],
+                "restart_required": result["restart_required"]
             }
         )
         

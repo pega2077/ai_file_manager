@@ -4,8 +4,14 @@
 import os
 from pathlib import Path
 from typing import Dict, Any, Optional
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 from loguru import logger
+from dotenv import load_dotenv
+
+# 显式加载 .env 文件
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 
 class Settings(BaseSettings):
@@ -84,6 +90,23 @@ class Settings(BaseSettings):
                 logger.info(f"目录已创建或已存在: {directory}")
             except Exception as e:
                 logger.error(f"创建目录失败 {directory}: {e}")
+    
+    def ensure_env_file(self):
+        """确保 .env 文件存在，如果不存在则从 .env.example 复制"""
+        env_file = Path(__file__).parent / ".env"
+        env_example = Path(__file__).parent / ".env.example"
+        
+        if not env_file.exists() and env_example.exists():
+            try:
+                import shutil
+                shutil.copy2(env_example, env_file)
+                logger.info(f"已从模板创建 .env 文件: {env_file}")
+            except Exception as e:
+                logger.error(f"创建 .env 文件失败: {e}")
+        elif not env_file.exists():
+            logger.warning(f".env 文件不存在，请手动创建: {env_file}")
+        else:
+            logger.info(f".env 文件已存在: {env_file}")
     
     def get_config_dict(self) -> Dict[str, Any]:
         """获取配置字典"""

@@ -7,3 +7,4 @@ workdir
 database
 __pycache__
 bin
+.env

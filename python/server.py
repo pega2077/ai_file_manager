@@ -7,6 +7,10 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional
 from pathlib import Path
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +21,8 @@ from loguru import logger
 
 # 导入控制器
 from controllers.system_controller import system_router
+# 导入配置
+from config import settings
 
 # 导入公共工具
 from commons import create_response
@@ -97,12 +103,17 @@ async def internal_error_handler(request, exc):
     )
 
 def init_directories():
-    """初始化必要的目录"""
+    """初始化必要的目录和配置文件"""
     try:
-        WORKDIR_PATH.mkdir(parents=True, exist_ok=True)
-        DATABASE_PATH.mkdir(parents=True, exist_ok=True)
-        logger.info(f"工作目录: {WORKDIR_PATH}")
-        logger.info(f"数据库目录: {DATABASE_PATH}")
+        # 确保 .env 文件存在
+        settings.ensure_env_file()
+        
+        # 使用设置中的路径创建目录
+        settings.create_directories()
+        
+        logger.info(f"工作目录: {settings.workdir_path}")
+        logger.info(f"数据库目录: {settings.database_path}")
+        logger.info(f"日志目录: {settings.logs_path}")
     except Exception as e:
         logger.error(f"初始化目录失败: {e}")
         raise
@@ -110,10 +121,10 @@ def init_directories():
 if __name__ == "__main__":
     # 配置日志
     logger.add(
-        PROJECT_ROOT / "logs" / "server.log",
+        settings.logs_path / "server.log",
         rotation="1 day",
         retention="7 days",
-        level="INFO"
+        level="DEBUG" if settings.debug else "INFO"
     )
     
     # 初始化目录
@@ -124,8 +135,8 @@ if __name__ == "__main__":
     # 启动服务
     uvicorn.run(
         "server:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True,
-        log_level="info"
+        host=settings.host,
+        port=settings.port,
+        reload=settings.debug,
+        log_level="debug" if settings.debug else "info"
     )
