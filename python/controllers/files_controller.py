@@ -123,11 +123,11 @@ class FileManager:
             logger.error(f"Error copying file to temp: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to copy file to temp: {str(e)}")
     
-    def convert_to_markdown(self, file_path: Path) -> Optional[str]:
-        """Convert document to markdown format"""
+    def convert_to_markdown(self, file_path: Path, output_path: Path) -> tuple[bool, Optional[str]]:
+        """Convert document to markdown format and save to output path"""
         try:
             if self.is_text_file(file_path):
-                # For text files, read directly
+                # For text files, read directly and convert
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 
@@ -136,40 +136,45 @@ class FileManager:
                     lines = content.split('\n')
                     # Simple conversion: treat empty lines as paragraph breaks
                     markdown_content = '\n\n'.join([line for line in lines if line.strip()])
-                    return markdown_content
                 else:
-                    return content
+                    markdown_content = content
+                
+                # Save to output path
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    f.write(markdown_content)
+                
+                logger.info(f"Text file converted to markdown: {file_path} -> {output_path}")
+                return True, markdown_content
             
             elif self.is_document_type(file_path):
-                # Use converter for other document types - create temp output file
-                temp_md_path = file_path.parent / f"{file_path.stem}_temp.md"
-                
+                # Use pandoc converter for other document types
                 try:
-                    success, message = self.converter.convert_to_markdown(str(file_path), str(temp_md_path))
-                    if success and temp_md_path.exists():
-                        with open(temp_md_path, 'r', encoding='utf-8') as f:
+                    success, message = self.converter.convert_to_markdown(str(file_path), str(output_path))
+                    if success and output_path.exists():
+                        # Read the converted content for analysis
+                        with open(output_path, 'r', encoding='utf-8') as f:
                             markdown_content = f.read()
-                        # Clean up temp file
-                        temp_md_path.unlink()
-                        return markdown_content
+                        
+                        logger.info(f"Document converted to markdown using pandoc: {file_path} -> {output_path}")
+                        return True, markdown_content
                     else:
                         logger.error(f"Pandoc conversion failed: {message}")
-                        return None
+                        return False, None
                         
                 except Exception as e:
                     logger.error(f"Error in pandoc conversion: {e}")
-                    # Clean up temp file if it exists
-                    if temp_md_path.exists():
-                        temp_md_path.unlink()
-                    return None
+                    return False, None
             
             else:
                 logger.warning(f"File type not supported for conversion: {file_path.suffix}")
-                return None
+                # For unsupported types, just copy the file
+                shutil.copy2(file_path, output_path)
+                logger.info(f"File copied without conversion: {file_path} -> {output_path}")
+                return True, None
                 
         except Exception as e:
             logger.error(f"Error converting file to markdown: {e}")
-            return None
+            return False, None
     
     def get_workdir_categories(self) -> List[str]:
         """Get existing category directories in workdir"""
@@ -340,6 +345,34 @@ Example response format:
         except Exception as e:
             logger.error(f"Error moving file: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to move file: {str(e)}")
+    
+    def convert_and_save_to_category(self, source_file_path: Path, category: str, original_filename: str) -> tuple[Path, Optional[str]]:
+        """Convert file to markdown and save directly to category directory"""
+        category_path = self.workdir / category
+        category_path.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique filename for markdown output
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_name = Path(original_filename).stem
+        
+        # Always save as .md file
+        final_filename = f"{base_name}_{timestamp}.md"
+        final_path = category_path / final_filename
+        
+        try:
+            # Convert to markdown and save directly
+            success, content = self.convert_to_markdown(source_file_path, final_path)
+            
+            if success:
+                logger.info(f"File converted and saved to: {final_path}")
+                return final_path, content
+            else:
+                logger.error(f"Failed to convert file: {source_file_path}")
+                raise HTTPException(status_code=500, detail=f"Failed to convert file to markdown")
+        
+        except Exception as e:
+            logger.error(f"Error converting and saving file: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to convert and save file: {str(e)}")
 
 # Initialize file manager
 file_manager = FileManager()
@@ -447,27 +480,27 @@ async def import_file(request: FileImportRequestBody):
                 detail=f"File too large. Maximum size: {settings.max_file_size_mb}MB"
             )
         
-        # Copy file to temp directory
-        temp_file_path = file_manager.copy_file_to_temp(source_file_path)
-        
         # Get file info
         filename = source_file_path.name
         file_tags = request.tags
         
         # Check if it's a document type
-        is_document = file_manager.is_document_type(temp_file_path)
-        markdown_content = None
+        is_document = file_manager.is_document_type(source_file_path)
         
-        if is_document:
-            # Convert to markdown
-            markdown_content = file_manager.convert_to_markdown(temp_file_path)
-            if not markdown_content:
-                logger.warning(f"Failed to convert document to markdown: {filename}")
-        
-        logger.info(f"Processing file: {filename}, size: {file_size} bytes, is_document: {is_document}, content preview: {markdown_content[:100] if markdown_content else 'N/A'}")
+        logger.info(f"Processing file: {filename}, size: {file_size} bytes, is_document: {is_document}")
 
-        # Get existing categories
+        # Get existing categories for LLM analysis
         existing_categories = file_manager.get_workdir_categories()
+        
+        # For content analysis, we need to get a preview first
+        markdown_content = None
+        if is_document and file_manager.is_text_file(source_file_path):
+            # For text files, read content for analysis
+            try:
+                with open(source_file_path, 'r', encoding='utf-8') as f:
+                    markdown_content = f.read()[:2000]  # Preview for analysis
+            except Exception as e:
+                logger.warning(f"Could not read file for content analysis: {e}")
         
         # Determine final category
         final_category = request.category
@@ -486,26 +519,29 @@ async def import_file(request: FileImportRequestBody):
         if not final_category:
             final_category = "Uncategorized"
         
-        # Move file to appropriate directory
+        # Create category directory if it doesn't exist
         if category_suggestion and not category_suggestion.existing_category:
-            # Create new category directory
+            file_manager.create_category_directory(final_category)
+        elif final_category not in existing_categories:
             file_manager.create_category_directory(final_category)
         
-        final_file_path = file_manager.move_file_to_category(
-            temp_file_path, 
+        # Convert and save file directly to category directory
+        final_file_path, full_markdown_content = file_manager.convert_and_save_to_category(
+            source_file_path, 
             final_category, 
             filename
         )
         
         # Create file info response
+        final_file_size = final_file_path.stat().st_size
         file_info = FileInfo(
             file_id=str(uuid.uuid4()),
-            name=filename,
+            name=final_file_path.name,  # Use the actual saved filename (with .md extension)
             path=str(final_file_path.relative_to(settings.workdir_path)),
-            type=mimetypes.guess_type(filename)[0] or "application/octet-stream",
-            size=file_size,
+            type="text/markdown",  # Always markdown now
+            size=final_file_size,  # Size of the converted file
             category=final_category,
-            summary=f"Imported from {request.file_path}" + (
+            summary=f"Converted from {filename} and imported from {request.file_path}" + (
                 f" - {category_suggestion.reason}" if category_suggestion else ""
             ),
             tags=file_tags,
@@ -513,10 +549,10 @@ async def import_file(request: FileImportRequestBody):
             processed=True
         )
         
-        logger.info(f"File imported successfully: {filename} -> {final_category}")
+        logger.info(f"File imported and converted successfully: {filename} -> {final_category}/{final_file_path.name}")
         
         return create_success_response(
-            message="File imported successfully",
+            message="File imported and converted to markdown successfully",
             data=file_info.dict()
         )
         
@@ -524,9 +560,6 @@ async def import_file(request: FileImportRequestBody):
         raise
     except Exception as e:
         logger.error(f"Error importing file: {e}")
-        # Clean up temp file if it exists
-        if 'temp_file_path' in locals() and temp_file_path.exists():
-            temp_file_path.unlink()
         
         return create_error_response(
             message="Failed to import file",
