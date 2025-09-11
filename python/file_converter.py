@@ -91,8 +91,8 @@ class FileConverter:
         Args:
             pandoc_path: Pandoc 可执行文件路径，如果为 None 则使用系统默认路径
         """
-        self.pandoc_path = pandoc_path or self._get_default_pandoc_path()
         self.platform = platform.system().lower()
+        self.pandoc_path = pandoc_path or self._get_default_pandoc_path()
         logger.info(f"文件转换器初始化完成，平台: {self.platform}, Pandoc路径: {self.pandoc_path}")
     
     def _get_default_pandoc_path(self) -> str:

@@ -21,6 +21,7 @@ from loguru import logger
 
 # 导入控制器
 from controllers.system_controller import system_router
+from controllers.files_controller import files_router
 # 导入配置
 from config import settings
 
@@ -58,6 +59,7 @@ class APIResponse(BaseModel):
 
 # 注册路由
 app.include_router(system_router)
+app.include_router(files_router)
 
 @app.get("/")
 async def root():
