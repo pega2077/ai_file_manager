@@ -15,6 +15,12 @@ from pydantic import BaseModel
 import uvicorn
 from loguru import logger
 
+# 导入控制器
+from controllers.system_controller import system_router
+
+# 导入公共工具
+from commons import create_response
+
 # 项目配置
 PROJECT_ROOT = Path(__file__).parent.parent
 WORKDIR_PATH = PROJECT_ROOT / "workdir"
@@ -35,9 +41,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 服务启动时间
-START_TIME = time.time()
-
 # 响应模型
 class APIResponse(BaseModel):
     success: bool
@@ -47,21 +50,8 @@ class APIResponse(BaseModel):
     timestamp: str
     request_id: str
 
-def create_response(
-    success: bool = True,
-    message: str = "",
-    data: Any = None,
-    error: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
-    """创建统一格式的API响应"""
-    return {
-        "success": success,
-        "message": message,
-        "data": data,
-        "error": error,
-        "timestamp": datetime.now().isoformat(),
-        "request_id": str(uuid.uuid4())
-    }
+# 注册路由
+app.include_router(system_router)
 
 @app.get("/")
 async def root():
@@ -71,116 +61,7 @@ async def root():
         data={"version": "1.0.0", "status": "running"}
     )
 
-@app.get("/api/system/status")
-async def get_system_status():
-    """获取系统运行状态"""
-    try:
-        # 检查目录是否存在
-        workdir_exists = WORKDIR_PATH.exists()
-        database_dir_exists = DATABASE_PATH.exists()
-        
-        # 计算运行时间
-        uptime_seconds = int(time.time() - START_TIME)
-        
-        # 检查数据库连接状态（暂时模拟）
-        database_status = "connected" if database_dir_exists else "disconnected"
-        
-        # 模拟各服务状态
-        services = {
-            "database": database_status,
-            "vector_db": "disconnected",  # 暂未实现
-            "embedding_model": "error",   # 暂未加载
-            "llm_model": "error"          # 暂未配置
-        }
-        
-        # 确定整体健康状态
-        if services["database"] == "connected":
-            if services["vector_db"] == "connected" and services["embedding_model"] == "loaded":
-                status = "healthy"
-            else:
-                status = "degraded"
-        else:
-            status = "unhealthy"
-        
-        # 统计信息（暂时模拟）
-        statistics = {
-            "total_files": 0,
-            "total_chunks": 0,
-            "total_embeddings": 0,
-            "storage_used_mb": 0
-        }
-        
-        # 如果workdir存在，统计文件数量
-        if workdir_exists:
-            try:
-                file_count = len([f for f in WORKDIR_PATH.rglob("*") if f.is_file()])
-                statistics["total_files"] = file_count
-            except Exception as e:
-                logger.warning(f"无法统计文件数量: {e}")
-        
-        system_status = {
-            "status": status,
-            "services": services,
-            "statistics": statistics,
-            "version": "1.0.0",
-            "uptime_seconds": uptime_seconds
-        }
-        
-        return create_response(
-            message="系统状态获取成功",
-            data=system_status
-        )
-        
-    except Exception as e:
-        logger.error(f"获取系统状态失败: {e}")
-        return create_response(
-            success=False,
-            message="获取系统状态失败",
-            error={
-                "code": "INTERNAL_ERROR",
-                "message": str(e),
-                "details": None
-            }
-        )
 
-@app.get("/api/system/config")
-async def get_system_config():
-    """获取系统配置信息"""
-    try:
-        config = {
-            "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
-            "llm_model": "not_configured",
-            "llm_type": "local",
-            "llm_endpoint": "http://localhost:11434",
-            "llm_api_key": "",
-            "chunk_size": 1000,
-            "chunk_overlap": 200,
-            "similarity_threshold": 0.7,
-            "max_file_size_mb": 50,
-            "supported_file_types": [
-                ".txt", ".md", ".pdf", ".docx", ".doc", 
-                ".html", ".htm", ".rtf", ".odt"
-            ],
-            "workdir_path": str(WORKDIR_PATH),
-            "database_path": str(DATABASE_PATH)
-        }
-        
-        return create_response(
-            message="系统配置获取成功",
-            data=config
-        )
-        
-    except Exception as e:
-        logger.error(f"获取系统配置失败: {e}")
-        return create_response(
-            success=False,
-            message="获取系统配置失败",
-            error={
-                "code": "INTERNAL_ERROR",
-                "message": str(e),
-                "details": None
-            }
-        )
 
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
