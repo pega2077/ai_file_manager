@@ -36,10 +36,13 @@ class Settings(BaseSettings):
     
     # Embedding配置
     embedding_model: str = Field(
-        default="sentence-transformers/all-MiniLM-L6-v2", 
+        default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", 
         env="EMBEDDING_MODEL"
     )
     embedding_dimension: int = Field(default=384, env="EMBEDDING_DIMENSION")
+    embedding_local_path: Optional[str] = Field(default=None, env="EMBEDDING_LOCAL_PATH")
+    embedding_cache_dir: Optional[str] = Field(default=None, env="EMBEDDING_CACHE_DIR")
+    huggingface_hub_url: str = Field(default="https://hf-mirror.com", env="HF_ENDPOINT")
     
     # 搜索配置
     similarity_threshold: float = Field(default=0.7, env="SIMILARITY_THRESHOLD")
