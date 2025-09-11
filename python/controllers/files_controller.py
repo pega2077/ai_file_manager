@@ -384,120 +384,143 @@ async def process_file_embeddings(file_id: str, content: str, file_path: str, ca
         from embedding import get_embedding_generator
         from vector_db import VectorDatabase
         from config import settings
-        
+
         # Initialize components
         embedding_gen = get_embedding_generator()
-        vector_db = VectorDatabase(settings.database_path / "vectors")
-        
+        vector_db = VectorDatabase(settings.database_path / "vectors", dimension=384)
+
         # Initialize vector database if not loaded
         if not vector_db.initialize():
             raise Exception("Failed to initialize vector database")
-        
-        # Split content into chunks for better embedding quality
-        chunks = split_text_into_chunks(content, max_length=512, overlap=50)
-        
+
+        # Split content into chunks using improved method (similar to chinese_rag.py)
+        chunks = split_text_into_chunks_improved(content, max_length=512)
+
         if not chunks:
             logger.warning(f"No content chunks generated for file: {file_id}")
             return
-        
+
         logger.info(f"Processing {len(chunks)} chunks for file: {file_id}")
-        
+
         # Generate embeddings for all chunks
-        chunk_texts = [chunk['text'] for chunk in chunks]
-        embeddings = embedding_gen.generate_embeddings_batch(chunk_texts)
-        
-        if not embeddings or all(emb is None for emb in embeddings):
-            raise Exception("Failed to generate embeddings for file content")
-        
-        # Prepare embedding data for vector database
         embeddings_data = []
-        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-            if embedding is not None:
+        for i, chunk in enumerate(chunks):
+            try:
+                # Generate embedding for single chunk
+                embedding = embedding_gen.generate_embedding(chunk)
+                if embedding is None:
+                    logger.warning(f"Failed to generate embedding for chunk {i} of file: {file_id}")
+                    continue
+
                 embedding_id = f"{file_id}_chunk_{i}"
                 metadata = {
                     "file_id": file_id,
                     "chunk_id": embedding_id,
                     "chunk_index": i,
-                    "content": chunk['text'][:200],  # Store preview of content
-                    "full_content": chunk['text'],
+                    "content": chunk[:200] + "..." if len(chunk) > 200 else chunk,
+                    "full_content": chunk,
                     "file_path": file_path,
                     "category": category,
-                    "start_pos": chunk['start'],
-                    "end_pos": chunk['end'],
-                    "char_count": len(chunk['text']),
+                    "chunk_length": len(chunk),
                     "created_at": datetime.now().isoformat()
                 }
-                
+
                 embeddings_data.append({
                     "embedding_id": embedding_id,
                     "embedding": embedding,
                     "metadata": metadata
                 })
-        
+
+            except Exception as chunk_error:
+                logger.error(f"Error processing chunk {i} for file {file_id}: {chunk_error}")
+                continue
+
         # Store embeddings in vector database
-        success_count = vector_db.add_embeddings_batch(embeddings_data)
-        
-        logger.info(f"Successfully stored {success_count}/{len(embeddings_data)} embeddings for file: {file_id}")
-        
+        if embeddings_data:
+            success_count = vector_db.add_embeddings_batch(embeddings_data)
+            logger.info(f"Successfully stored {success_count}/{len(embeddings_data)} embeddings for file: {file_id}")
+        else:
+            logger.warning(f"No embeddings generated for file: {file_id}")
+
+        # Store chunks in SQLite database
+        try:
+            from database import DatabaseManager
+            db_manager = DatabaseManager()
+
+            chunks_data = []
+            for i, chunk in enumerate(chunks):
+                chunk_data = {
+                    'chunk_id': f"{file_id}_chunk_{i}",
+                    'file_id': file_id,
+                    'chunk_index': i,
+                    'content': chunk,
+                    'content_type': 'text',
+                    'char_count': len(chunk),
+                    'token_count': len(chunk.split()),
+                    'embedding_id': f"{file_id}_chunk_{i}",
+                    'created_at': datetime.now().isoformat()
+                }
+                chunks_data.append(chunk_data)
+
+            # Save chunks to database
+            saved_chunks_count = db_manager.insert_file_chunks(chunks_data)
+            logger.info(f"Successfully stored {saved_chunks_count}/{len(chunks_data)} chunks in SQLite database")
+
+        except Exception as db_error:
+            logger.error(f"Failed to save chunks to SQLite database: {db_error}")
+
         # Update file record to mark as processed
         try:
             from database import DatabaseManager
             db_manager = DatabaseManager()
-            
-            # You might want to add an update method to DatabaseManager
-            # For now, we'll just log that processing is complete
             logger.info(f"File embedding processing completed for: {file_id}")
-            
+
         except Exception as e:
             logger.error(f"Failed to update file processing status: {e}")
-        
+
     except Exception as e:
         logger.error(f"Error processing file embeddings: {e}")
         raise
 
-def split_text_into_chunks(text: str, max_length: int = 512, overlap: int = 50) -> List[Dict[str, Any]]:
-    """Split text into overlapping chunks for embedding processing"""
-    if not text or len(text) <= max_length:
-        return [{"text": text, "start": 0, "end": len(text)}] if text else []
-    
+def split_text_into_chunks_improved(text: str, max_length: int = 512) -> List[str]:
+    """改进的文本分片方法，基于句子分割，避免破坏句子结构"""
+    if not text:
+        return []
+
+    if len(text) <= max_length:
+        return [text]
+
     chunks = []
-    start = 0
-    
-    while start < len(text):
-        # Calculate end position
-        end = min(start + max_length, len(text))
-        
-        # Try to break at sentence or paragraph boundaries if possible
-        if end < len(text):
-            # Look for sentence endings within the last 100 characters
-            search_start = max(start, end - 100)
-            sentence_endings = ['。', '！', '？', '.', '!', '?', '\n\n']
-            
-            best_break = -1
-            for ending in sentence_endings:
-                pos = text.rfind(ending, search_start, end)
-                if pos > best_break:
-                    best_break = pos + 1
-            
-            if best_break > start:
-                end = best_break
-        
-        chunk_text = text[start:end].strip()
-        if chunk_text:
-            chunks.append({
-                "text": chunk_text,
-                "start": start,
-                "end": end
-            })
-        
-        # Move start position with overlap
-        start = max(start + 1, end - overlap)
-        
-        # Prevent infinite loop
-        if start >= len(text):
-            break
-    
-    return chunks
+    sentences = []
+
+    # 按句子分割
+    sentence_endings = ['。', '！', '？', '；', '\n']
+    current_sentence = ""
+
+    for char in text:
+        current_sentence += char
+        if char in sentence_endings:
+            sentences.append(current_sentence.strip())
+            current_sentence = ""
+
+    # 如果还有剩余内容
+    if current_sentence.strip():
+        sentences.append(current_sentence.strip())
+
+    # 合并句子到chunks
+    current_chunk = ""
+    for sentence in sentences:
+        if len(current_chunk) + len(sentence) <= max_length:
+            current_chunk += sentence
+        else:
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+            current_chunk = sentence
+
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+
+    return [chunk for chunk in chunks if chunk]
 
 @files_router.get("/")
 async def files_root():

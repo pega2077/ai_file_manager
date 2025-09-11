@@ -115,11 +115,13 @@ class EmbeddingGenerator:
         try:
             if not self.is_model_loaded():
                 if not self.load_model():
-                    logger.warning("模型未加载，使用随机向量作为fallback")
-                    return np.random.rand(self.dimension).tolist()
+                    raise RuntimeError("Embedding模型加载失败，无法生成embeddings。请检查模型配置和网络连接。")
+            
+            # 预处理中文文本，确保与批量处理保持一致
+            processed_text = self.normalize_chinese_text(text)
             
             # 生成真正的embedding
-            embedding = self.model.encode(text, convert_to_tensor=False)
+            embedding = self.model.encode(processed_text, convert_to_tensor=False, normalize_embeddings=True)
             
             # 确保返回 Python list 格式
             if hasattr(embedding, 'tolist'):
@@ -129,8 +131,7 @@ class EmbeddingGenerator:
             
         except Exception as e:
             logger.error(f"生成embedding失败: {e}")
-            # Fallback到随机向量
-            return np.random.rand(self.dimension).tolist()
+            raise RuntimeError(f"生成embedding失败: {str(e)}")
     
     def generate_embeddings_batch(self, texts: List[str]) -> List[Optional[np.ndarray]]:
         """批量生成embeddings - 更高效的批处理，返回numpy数组"""
@@ -140,8 +141,7 @@ class EmbeddingGenerator:
         try:
             if not self.is_model_loaded():
                 if not self.load_model():
-                    logger.warning("模型未加载，使用随机向量作为fallback")
-                    return [np.random.rand(self.dimension).astype(np.float32) for _ in texts]
+                    raise RuntimeError("Embedding模型加载失败，无法生成embeddings。请检查模型配置和网络连接。")
             
             # 预处理文本
             processed_texts = [self.normalize_chinese_text(text) for text in texts]
@@ -182,8 +182,7 @@ class EmbeddingGenerator:
             
         except Exception as e:
             logger.error(f"批量生成embedding失败: {e}")
-            # Fallback到随机向量
-            return [np.random.rand(self.dimension).astype(np.float32) if text.strip() else None for text in texts]
+            raise RuntimeError(f"批量生成embedding失败: {str(e)}")
 
     def normalize_chinese_text(self, text: str) -> str:
         """Normalize Chinese text for better embedding quality"""

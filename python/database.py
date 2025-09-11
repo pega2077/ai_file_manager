@@ -57,6 +57,8 @@ class DatabaseManager:
                         char_count INTEGER NOT NULL,
                         token_count INTEGER,
                         embedding_id TEXT,
+                        start_pos INTEGER,
+                        end_pos INTEGER,
                         created_at TEXT NOT NULL,
                         FOREIGN KEY (file_id) REFERENCES files (file_id)
                     )
@@ -198,37 +200,46 @@ class DatabaseManager:
             logger.error(f"Failed to list files: {e}")
             return [], 0
     
-    def insert_chunk(self, chunk_info: Dict[str, Any]) -> int:
-        """Insert chunk record"""
+    def insert_file_chunks(self, chunks_data: List[Dict[str, Any]]) -> int:
+        """Insert multiple chunk records for a file"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                cursor.execute("""
-                    INSERT INTO chunks (
-                        chunk_id, file_id, chunk_index, content, content_type,
-                        char_count, token_count, embedding_id, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    chunk_info['chunk_id'],
-                    chunk_info['file_id'],
-                    chunk_info['chunk_index'],
-                    chunk_info['content'],
-                    chunk_info.get('content_type', 'text'),
-                    chunk_info['char_count'],
-                    chunk_info.get('token_count'),
-                    chunk_info.get('embedding_id'),
-                    chunk_info.get('created_at', datetime.now().isoformat())
-                ))
+                # Insert chunks in batch
+                inserted_count = 0
+                for chunk_info in chunks_data:
+                    try:
+                        cursor.execute("""
+                            INSERT INTO chunks (
+                                chunk_id, file_id, chunk_index, content, content_type,
+                                char_count, token_count, embedding_id, start_pos, end_pos, created_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            chunk_info['chunk_id'],
+                            chunk_info['file_id'],
+                            chunk_info['chunk_index'],
+                            chunk_info['content'],
+                            chunk_info.get('content_type', 'text'),
+                            chunk_info['char_count'],
+                            chunk_info.get('token_count'),
+                            chunk_info.get('embedding_id'),
+                            chunk_info.get('start_pos'),
+                            chunk_info.get('end_pos'),
+                            chunk_info.get('created_at', datetime.now().isoformat())
+                        ))
+                        inserted_count += 1
+                        
+                    except Exception as chunk_error:
+                        logger.error(f"Failed to insert chunk {chunk_info.get('chunk_id')}: {chunk_error}")
+                        continue
                 
-                chunk_db_id = cursor.lastrowid
                 conn.commit()
-                
-                logger.info(f"Chunk record inserted: {chunk_info['chunk_id']}")
-                return chunk_db_id
+                logger.info(f"Successfully inserted {inserted_count}/{len(chunks_data)} chunks")
+                return inserted_count
                 
         except Exception as e:
-            logger.error(f"Failed to insert chunk record: {e}")
+            logger.error(f"Failed to insert file chunks: {e}")
             raise
     
     def get_chunks_by_file_id(self, file_id: str) -> List[Dict[str, Any]]:
@@ -248,6 +259,97 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Failed to get chunks for file: {e}")
             return []
+    
+    def get_chunk_by_id(self, chunk_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific chunk by its ID"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM chunks WHERE chunk_id = ?", (chunk_id,))
+                
+                row = cursor.fetchone()
+                return dict(row) if row else None
+                
+        except Exception as e:
+            logger.error(f"Failed to get chunk by ID: {e}")
+            return None
+    
+    def get_chunk_by_index(self, file_id: str, chunk_index: int) -> Optional[Dict[str, Any]]:
+        """Get a specific chunk by file ID and chunk index"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT * FROM chunks 
+                    WHERE file_id = ? AND chunk_index = ?
+                """, (file_id, chunk_index))
+                
+                row = cursor.fetchone()
+                return dict(row) if row else None
+                
+        except Exception as e:
+            logger.error(f"Failed to get chunk by index: {e}")
+            return None
+    
+    def search_chunks_by_content(
+        self, 
+        query: str, 
+        page: int = 1, 
+        limit: int = 20
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Search chunks by content with pagination"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Get total count
+                cursor.execute("""
+                    SELECT COUNT(*) FROM chunks 
+                    WHERE content LIKE ?
+                """, (f"%{query}%",))
+                total_count = cursor.fetchone()[0]
+                
+                # Get paginated results
+                offset = (page - 1) * limit
+                cursor.execute("""
+                    SELECT c.*, f.name as file_name, f.path as file_path, 
+                           f.type as file_type, f.category
+                    FROM chunks c
+                    JOIN files f ON c.file_id = f.file_id
+                    WHERE c.content LIKE ?
+                    ORDER BY 
+                        CASE 
+                            WHEN c.content LIKE ? THEN 1  -- Exact phrase match
+                            WHEN c.content LIKE ? THEN 2  -- Starts with query
+                            ELSE 3                         -- Contains query
+                        END,
+                        LENGTH(c.content) - LENGTH(REPLACE(LOWER(c.content), LOWER(?), '')) DESC
+                    LIMIT ? OFFSET ?
+                """, (
+                    f"%{query}%",
+                    f"{query}%",
+                    f"%{query}%",
+                    query.lower(),
+                    limit, 
+                    offset
+                ))
+                
+                rows = cursor.fetchall()
+                results = []
+                for row in rows:
+                    chunk_dict = dict(row)
+                    # Remove duplicate fields from join
+                    chunk_dict.pop('file_name', None)
+                    chunk_dict.pop('file_path', None)
+                    chunk_dict.pop('file_type', None)
+                    chunk_dict.pop('category', None)
+                    results.append(chunk_dict)
+                
+                return results, total_count
+                
+        except Exception as e:
+            logger.error(f"Failed to search chunks by content: {e}")
+            return [], 0
     
     def update_chunk_embedding_id(self, chunk_id: str, embedding_id: str):
         """Update chunk with embedding ID"""
