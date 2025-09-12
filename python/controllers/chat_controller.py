@@ -22,6 +22,8 @@ from database import DatabaseManager
 from vector_db import VectorDatabase
 # 导入 LLM 客户端
 from embedding import get_llm_client, get_embedding_generator
+# 导入提示词模板管理器
+from prompts import get_prompt_template
 
 # 创建路由器
 chat_router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -77,6 +79,7 @@ _db_manager = None
 _vector_db = None
 _llm_client = None
 _embedding_generator = None
+_prompt_template_manager = None
 
 def get_db_manager() -> DatabaseManager:
     """获取数据库管理器实例"""
@@ -107,6 +110,13 @@ def get_embedding_generator_instance():
         _embedding_generator = get_embedding_generator()
     return _embedding_generator
 
+def get_prompt_template_manager():
+    """获取提示词模板管理器实例"""
+    global _prompt_template_manager
+    if _prompt_template_manager is None:
+        _prompt_template_manager = get_prompt_template()
+    return _prompt_template_manager
+
 @chat_router.post("/ask")
 async def ask_question(request: ChatAskRequest):
     """
@@ -121,6 +131,7 @@ async def ask_question(request: ChatAskRequest):
         vector_db = get_vector_db()
         llm_client = get_llm_client_instance()
         embedding_gen = get_embedding_generator_instance()
+        prompt_template_manager = get_prompt_template_manager()
 
         if not llm_client:
             return create_error_response(
@@ -193,14 +204,11 @@ async def ask_question(request: ChatAskRequest):
         context = "\n\n".join(context_parts)
 
         # 4. 构建提示词
-        prompt = f"""基于以下文档内容回答用户的问题。如果文档中没有相关信息，请说明无法回答。
-
-文档内容：
-{context}
-
-用户问题：{request.question}
-
-请提供准确、简洁的回答，并说明答案的来源。"""
+        prompt = prompt_template_manager.format_template(
+            "chat_qa",
+            context=context,
+            question=request.question
+        )
         # logger.debug(f"构建的提示词: {prompt}")
         # 5. 调用LLM生成回答
         generation_start = time.time()

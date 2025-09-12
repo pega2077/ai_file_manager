@@ -1,0 +1,5 @@
+{
+  "chat_qa": "基于以下文档内容回答用户的问题。如果文档中没有相关信息，请说明无法回答。\n\n文档内容：\n{context}\n\n用户问题：{question}\n\n请提供准确、简洁的回答，并说明答案的来源。",
+  "chat_summary": "请根据以下文档内容生成一个简洁的摘要。\n\n文档内容：\n{content}\n\n摘要：",
+  "chat_translate": "请将以下文本翻译成{target_language}。\n\n原文：\n{text}\n\n翻译："
+}
