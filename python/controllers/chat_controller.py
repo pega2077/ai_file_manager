@@ -58,6 +58,34 @@ class ChatHistoryResponse(BaseModel):
     conversations: List[Dict[str, Any]]
     pagination: Dict[str, Any]
 
+class DirectoryStructureRequest(BaseModel):
+    profession: str = Field(..., description="职业")
+    purpose: str = Field(..., description="文件夹用途")
+    temperature: float = Field(default=0.7, description="LLM 温度参数", ge=0.0, le=2.0)
+    max_tokens: int = Field(default=1000, description="最大生成token数", ge=100, le=4000)
+
+class DirectoryItem(BaseModel):
+    path: str
+    description: str
+
+class DirectoryStructureResponse(BaseModel):
+    directories: List[DirectoryItem]
+    metadata: Dict[str, Any]
+
+class RecommendDirectoryRequest(BaseModel):
+    file_name: str = Field(..., description="文件名称")
+    file_content: str = Field(..., description="文件部分内容")
+    current_structure: Optional[List[str]] = Field(default=None, description="当前目录结构")
+    temperature: float = Field(default=0.7, description="LLM 温度参数", ge=0.0, le=2.0)
+    max_tokens: int = Field(default=500, description="最大生成token数", ge=100, le=2000)
+
+class RecommendDirectoryResponse(BaseModel):
+    recommended_directory: str
+    confidence: float
+    reasoning: str
+    alternatives: List[str]
+    metadata: Dict[str, Any]
+
 class SourceInfo(BaseModel):
     file_id: str
     file_name: str
@@ -306,4 +334,219 @@ async def get_chat_history(request: ChatHistoryRequest):
         return create_error_response(
             f"获取对话历史失败: {str(e)}",
             error_code="INTERNAL_ERROR"
+        )
+
+@chat_router.post("/directory-structure")
+async def recommend_directory_structure(request: DirectoryStructureRequest):
+    """
+    目录结构推荐接口
+    基于职业和用途推荐目录结构
+    """
+    start_time = time.time()
+
+    try:
+        # 获取组件实例
+        llm_client = get_llm_client_instance()
+
+        if not llm_client:
+            return create_error_response(
+                "LLM服务不可用，请检查配置",
+                error_code="LLM_NOT_AVAILABLE"
+            )
+
+        # 构建messages
+        messages = [
+            {
+                "role": "system",
+                "content": "你是一个擅长为不同职业设计、可维护并易于扩展的文件夹/目录结构的助手。输出必须严格符合给定的 JSON Schema。"
+            },
+            {
+                "role": "user",
+                "content": f"""请根据下面输入参数，返回一个推荐的、便于长期维护的目录结构。输出必须仅为 JSON，不要额外文字。
+
+输入参数（JSON）:
+{{
+  "profession": "{request.profession}",
+  "folder_purpose": "{request.purpose}"
+}}
+
+要求：
+- 返回 JSON，主键名为 directories。
+- directories 为数组，数组项包含：path（相对路径，例如 "招聘/简历/待筛选"）、description（用途说明）。
+- 要覆盖常见场景（例如备份、归档、临时、公共/私有等），并给出 4~10 条路径项（视职业复杂度）。
+- 输出必须严格匹配下面的 JSON Schema。"""
+            }
+        ]
+
+        # 设置response_format
+        response_format = {
+            "json_schema": {
+                "name": "directory_schema",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "directories": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "path": {"type": "string"},                          
+                                    "description": {"type": "string"},
+                                },
+                                "required": ["path", "description"]
+                            }
+                        }
+                    },
+                    "required": ["directories"]
+                },
+                "strict": True
+            }
+        }
+
+        # 调用LLM生成推荐
+        generation_start = time.time()
+        response_data = await llm_client.generate_structured_response(
+            messages=messages,
+            temperature=0.2,
+            max_tokens=800,
+            response_format=response_format
+        )
+        generation_time = int((time.time() - generation_start) * 1000)
+        print("got response:")
+        print(response_data)
+        # 检查响应是否包含错误
+        if "error" in response_data:
+            logger.error(f"LLM structured response error: {response_data['error']}")
+            return create_error_response(
+                f"LLM响应错误: {response_data['error']}",
+                error_code="LLM_RESPONSE_ERROR"
+            )
+
+        # 解析directories
+        directories = response_data.get("directories", [])
+        print("directories count:", len(directories))
+        
+        # 转换为DirectoryItem对象
+        directory_items = []
+        for item in directories:
+            if not isinstance(item, dict):
+                logger.warning(f"Invalid directory item format: {item}")
+                continue
+                
+            path = item.get("path")
+            description = item.get("description")
+            
+            if not path or not description:
+                logger.warning(f"Missing required fields in directory item: {item}")
+                continue
+                
+            print("item:", path, description)
+            directory_items.append(DirectoryItem(
+                path=path,
+                description=description
+            ))
+
+        response = DirectoryStructureResponse(
+            directories=directory_items,
+            metadata={
+                "model_used": settings.llm_model or "unknown",
+                "tokens_used": len(str(response_data).split()),
+                "response_time_ms": int((time.time() - start_time) * 1000),
+                "generation_time_ms": generation_time
+            }
+        )
+
+        return create_response(data=response)
+
+    except Exception as e:
+        logger.error(f"目录结构推荐失败: {e}")
+        return create_error_response(
+            f"目录结构推荐失败: {str(e)}",
+            error_code="GENERATION_FAILED"
+        )
+
+@chat_router.post("/recommend-directory")
+async def recommend_directory(request: RecommendDirectoryRequest):
+    """
+    推荐存放目录接口
+    基于文件内容推荐存放目录
+    """
+    start_time = time.time()
+
+    try:
+        # 获取组件实例
+        llm_client = get_llm_client_instance()
+        prompt_template_manager = get_prompt_template_manager()
+
+        if not llm_client:
+            return create_error_response(
+                "LLM服务不可用，请检查配置",
+                error_code="LLM_NOT_AVAILABLE"
+            )
+
+        # 构建当前目录结构字符串
+        current_structure_str = ""
+        if request.current_structure:
+            current_structure_str = "\n".join(request.current_structure)
+
+        # 构建提示词
+        prompt = prompt_template_manager.format_template(
+            "recommend_directory",
+            file_name=request.file_name,
+            file_content=request.file_content[:1000],  # 限制内容长度
+            current_structure=current_structure_str
+        )
+
+        # 调用LLM生成推荐
+        generation_start = time.time()
+        response_text = await llm_client.generate_response(
+            prompt=prompt,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens
+        )
+        generation_time = int((time.time() - generation_start) * 1000)
+
+        # 解析响应
+        # 简单的解析逻辑，假设LLM返回格式：推荐目录: XXX\n置信度: 0.8\n理由: XXX\n备选: XXX,YYY
+        recommended_directory = "未分类"
+        confidence = 0.5
+        reasoning = response_text
+        alternatives = []
+
+        lines = response_text.split('\n')
+        for line in lines:
+            line = line.strip()
+            if line.startswith('推荐目录:') or line.startswith('推荐目录：'):
+                recommended_directory = line.split(':', 1)[1].strip()
+            elif line.startswith('置信度:') or line.startswith('置信度：'):
+                try:
+                    confidence = float(line.split(':', 1)[1].strip())
+                except:
+                    confidence = 0.5
+            elif line.startswith('理由:') or line.startswith('理由：'):
+                reasoning = line.split(':', 1)[1].strip()
+            elif line.startswith('备选:') or line.startswith('备选：'):
+                alt_text = line.split(':', 1)[1].strip()
+                alternatives = [alt.strip() for alt in alt_text.split(',') if alt.strip()]
+
+        response_data = RecommendDirectoryResponse(
+            recommended_directory=recommended_directory,
+            confidence=round(confidence, 2),
+            reasoning=reasoning,
+            alternatives=alternatives,
+            metadata={
+                "model_used": settings.llm_model or "unknown",
+                "tokens_used": len(response_text.split()),
+                "response_time_ms": int((time.time() - start_time) * 1000),
+                "generation_time_ms": generation_time
+            }
+        )
+
+        return create_response(data=response_data)
+
+    except Exception as e:
+        logger.error(f"推荐存放目录失败: {e}")
+        return create_error_response(
+            f"推荐存放目录失败: {str(e)}",
+            error_code="GENERATION_FAILED"
         )

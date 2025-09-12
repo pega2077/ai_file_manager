@@ -412,6 +412,22 @@ class LLMClient:
             logger.error(f"Error generating LLM response: {e}")
             return self._fallback_response(prompt)
     
+    async def generate_structured_response(self, messages: List[Dict[str, Any]], temperature: float = 0.7, max_tokens: int = 1000, response_format: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Generate structured response from LLM with messages and response format"""
+        logger.debug(f"Generating structured response using {self.llm_type} model")
+        try:
+            if self.llm_type == "openai":
+                return await self._call_openai_structured(messages, temperature, max_tokens, response_format)
+            elif self.llm_type == "ollama":
+                return await self._call_ollama_structured(messages, temperature, max_tokens, response_format)
+            else:
+                logger.error(f"Structured response not supported for LLM type: {self.llm_type}")
+                return {"error": f"Structured response not supported for {self.llm_type}"}
+                
+        except Exception as e:
+            logger.error(f"Error generating structured LLM response: {e}")
+            return {"error": str(e)}
+    
     async def _call_ollama(self, prompt: str, temperature: float, max_tokens: int) -> str:
         """Call Ollama API"""
         url = f"{self.llm_endpoint}/api/generate"
@@ -442,6 +458,57 @@ class LLMClient:
             logger.error(f"Error calling Ollama: {e}")
             return self._fallback_response(prompt)
     
+    async def _call_ollama_structured(self, messages: List[Dict[str, Any]], temperature: float, max_tokens: int, response_format: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Call Ollama API with structured response"""
+        url = f"{self.llm_endpoint}/api/generate"
+        
+        # Convert messages to a single prompt string
+        prompt_parts = []
+        for message in messages:
+            role = message.get("role", "user")
+            content = message.get("content", "")
+            if role == "system":
+                prompt_parts.append(f"System: {content}")
+            elif role == "user":
+                prompt_parts.append(f"User: {content}")
+            elif role == "assistant":
+                prompt_parts.append(f"Assistant: {content}")
+        
+        prompt = "\n\n".join(prompt_parts)
+        
+        payload = {
+            "model": self.llm_model or "llama2",
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens
+            },
+            "think": False
+        }
+        
+        # Add format if response_format is provided
+        if response_format:
+            payload["response_format"] = response_format.get("json_schema", {}).get("schema")
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        content = result.get("response", "")
+                        # Try to parse as JSON
+                        try:
+                            return json.loads(content.strip())
+                        except json.JSONDecodeError:
+                            return {"error": "Invalid JSON response", "content": content}
+                    else:
+                        logger.error(f"Ollama API error: {response.status}")
+                        return {"error": f"API error: {response.status}"}
+        except Exception as e:
+            logger.error(f"Error calling Ollama structured: {e}")
+            return {"error": str(e)}
+    
     async def _call_openai(self, prompt: str, temperature: float, max_tokens: int) -> str:
         """Call OpenAI API"""
         url = f"{self.llm_endpoint}/chat/completions"
@@ -470,6 +537,43 @@ class LLMClient:
         except Exception as e:
             logger.error(f"Error calling OpenAI: {e}")
             return self._fallback_response(prompt)
+    
+    async def _call_openai_structured(self, messages: List[Dict[str, Any]], temperature: float, max_tokens: int, response_format: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Call OpenAI API with structured response"""
+        url = f"{self.llm_endpoint}/chat/completions"
+        
+        headers = {
+            "Authorization": f"Bearer {self.llm_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": self.llm_model or "gpt-3.5-turbo",
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+        
+        if response_format:
+            payload["response_format"] = response_format
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, headers=headers) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        content = result["choices"][0]["message"]["content"]
+                        # Try to parse as JSON
+                        try:
+                            return json.loads(content)
+                        except json.JSONDecodeError:
+                            return {"error": "Invalid JSON response", "content": content}
+                    else:
+                        logger.error(f"OpenAI API error: {response.status}")
+                        return {"error": f"API error: {response.status}"}
+        except Exception as e:
+            logger.error(f"Error calling OpenAI structured: {e}")
+            return {"error": str(e)}
     
     async def _call_claude(self, prompt: str, temperature: float, max_tokens: int) -> str:
         """Call Claude API"""

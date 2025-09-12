@@ -58,6 +58,8 @@
 | 搜索检索 | 关键词搜索 | POST | `/api/search/keyword` | 基于关键词的全文搜索 |
 | RAG问答 | 智能问答 | POST | `/api/chat/ask` | 基于RAG的智能问答 |
 | RAG问答 | 对话历史 | POST | `/api/chat/history` | 获取对话历史记录 |
+| RAG问答 | 目录结构推荐 | POST | `/api/chat/directory-structure` | 基于职业和用途推荐目录结构 |
+| RAG问答 | 推荐存放目录 | POST | `/api/chat/recommend-directory` | 基于文件内容推荐存放目录 |
 | 系统管理 | 系统状态 | GET | `/api/system/status` | 获取系统运行状态 |
 | 系统管理 | 系统配置 | GET | `/api/system/config` | 获取系统配置信息 |
 | 系统管理 | 更新配置 | POST | `/api/system/config/update` | 更新系统配置 |
@@ -360,7 +362,7 @@
 }
 ```
 
-## 4. RAG 问答模块接口
+## 4. 问答模块接口
 
 ### 4.1 智能问答
 
@@ -440,6 +442,73 @@
     "total_pages": "number",
     "total_count": "number",
     "limit": "number"
+  }
+}
+```
+
+### 4.3 目录结构推荐
+
+**接口**: `POST /api/chat/directory-structure`
+
+**请求参数**:
+```json
+{
+  "profession": "string",       // 职业，如 "软件工程师"、"设计师"、"教师"
+  "purpose": "string",          // 文件夹用途，如 "项目管理"、"个人资料"、"学习资料"
+  "temperature": "number",      // LLM 温度参数，默认 0.7
+  "max_tokens": "number"        // 最大生成token数，默认 1000
+}
+```
+
+**响应数据**:
+```json
+{
+  "directories": [
+    {
+      "path": "string",          // 相对路径，如 "项目文档/需求分析"
+      "description": "string"    // 用途说明
+    }
+  ],
+  "metadata": {
+    "model_used": "string",
+    "tokens_used": "number",
+    "response_time_ms": "number",
+    "generation_time_ms": "number"
+  }
+}
+```
+
+### 4.4 推荐存放目录
+
+**接口**: `POST /api/chat/recommend-directory`
+
+**请求参数**:
+```json
+{
+  "file_name": "string",        // 文件名称，如 "项目需求文档.pdf"
+  "file_content": "string",     // 文件部分内容（前1000字符）
+  "current_structure": [        // 可选，当前目录结构
+    "string"
+  ],
+  "temperature": "number",      // LLM 温度参数，默认 0.7
+  "max_tokens": "number"        // 最大生成token数，默认 500
+}
+```
+
+**响应数据**:
+```json
+{
+  "recommended_directory": "string",  // 推荐的目录路径，如 "项目文档/需求分析"
+  "confidence": "number",             // 推荐置信度 0-1
+  "reasoning": "string",              // 推荐理由
+  "alternatives": [                   // 备选目录列表
+    "string"
+  ],
+  "metadata": {
+    "model_used": "string",
+    "tokens_used": "number",
+    "response_time_ms": "number",
+    "generation_time_ms": "number"
   }
 }
 ```

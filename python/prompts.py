@@ -66,7 +66,30 @@ class PromptTemplate:
 原文：
 {text}
 
-翻译："""
+翻译：""",
+
+            "directory_structure": """请为{profession}推荐一个适合{purpose}的目录结构。
+
+请提供一个清晰的分层目录结构，使用以下格式：
+- 主要目录
+- 主要目录/子目录
+- 主要目录/子目录/子子目录
+
+请确保目录结构合理、实用，并简要说明推荐理由。""",
+
+            "recommend_directory": """请根据文件名称和内容，推荐最合适的存放目录。
+
+文件名称：{file_name}
+文件内容：{file_content}
+
+当前目录结构：
+{current_structure}
+
+请以以下格式回复：
+推荐目录: [目录路径]
+置信度: [0-1之间的数值]
+理由: [推荐理由]
+备选: [备选目录1,备选目录2,...]"""
         }
 
     def get_template(self, template_name: str) -> str:
