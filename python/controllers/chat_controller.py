@@ -211,11 +211,13 @@ async def ask_question(request: ChatAskRequest):
         sources = []
 
         for result in search_results:
-            chunk_id = result['metadata'].get('chunk_id')
-            if not chunk_id:
+            # 从向量数据库结果中获取 embedding_id
+            embedding_id = result.get('embedding_id', '')
+            if not embedding_id:
                 continue
                 
-            chunk_data = db_manager.get_chunk_by_id(chunk_id)
+            # 根据 embedding_id 从 SQLite 获取完整的 chunk 信息
+            chunk_data = db_manager.get_chunk_by_embedding_id(embedding_id)
 
             if chunk_data:
                 # 获取文件信息
@@ -227,7 +229,7 @@ async def ask_question(request: ChatAskRequest):
                         "file_id": file_data['file_id'],
                         "file_name": file_data['name'],
                         "file_path": file_data['path'],
-                        "chunk_id": chunk_id,
+                        "chunk_id": chunk_data['chunk_id'],
                         "chunk_content": chunk_data['content'][:200] + "..." if len(chunk_data['content']) > 200 else chunk_data['content'],
                         "chunk_index": chunk_data['chunk_index'],
                         "relevance_score": result['similarity_score']

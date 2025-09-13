@@ -308,6 +308,23 @@ class DatabaseManager:
             logger.error(f"Failed to get chunk by index: {e}")
             return None
     
+    def get_chunk_by_embedding_id(self, embedding_id: str) -> Optional[Dict[str, Any]]:
+        """Get a chunk by its embedding ID"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT * FROM chunks 
+                    WHERE embedding_id = ?
+                """, (embedding_id,))
+                
+                row = cursor.fetchone()
+                return dict(row) if row else None
+                
+        except Exception as e:
+            logger.error(f"Failed to get chunk by embedding ID: {e}")
+            return None
+    
     def search_chunks_by_content(
         self, 
         query: str, 

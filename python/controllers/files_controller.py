@@ -413,22 +413,11 @@ async def process_file_embeddings(file_id: str, content: str, file_path: str, ca
                     continue
 
                 embedding_id = f"{file_id}_chunk_{i}"
-                metadata = {
-                    "file_id": file_id,
-                    "chunk_id": embedding_id,
-                    "chunk_index": i,
-                    "content": chunk[:200] + "..." if len(chunk) > 200 else chunk,
-                    "full_content": chunk,
-                    "file_path": file_path,
-                    "category": category,
-                    "chunk_length": len(chunk),
-                    "created_at": datetime.now().isoformat()
-                }
 
                 embeddings_data.append({
                     "embedding_id": embedding_id,
                     "embedding": embedding,
-                    "metadata": metadata
+                    "metadata": {}  # 向量数据库中不再存储metadata，只存储embedding_id用于关联
                 })
 
             except Exception as chunk_error:
@@ -442,7 +431,7 @@ async def process_file_embeddings(file_id: str, content: str, file_path: str, ca
         else:
             logger.warning(f"No embeddings generated for file: {file_id}")
 
-        # Store chunks in SQLite database
+        # Store chunks metadata in SQLite database only
         try:
             from database import DatabaseManager
             db_manager = DatabaseManager()
@@ -458,16 +447,18 @@ async def process_file_embeddings(file_id: str, content: str, file_path: str, ca
                     'char_count': len(chunk),
                     'token_count': len(chunk.split()),
                     'embedding_id': f"{file_id}_chunk_{i}",
+                    'file_path': file_path,
+                    'category': category,
                     'created_at': datetime.now().isoformat()
                 }
                 chunks_data.append(chunk_data)
 
             # Save chunks to database
             saved_chunks_count = db_manager.insert_file_chunks(chunks_data)
-            logger.info(f"Successfully stored {saved_chunks_count}/{len(chunks_data)} chunks in SQLite database")
+            logger.info(f"Successfully stored {saved_chunks_count}/{len(chunks_data)} chunks metadata in SQLite database")
 
         except Exception as db_error:
-            logger.error(f"Failed to save chunks to SQLite database: {db_error}")
+            logger.error(f"Failed to save chunks metadata to SQLite database: {db_error}")
 
         # Update file record to mark as processed
         try:
@@ -920,7 +911,13 @@ async def delete_file(request: FileDeleteRequest):
             raise HTTPException(status_code=404, detail=f"File not found: {file_id}")
         
         # 删除向量数据库中的embeddings
-        deleted_embeddings = vector_db_manager.delete_embeddings_by_file(file_id)
+        # 从 SQLite 获取该文件的所有 chunks，然后删除对应的 embeddings
+        chunks = db_manager.get_chunks_by_file_id(file_id)
+        deleted_embeddings = 0
+        for chunk in chunks:
+            embedding_id = chunk.get("embedding_id")
+            if embedding_id and vector_db_manager.delete_embedding(embedding_id):
+                deleted_embeddings += 1
         
         # 删除数据库中的文件记录
         deleted_from_db = db_manager.delete_file(file_id)

@@ -140,18 +140,22 @@ async def semantic_search(request: SemanticSearchRequest):
         results = []
         for result in similar_results[:request.limit]:
             try:
-                metadata = result.get("metadata", {})
-
-                # 获取文件信息
-                file_data = db_manager.get_file_by_id(metadata.get("file_id"))
-                if not file_data:
-                    logger.warning(f"File data not found for file_id: {metadata.get('file_id')}")
+                # 从向量数据库结果中获取 embedding_id
+                embedding_id = result.get("embedding_id", "")
+                if not embedding_id:
+                    logger.warning("No embedding_id found in search result")
                     continue
 
-                # 获取chunk内容
-                chunk_data = db_manager.get_chunk_by_id(metadata.get("chunk_id"))
+                # 根据 embedding_id 从 SQLite 获取完整的 chunk 信息
+                chunk_data = db_manager.get_chunk_by_embedding_id(embedding_id)
                 if not chunk_data:
-                    logger.warning(f"Chunk data not found for chunk_id: {metadata.get('chunk_id')}")
+                    logger.warning(f"Chunk data not found for embedding_id: {embedding_id}")
+                    continue
+
+                # 获取文件信息
+                file_data = db_manager.get_file_by_id(chunk_data.get("file_id"))
+                if not file_data:
+                    logger.warning(f"File data not found for file_id: {chunk_data.get('file_id')}")
                     continue
 
                 # 应用过滤器
@@ -166,27 +170,27 @@ async def semantic_search(request: SemanticSearchRequest):
 
                 # 获取上下文（参考 chinese_rag.py 的实现方式）
                 context = {}
-                chunk_index = metadata.get("chunk_index", 0)
+                chunk_index = chunk_data.get("chunk_index", 0)
 
                 # 获取前一个chunk作为上下文
                 if chunk_index > 0:
                     prev_chunk = db_manager.get_chunk_by_index(
-                        metadata.get("file_id"), chunk_index - 1
+                        chunk_data.get("file_id"), chunk_index - 1
                     )
                     if prev_chunk:
                         context["prev_chunk"] = prev_chunk.get("content", "")[:200] + "..." if len(prev_chunk.get("content", "")) > 200 else prev_chunk.get("content", "")
 
                 # 获取后一个chunk作为上下文
                 next_chunk = db_manager.get_chunk_by_index(
-                    metadata.get("file_id"), chunk_index + 1
+                    chunk_data.get("file_id"), chunk_index + 1
                 )
                 if next_chunk:
                     context["next_chunk"] = next_chunk.get("content", "")[:200] + "..." if len(next_chunk.get("content", "")) > 200 else next_chunk.get("content", "")
 
                 # 构建结果（参考 chinese_rag.py 的格式）
                 result_item = {
-                    "chunk_id": metadata.get("chunk_id", ""),
-                    "file_id": metadata.get("file_id", ""),
+                    "chunk_id": chunk_data.get("chunk_id", ""),
+                    "file_id": chunk_data.get("file_id", ""),
                     "file_name": file_data.get("name", ""),
                     "file_path": file_data.get("path", ""),
                     "chunk_content": chunk_data.get("content", ""),
@@ -197,7 +201,7 @@ async def semantic_search(request: SemanticSearchRequest):
                         "file_category": file_data.get("category", ""),
                         "file_type": file_data.get("type", ""),
                         "chunk_length": len(chunk_data.get("content", "")),
-                        "created_at": metadata.get("created_at", "")
+                        "created_at": chunk_data.get("created_at", "")
                     }
                 }
 
