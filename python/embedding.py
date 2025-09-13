@@ -412,6 +412,24 @@ class LLMClient:
             logger.error(f"Error generating LLM response: {e}")
             return self._fallback_response(prompt)
     
+    async def generate_stream_response(self, prompt: str, temperature: float = 0.7, max_tokens: int = 1000):
+        """Generate streaming response from LLM"""
+        logger.debug(f"Generating streaming response using {self.llm_type} model")
+        try:
+            if self.llm_type == "openai":
+                async for chunk in self._call_openai_stream(prompt, temperature, max_tokens):
+                    yield chunk
+            elif self.llm_type == "ollama":
+                async for chunk in self._call_ollama_stream(prompt, temperature, max_tokens):
+                    yield chunk
+            else:
+                logger.error(f"Streaming not supported for LLM type: {self.llm_type}")
+                yield self._fallback_response(prompt)
+                
+        except Exception as e:
+            logger.error(f"Error generating streaming LLM response: {e}")
+            yield self._fallback_response(prompt)
+    
     async def generate_structured_response(self, messages: List[Dict[str, Any]], temperature: float = 0.7, max_tokens: int = 1000, response_format: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate structured response from LLM with messages and response format"""
         logger.debug(f"Generating structured response using {self.llm_type} model")
@@ -491,6 +509,8 @@ class LLMClient:
         if response_format:
             payload["response_format"] = response_format.get("json_schema", {}).get("schema")
         
+        logger.debug(f"Calling Ollama structured API with payload: {json.dumps(payload)}")
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=payload) as response:
@@ -501,6 +521,7 @@ class LLMClient:
                         try:
                             return json.loads(content.strip())
                         except json.JSONDecodeError:
+                            logger.error(f"Failed to parse JSON from Ollama response: {content}")
                             return {"error": "Invalid JSON response", "content": content}
                     else:
                         logger.error(f"Ollama API error: {response.status}")
@@ -574,6 +595,87 @@ class LLMClient:
         except Exception as e:
             logger.error(f"Error calling OpenAI structured: {e}")
             return {"error": str(e)}
+    
+    async def _call_openai_stream(self, prompt: str, temperature: float, max_tokens: int):
+        """Call OpenAI API with streaming"""
+        url = f"{self.llm_endpoint}/chat/completions"
+        
+        headers = {
+            "Authorization": f"Bearer {self.llm_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": self.llm_model or "gpt-3.5-turbo",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, headers=headers) as response:
+                    if response.status == 200:
+                        async for line in response.content:
+                            line = line.decode('utf-8').strip()
+                            if line.startswith('data: '):
+                                data = line[6:]
+                                if data == '[DONE]':
+                                    break
+                                try:
+                                    chunk_data = json.loads(data)
+                                    if chunk_data.get('choices'):
+                                        delta = chunk_data['choices'][0].get('delta', {})
+                                        content = delta.get('content', '')
+                                        if content:
+                                            yield content
+                                except json.JSONDecodeError:
+                                    continue
+                    else:
+                        logger.error(f"OpenAI streaming API error: {response.status}")
+                        yield f"Error: {response.status}"
+        except Exception as e:
+            logger.error(f"Error calling OpenAI streaming: {e}")
+            yield f"Error: {str(e)}"
+    
+    async def _call_ollama_stream(self, prompt: str, temperature: float, max_tokens: int):
+        """Call Ollama API with streaming"""
+        url = f"{self.llm_endpoint}/api/generate"
+        
+        payload = {
+            "model": self.llm_model or "llama2",
+            "prompt": prompt,
+            "stream": True,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens
+            },
+            "think": False
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload) as response:
+                    if response.status == 200:
+                        async for line in response.content:
+                            line = line.decode('utf-8').strip()
+                            if line:
+                                try:
+                                    chunk_data = json.loads(line)
+                                    response_chunk = chunk_data.get('response', '')
+                                    if response_chunk:
+                                        yield response_chunk
+                                    if chunk_data.get('done', False):
+                                        break
+                                except json.JSONDecodeError:
+                                    continue
+                    else:
+                        logger.error(f"Ollama streaming API error: {response.status}")
+                        yield f"Error: {response.status}"
+        except Exception as e:
+            logger.error(f"Error calling Ollama streaming: {e}")
+            yield f"Error: {str(e)}"
     
     async def _call_claude(self, prompt: str, temperature: float, max_tokens: int) -> str:
         """Call Claude API"""

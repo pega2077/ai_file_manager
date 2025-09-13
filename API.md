@@ -455,6 +455,8 @@
 {
   "profession": "string",       // 职业，如 "软件工程师"、"设计师"、"教师"
   "purpose": "string",          // 文件夹用途，如 "项目管理"、"个人资料"、"学习资料"
+  "min_directories": "number",  // 最少目录数量，默认 6
+  "max_directories": "number",  // 最多目录数量，默认 20
   "temperature": "number",      // LLM 温度参数，默认 0.7
   "max_tokens": "number"        // 最大生成token数，默认 1000
 }

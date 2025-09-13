@@ -2,6 +2,7 @@
 Chat Controller
 聊天相关接口控制器
 """
+import json
 import time
 import uuid
 from datetime import datetime
@@ -9,6 +10,7 @@ from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from loguru import logger
 
@@ -61,6 +63,8 @@ class ChatHistoryResponse(BaseModel):
 class DirectoryStructureRequest(BaseModel):
     profession: str = Field(..., description="职业")
     purpose: str = Field(..., description="文件夹用途")
+    min_directories: int = Field(default=6, description="最少目录数量", ge=1, le=50)
+    max_directories: int = Field(default=20, description="最多目录数量", ge=1, le=50)
     temperature: float = Field(default=0.7, description="LLM 温度参数", ge=0.0, le=2.0)
     max_tokens: int = Field(default=1000, description="最大生成token数", ge=100, le=4000)
 
@@ -81,7 +85,7 @@ class RecommendDirectoryRequest(BaseModel):
 
 class RecommendDirectoryResponse(BaseModel):
     recommended_directory: str
-    confidence: float
+    recommended_directory_exist: bool
     reasoning: str
     alternatives: List[str]
     metadata: Dict[str, Any]
@@ -240,55 +244,114 @@ async def ask_question(request: ChatAskRequest):
         # logger.debug(f"构建的提示词: {prompt}")
         # 5. 调用LLM生成回答
         generation_start = time.time()
-        answer = await llm_client.generate_response(
-            prompt=prompt,
-            temperature=request.temperature,
-            max_tokens=request.max_tokens
-        )
-        generation_time = int((time.time() - generation_start) * 1000)
+        
+        if request.stream:
+            # 流式输出
+            async def generate_stream():
+                full_answer = ""
+                async for chunk in llm_client.generate_stream_response(
+                    prompt=prompt,
+                    temperature=request.temperature,
+                    max_tokens=request.max_tokens
+                ):
+                    full_answer += chunk
+                    # 返回SSE格式的数据
+                    yield f"data: {json.dumps({'chunk': chunk, 'type': 'content'})}\n\n"
+                
+                # 发送结束信号和元数据
+                generation_time = int((time.time() - generation_start) * 1000)
+                avg_similarity = sum(result['similarity_score'] for result in search_results) / len(search_results)
+                confidence = min(avg_similarity * 1.2, 1.0)
+                
+                metadata = {
+                    "model_used": settings.llm_model or "unknown",
+                    "tokens_used": len(full_answer.split()),
+                    "response_time_ms": int((time.time() - start_time) * 1000),
+                    "retrieval_time_ms": retrieval_time,
+                    "generation_time_ms": generation_time
+                }
+                
+                yield f"data: {json.dumps({'type': 'metadata', 'confidence': round(confidence, 2), 'sources': sources, 'metadata': metadata})}\n\n"
+                yield "data: [DONE]\n\n"
+                
+                # 保存对话历史（流式输出完成后）
+                conversation_id = str(uuid.uuid4())
+                session_id = str(uuid.uuid4())
+                conversation_data = {
+                    "id": conversation_id,
+                    "session_id": session_id,
+                    "question": request.question,
+                    "answer": full_answer,
+                    "sources_count": len(sources),
+                    "confidence": confidence,
+                    "created_at": datetime.now().isoformat(),
+                    "metadata": {
+                        "context_limit": request.context_limit,
+                        "temperature": request.temperature,
+                        "max_tokens": request.max_tokens,
+                        "retrieval_time_ms": retrieval_time,
+                        "generation_time_ms": generation_time,
+                        "stream": True
+                    }
+                }
+                db_manager.save_conversation(conversation_data)
+            
+            return StreamingResponse(
+                generate_stream(),
+                media_type="text/plain",
+                headers={"Content-Type": "text/event-stream; charset=utf-8"}
+            )
+        else:
+            # 普通输出
+            answer = await llm_client.generate_response(
+                prompt=prompt,
+                temperature=request.temperature,
+                max_tokens=request.max_tokens
+            )
+            generation_time = int((time.time() - generation_start) * 1000)
 
-        # 6. 计算置信度（基于检索结果的相似度）
-        avg_similarity = sum(result['similarity_score'] for result in search_results) / len(search_results)
-        confidence = min(avg_similarity * 1.2, 1.0)  # 稍微放大但不超过1.0
+            # 6. 计算置信度（基于检索结果的相似度）
+            avg_similarity = sum(result['similarity_score'] for result in search_results) / len(search_results)
+            confidence = min(avg_similarity * 1.2, 1.0)  # 稍微放大但不超过1.0
 
-        # 7. 保存对话历史
-        conversation_id = str(uuid.uuid4())
-        session_id = str(uuid.uuid4())  # 为每个对话创建新会话
+            # 7. 保存对话历史
+            conversation_id = str(uuid.uuid4())
+            session_id = str(uuid.uuid4())  # 为每个对话创建新会话
 
-        conversation_data = {
-            "id": conversation_id,
-            "session_id": session_id,
-            "question": request.question,
-            "answer": answer,
-            "sources_count": len(sources),
-            "confidence": confidence,
-            "created_at": datetime.now().isoformat(),
-            "metadata": {
-                "context_limit": request.context_limit,
-                "temperature": request.temperature,
-                "max_tokens": request.max_tokens,
-                "retrieval_time_ms": retrieval_time,
-                "generation_time_ms": generation_time
+            conversation_data = {
+                "id": conversation_id,
+                "session_id": session_id,
+                "question": request.question,
+                "answer": answer,
+                "sources_count": len(sources),
+                "confidence": confidence,
+                "created_at": datetime.now().isoformat(),
+                "metadata": {
+                    "context_limit": request.context_limit,
+                    "temperature": request.temperature,
+                    "max_tokens": request.max_tokens,
+                    "retrieval_time_ms": retrieval_time,
+                    "generation_time_ms": generation_time
+                }
             }
-        }
 
-        db_manager.save_conversation(conversation_data)
+            db_manager.save_conversation(conversation_data)
 
-        # 8. 构建响应
-        response_data = ChatResponse(
-            answer=answer,
-            confidence=round(confidence, 2),
-            sources=sources,
-            metadata={
-                "model_used": settings.llm_model or "unknown",
-                "tokens_used": len(answer.split()),  # 粗略估算token数
-                "response_time_ms": int((time.time() - start_time) * 1000),
-                "retrieval_time_ms": retrieval_time,
-                "generation_time_ms": generation_time
-            }
-        )
+            # 8. 构建响应
+            response_data = ChatResponse(
+                answer=answer,
+                confidence=round(confidence, 2),
+                sources=sources,
+                metadata={
+                    "model_used": settings.llm_model or "unknown",
+                    "tokens_used": len(answer.split()),  # 粗略估算token数
+                    "response_time_ms": int((time.time() - start_time) * 1000),
+                    "retrieval_time_ms": retrieval_time,
+                    "generation_time_ms": generation_time
+                }
+            )
 
-        return create_response(data=response_data)
+            return create_response(data=response_data)
 
     except Exception as e:
         logger.error(f"问答处理失败: {e}")
@@ -362,18 +425,20 @@ async def recommend_directory_structure(request: DirectoryStructureRequest):
             },
             {
                 "role": "user",
-                "content": f"""请根据下面输入参数，返回一个推荐的、便于长期维护的目录结构。输出必须仅为 JSON，不要额外文字。
+                "content": f"""请根据下面输入参数，返回一个推荐的、便于长期维护的目录结构。输出必须仅为 JSON 字符串，不要使用```json，不要额外文字。
 
 输入参数（JSON）:
 {{
   "profession": "{request.profession}",
-  "folder_purpose": "{request.purpose}"
+  "folder_purpose": "{request.purpose}",
+  "min_directories": {request.min_directories},
+  "max_directories": {request.max_directories}
 }}
 
 要求：
 - 返回 JSON，主键名为 directories。
 - directories 为数组，数组项包含：path（相对路径，例如 "招聘/简历/待筛选"）、description（用途说明）。
-- 要覆盖常见场景（例如备份、归档、临时、公共/私有等），并给出 4~10 条路径项（视职业复杂度）。
+- 要覆盖常见场景（例如备份、归档、临时、公共/私有等），并给出 {request.min_directories}~{request.max_directories} 条路径项（视职业复杂度）。
 - 输出必须严格匹配下面的 JSON Schema。"""
             }
         ]
@@ -412,8 +477,8 @@ async def recommend_directory_structure(request: DirectoryStructureRequest):
             response_format=response_format
         )
         generation_time = int((time.time() - generation_start) * 1000)
-        print("got response:")
-        print(response_data)
+        # print("got response:")
+        # print(response_data)
         # 检查响应是否包含错误
         if "error" in response_data:
             logger.error(f"LLM structured response error: {response_data['error']}")
@@ -424,8 +489,8 @@ async def recommend_directory_structure(request: DirectoryStructureRequest):
 
         # 解析directories
         directories = response_data.get("directories", [])
-        print("directories count:", len(directories))
-        
+        logger.info(f"directories count: {len(directories)}")
+
         # 转换为DirectoryItem对象
         directory_items = []
         for item in directories:
@@ -440,7 +505,7 @@ async def recommend_directory_structure(request: DirectoryStructureRequest):
                 logger.warning(f"Missing required fields in directory item: {item}")
                 continue
                 
-            print("item:", path, description)
+            # print("item:", path, description)
             directory_items.append(DirectoryItem(
                 path=path,
                 description=description
@@ -476,7 +541,6 @@ async def recommend_directory(request: RecommendDirectoryRequest):
     try:
         # 获取组件实例
         llm_client = get_llm_client_instance()
-        prompt_template_manager = get_prompt_template_manager()
 
         if not llm_client:
             return create_error_response(
@@ -489,60 +553,83 @@ async def recommend_directory(request: RecommendDirectoryRequest):
         if request.current_structure:
             current_structure_str = "\n".join(request.current_structure)
 
-        # 构建提示词
-        prompt = prompt_template_manager.format_template(
-            "recommend_directory",
-            file_name=request.file_name,
-            file_content=request.file_content[:1000],  # 限制内容长度
-            current_structure=current_structure_str
-        )
+        # 构建messages
+        messages = [
+            {
+                "role": "system",
+                "content": "你是一个文件分类专家，擅长根据文件内容和名称推荐合适的存放目录。输出必须严格符合给定的 JSON Schema。"
+            },
+            {
+                "role": "user",
+                "content": f"""请根据文件信息，确认是否有合适的存放目录，若没有给出一个应该创建的目录路径,若有，请返回一个推荐的目录路径。输出必须仅为 JSON，不要使用```json，不要额外文字。
+
+文件信息:
+- 当前目录结构:
+{current_structure_str}
+- 文件名: {request.file_name}
+- 文件内容: {request.file_content[:1000]}
+
+要求：
+- 分析文件内容和名称，将文件合理地分类到已有目录。如果没有合适目录，需要新建合理的子目录
+- 返回 JSON，包含：recommended_directory（推荐目录）、recommended_directory_exist（推荐目录是否存在）、reasoning（推荐理由）、alternatives（备选目录数组）
+- 输出必须严格匹配下面的 JSON Schema。"""
+            }
+        ]
+
+        # 设置response_format
+        response_format = {
+            "json_schema": {
+                "name": "directory_recommendation_schema",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "recommended_directory": {"type": "string"},
+                        "recommended_directory_exist": {"type": "boolean"},
+                        "reasoning": {"type": "string"},
+                        "alternatives": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        }
+                    },
+                    "required": ["recommended_directory", "recommended_directory_exist", "reasoning", "alternatives"]
+                },
+                "strict": True
+            }
+        }
 
         # 调用LLM生成推荐
         generation_start = time.time()
-        response_text = await llm_client.generate_response(
-            prompt=prompt,
+        response_data = await llm_client.generate_structured_response(
+            messages=messages,
             temperature=request.temperature,
-            max_tokens=request.max_tokens
+            max_tokens=request.max_tokens,
+            response_format=response_format
         )
         generation_time = int((time.time() - generation_start) * 1000)
 
-        # 解析响应
-        # 简单的解析逻辑，假设LLM返回格式：推荐目录: XXX\n置信度: 0.8\n理由: XXX\n备选: XXX,YYY
-        recommended_directory = "未分类"
-        confidence = 0.5
-        reasoning = response_text
-        alternatives = []
+        # 检查响应是否包含错误
+        if "error" in response_data:
+            logger.error(f"LLM structured response error: {response_data['error']}")
+            return create_error_response(
+                f"LLM响应错误: {response_data['error']}",
+                error_code="LLM_RESPONSE_ERROR"
+            )
 
-        lines = response_text.split('\n')
-        for line in lines:
-            line = line.strip()
-            if line.startswith('推荐目录:') or line.startswith('推荐目录：'):
-                recommended_directory = line.split(':', 1)[1].strip()
-            elif line.startswith('置信度:') or line.startswith('置信度：'):
-                try:
-                    confidence = float(line.split(':', 1)[1].strip())
-                except:
-                    confidence = 0.5
-            elif line.startswith('理由:') or line.startswith('理由：'):
-                reasoning = line.split(':', 1)[1].strip()
-            elif line.startswith('备选:') or line.startswith('备选：'):
-                alt_text = line.split(':', 1)[1].strip()
-                alternatives = [alt.strip() for alt in alt_text.split(',') if alt.strip()]
-
-        response_data = RecommendDirectoryResponse(
-            recommended_directory=recommended_directory,
-            confidence=round(confidence, 2),
-            reasoning=reasoning,
-            alternatives=alternatives,
+        # 直接使用结构化响应数据
+        response = RecommendDirectoryResponse(
+            recommended_directory=response_data.get("recommended_directory", "未分类"),
+            recommended_directory_exist=response_data.get("recommended_directory_exist", False),
+            reasoning=response_data.get("reasoning", "无法确定推荐理由"),
+            alternatives=response_data.get("alternatives", []),
             metadata={
                 "model_used": settings.llm_model or "unknown",
-                "tokens_used": len(response_text.split()),
+                "tokens_used": len(str(response_data).split()),
                 "response_time_ms": int((time.time() - start_time) * 1000),
                 "generation_time_ms": generation_time
             }
         )
 
-        return create_response(data=response_data)
+        return create_response(data=response)
 
     except Exception as e:
         logger.error(f"推荐存放目录失败: {e}")
