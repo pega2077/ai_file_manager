@@ -561,7 +561,7 @@ async def recommend_directory(request: RecommendDirectoryRequest):
             },
             {
                 "role": "user",
-                "content": f"""请根据文件信息，确认是否有合适的存放目录，若没有给出一个应该创建的目录路径,若有，请返回一个推荐的目录路径。输出必须仅为 JSON，不要使用```json，不要额外文字。
+                "content": f"""请根据以下文件信息：
 
 文件信息:
 - 当前目录结构:
@@ -570,8 +570,13 @@ async def recommend_directory(request: RecommendDirectoryRequest):
 - 文件内容: {request.file_content[:1000]}
 
 要求：
-- 分析文件内容和名称，将文件合理地分类到已有目录。如果没有合适目录，需要新建合理的子目录
+- 检查所有已有目录是否适合文件（根据文件名和内容）。
+- 检查时如果包含项目名称，应当重点根据项目名称判断。
+- 如果找到匹配目录 → 选择该目录，recommended_directory_exist = true。
+- 如果没有找到 → 不要选择已有目录，生成新目录路径，recommended_directory_exist = false。
+- 严格禁止将文件放入不相关的已有目录。如果找不到匹配的已有目录，必须创建新目录，不能假设或猜测已有目录。
 - 返回 JSON，包含：recommended_directory（推荐目录）、recommended_directory_exist（推荐目录是否存在）、reasoning（推荐理由）、alternatives（备选目录数组）
+- 禁止将包含 ```json```，```json```，禁止将包含额外的说明文字，不要包含其他说明文字。
 - 输出必须严格匹配下面的 JSON Schema。"""
             }
         ]
