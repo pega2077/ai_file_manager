@@ -696,10 +696,15 @@ const Home = () => {
             <TreeSelect
               style={{ width: '100%' }}
               value={selectedDirectory}
-              dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
+              styles={{ popup: { root: { maxHeight: 400, overflow: 'auto' } } }}
               treeData={directoryTreeData}
               placeholder="请选择目录"
               treeDefaultExpandAll
+              treeLine
+              showSearch
+              filterTreeNode={(input, treeNode) =>
+                String(treeNode?.title).toLowerCase().includes(input.toLowerCase())
+              }
               onChange={(value: string) => setSelectedDirectory(value)}
             />
           </div>
