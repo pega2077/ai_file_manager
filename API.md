@@ -57,6 +57,7 @@
 | 文件管理 | 递归列出目录结构 | POST | `/api/files/list-directory-recursive` | 递归列出目录树结构 |
 | 文件管理 | 文件预览 | POST | `/api/files/preview` | 预览文件内容（文本/图片） |
 | 文件管理 | 保存文件 | POST | `/api/files/save-file` | 保存文件到指定目录 |
+| 文件管理 | 推荐保存目录 | POST | `/api/files/recommend-directory` | 分析文件并推荐保存目录 |
 | 文档分段 | 分段列表 | POST | `/api/files/chunks/list` | 获取文件分段列表 |
 | 文档分段 | 重新分段 | POST | `/api/files/reprocess` | 重新处理文件分段 |
 | 搜索检索 | 语义搜索 | POST | `/api/search/semantic` | 基于向量的语义搜索 |
@@ -440,7 +441,7 @@
 }
 ```
 
-### 1.10 递归列出目录结构
+### 1.11 递归列出目录结构
 
 **接口**: `POST /api/files/list-directory-recursive`
 
@@ -612,6 +613,80 @@
 **错误情况**:
 - `SOURCE_FILE_MISSING`: 源文件不存在
 - `SAVE_FILE_ERROR`: 保存文件失败
+
+### 1.10 推荐保存目录
+
+**接口**: `POST /api/files/recommend-directory`
+
+**请求参数**:
+```json
+{
+  "file_path": "string",
+  "available_directories": ["string"]
+}
+```
+
+**请求参数说明**:
+- `file_path`: 要分析的文件路径
+- `available_directories`: 项目中可用的目录路径列表
+
+**处理逻辑**:
+1. 检查文件是否存在
+2. 如果是文档类型，使用pandoc转换为文本格式
+3. 提取文件名和文件前500字符内容
+4. 调用大语言模型分析内容并推荐最合适的保存目录
+5. 返回推荐结果及置信度
+
+**响应数据**:
+```json
+{
+  "file_path": "string",
+  "filename": "string",
+  "recommended_directory": "string",
+  "confidence": "number",
+  "reasoning": "string",
+  "alternatives": ["string"]
+}
+```
+
+**字段说明**:
+- `file_path`: 分析的文件路径
+- `filename`: 文件名
+- `recommended_directory`: 推荐的保存目录
+- `confidence`: 推荐置信度 (0.0-1.0)
+- `reasoning`: 推荐理由
+- `alternatives`: 备选目录列表
+
+**示例请求**:
+```json
+{
+  "file_path": "/path/to/document.pdf",
+  "available_directories": [
+    "Documents/Work",
+    "Documents/Personal",
+    "Images",
+    "Projects"
+  ]
+}
+```
+
+**示例响应**:
+```json
+{
+  "file_path": "/path/to/document.pdf",
+  "filename": "document.pdf",
+  "recommended_directory": "Documents/Work",
+  "confidence": 0.9,
+  "reasoning": "This appears to be a work-related document based on the content about project planning",
+  "alternatives": ["Documents/Projects", "Projects"]
+}
+```
+
+**错误情况**:
+- `SOURCE_FILE_MISSING`: 源文件不存在
+- `LLM_NOT_AVAILABLE`: 大语言模型服务不可用
+- `LLM_ERROR`: 大语言模型调用失败
+- `ANALYSIS_ERROR`: 文件分析失败
 
 ## 2. 文档分段模块接口
 

@@ -79,6 +79,10 @@ class SaveFileRequest(BaseModel):
     target_directory: str = Field(..., description="Target directory path")
     overwrite: bool = Field(False, description="Whether to overwrite if file exists")
 
+class RecommendDirectoryRequest(BaseModel):
+    file_path: str = Field(..., description="Path of the file to analyze")
+    available_directories: List[str] = Field(..., description="List of available directory paths in the project")
+
 # 文档类型检测
 DOCUMENT_EXTENSIONS = {
     '.txt', '.md', '.markdown', '.rst', '.tex',
@@ -657,6 +661,170 @@ Example response format:
                 error_code="SAVE_FILE_ERROR",
                 error_details=str(e)
             )
+
+    async def recommend_directory(self, file_path: str, available_directories: List[str]) -> dict:
+        """Analyze file and recommend the best directory to save it"""
+        try:
+            # Convert to Path object
+            source_path = Path(file_path)
+
+            # Check if source file exists
+            if not source_path.exists():
+                return create_error_response(
+                    message="Source file does not exist",
+                    error_code="SOURCE_FILE_MISSING"
+                )
+
+            filename = source_path.name
+
+            # Extract content for analysis
+            content_preview = ""
+            if self.is_document_type(source_path):
+                # Convert document to text using pandoc
+                try:
+                    success, converted_content = self.converter.convert_to_markdown(str(source_path), None)
+                    if success and converted_content:
+                        # Take first 500 characters for analysis
+                        content_preview = converted_content[:500]
+                    else:
+                        logger.warning(f"Failed to convert document {filename} to text")
+                except Exception as e:
+                    logger.error(f"Error converting document {filename}: {e}")
+            elif self.is_text_file(source_path):
+                # Read text file directly
+                try:
+                    with open(source_path, 'r', encoding='utf-8') as f:
+                        content_preview = f.read(500)
+                except Exception as e:
+                    logger.warning(f"Could not read text file {filename}: {e}")
+
+            # Use LLM to recommend directory
+            try:
+                # Import LLM service
+                from embedding import get_llm_client
+
+                llm = get_llm_client()
+                if not llm:
+                    return create_error_response(
+                        message="LLM service not available",
+                        error_code="LLM_NOT_AVAILABLE"
+                    )
+
+                # Create prompt for directory recommendation
+                prompt = self._create_directory_recommendation_prompt(
+                    filename, content_preview, available_directories
+                )
+
+                # Get LLM response
+                response = await llm.generate_response(prompt)
+                logger.debug(f"LLM response for directory recommendation: {response}")
+
+                # Parse response
+                recommendation = self._parse_directory_recommendation_response(response, available_directories)
+
+                return create_success_response(
+                    message="Directory recommendation generated successfully",
+                    data={
+                        "file_path": file_path,
+                        "filename": filename,
+                        "recommended_directory": recommendation.recommended_directory,
+                        "confidence": recommendation.confidence,
+                        "reasoning": recommendation.reasoning,
+                        "alternatives": recommendation.alternatives
+                    }
+                )
+
+            except Exception as e:
+                logger.error(f"Error getting LLM recommendation: {e}")
+                return create_error_response(
+                    message="Failed to generate directory recommendation",
+                    error_code="LLM_ERROR",
+                    error_details=str(e)
+                )
+
+        except Exception as e:
+            logger.error(f"Error recommending directory for file {file_path}: {e}")
+            return create_error_response(
+                message="Failed to analyze file and recommend directory",
+                error_code="ANALYSIS_ERROR",
+                error_details=str(e)
+            )
+
+    def _create_directory_recommendation_prompt(
+        self,
+        filename: str,
+        content_preview: str,
+        available_directories: List[str]
+    ) -> str:
+        """Create prompt for LLM directory recommendation"""
+        content_info = content_preview[:200] if content_preview else "No content available"
+
+        directories_list = "\n".join([f"- {dir}" for dir in available_directories])
+
+        prompt = f"""Analyze this file and recommend the most appropriate directory to save it.
+
+Filename: {filename}
+Content preview: {content_info}
+
+Available directories:
+{directories_list}
+
+Please analyze the filename and content to determine which directory would be the best fit. Consider:
+1. The topic and content type of the file
+2. The purpose and naming of available directories
+3. Common organizational patterns
+
+Respond with a JSON object containing:
+- "recommended_directory": The best directory path from the available options
+- "confidence": A confidence score from 0.0 to 1.0
+- "reasoning": Brief explanation for the recommendation
+- "alternatives": Array of up to 3 alternative directory suggestions (in order of preference)
+
+Example response:
+{{
+  "recommended_directory": "Documents/Work",
+  "confidence": 0.9,
+  "reasoning": "This appears to be a work-related document based on the content about project planning",
+  "alternatives": ["Documents/Projects", "Work/Planning"]
+}}
+
+If no suitable directory is found, you can suggest creating a new one by specifying a reasonable directory name.
+"""
+        return prompt
+
+    def _parse_directory_recommendation_response(self, response: str, available_directories: List[str]) -> dict:
+        """Parse LLM response for directory recommendation"""
+        try:
+            # Try to parse JSON response
+            response_data = json.loads(response.strip())
+
+            recommended_directory = response_data.get("recommended_directory", "")
+            confidence = min(max(float(response_data.get("confidence", 0.5)), 0.0), 1.0)
+            reasoning = response_data.get("reasoning", "Recommended based on file analysis")
+            alternatives = response_data.get("alternatives", [])
+
+            # Validate recommended directory
+            if recommended_directory not in available_directories:
+                # If not in available directories, still accept it (could be a suggestion for new directory)
+                pass
+
+            return type('DirectoryRecommendation', (), {
+                'recommended_directory': recommended_directory,
+                'confidence': confidence,
+                'reasoning': reasoning,
+                'alternatives': alternatives[:3]  # Limit to 3 alternatives
+            })()
+
+        except Exception as e:
+            logger.error(f"Error parsing LLM directory recommendation response: {e}")
+            # Fallback: return first available directory
+            fallback_dir = available_directories[0] if available_directories else "Documents"
+            return type('DirectoryRecommendation', (), {
+                'recommended_directory': fallback_dir,
+                'confidence': 0.5,
+                'reasoning': "Fallback recommendation due to parsing error",
+                'alternatives': []
+            })()
 
 
 # Initialize file manager
@@ -1634,6 +1802,24 @@ async def save_file(request: SaveFileRequest):
         
     except Exception as e:
         logger.error(f"Error in save_file endpoint: {e}")
+        return create_error_response(
+            message="Internal server error",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )
+
+@files_router.post("/recommend-directory")
+async def recommend_directory(request: RecommendDirectoryRequest):
+    """Analyze file and recommend the best directory to save it"""
+    try:
+        result = await file_manager.recommend_directory(
+            file_path=request.file_path,
+            available_directories=request.available_directories
+        )
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in recommend_directory endpoint: {e}")
         return create_error_response(
             message="Internal server error",
             error_code="INTERNAL_ERROR",
