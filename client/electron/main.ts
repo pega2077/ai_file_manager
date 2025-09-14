@@ -1,10 +1,8 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
-import { createRequire } from 'node:module'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import Store from 'electron-store'
 
-const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // Initialize electron-store
@@ -66,6 +64,14 @@ ipcMain.handle('store:delete', (event, key) => {
 
 ipcMain.handle('store:has', (event, key) => {
   return store.has(key)
+})
+
+// IPC handler for folder selection
+ipcMain.handle('select-folder', async () => {
+  const result = await dialog.showOpenDialog(win!, {
+    properties: ['openDirectory']
+  })
+  return result.canceled ? null : result.filePaths[0]
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common

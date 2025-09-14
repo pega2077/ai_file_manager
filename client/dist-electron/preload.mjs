@@ -20,6 +20,9 @@ electron.contextBridge.exposeInMainWorld("ipcRenderer", {
   // You can expose other APTs you need here.
   // ...
 });
+electron.contextBridge.exposeInMainWorld("electronAPI", {
+  selectFolder: () => electron.ipcRenderer.invoke("select-folder")
+});
 electron.contextBridge.exposeInMainWorld("electronStore", {
   get: (key) => electron.ipcRenderer.invoke("store:get", key),
   set: (key, value) => electron.ipcRenderer.invoke("store:set", key, value),

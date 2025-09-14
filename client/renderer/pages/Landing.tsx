@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Typography, Space, Button } from 'antd';
+import { Layout, Typography, Space, Button, message } from 'antd';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -21,12 +21,22 @@ const Landing = () => {
   const version = '0.0.1'; // Version from package.json
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const isInitialized = window.electronStore.get('isInitialized');
-      console.log('isInitialized:', isInitialized);
-      if (isInitialized === true) {
-        navigate('/home');
-      } else {
+    const timer = setTimeout(async () => {
+      try {
+        if (window.electronStore) {
+          const isInitialized = await window.electronStore.get('isInitialized');
+          console.log('isInitialized:', isInitialized);
+          if (isInitialized === true) {
+            navigate('/home');
+          } else {
+            navigate('/setup');
+          }
+        } else {
+          // Fallback if electronStore is not available
+          navigate('/setup');
+        }
+      } catch (error) {
+        console.error('Error checking initialization status:', error);
         navigate('/setup');
       }
     }, 3000);
@@ -50,7 +60,12 @@ const Landing = () => {
           </Text>
           <Button
             type="default"
-            onClick={() => window.electronStore.set('isInitialized', false)}
+            onClick={async () => {
+              if (window.electronStore) {
+                await window.electronStore.set('isInitialized', false);
+                message.success('初始化状态已重置');
+              }
+            }}
           >
             Reset Initialization (Test)
           </Button>

@@ -9,8 +9,7 @@ var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read fr
 var __privateAdd = (obj, member, value) => member.has(obj) ? __typeError("Cannot add the same private member more than once") : member instanceof WeakSet ? member.add(obj) : member.set(obj, value);
 var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
 var _validator, _encryptionKey, _options, _defaultValues;
-import electron, { ipcMain as ipcMain$1, app as app$1, BrowserWindow } from "electron";
-import { createRequire } from "node:module";
+import electron, { ipcMain as ipcMain$1, dialog, app as app$1, BrowserWindow } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process$1 from "node:process";
@@ -15329,7 +15328,6 @@ class ElectronStore extends Conf {
     }
   }
 }
-createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const store = new ElectronStore();
 process.env.APP_ROOT = path.join(__dirname, "..");
@@ -15365,6 +15363,12 @@ ipcMain$1.handle("store:delete", (event, key) => {
 });
 ipcMain$1.handle("store:has", (event, key) => {
   return store.has(key);
+});
+ipcMain$1.handle("select-folder", async () => {
+  const result = await dialog.showOpenDialog(win, {
+    properties: ["openDirectory"]
+  });
+  return result.canceled ? null : result.filePaths[0];
 });
 app$1.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
