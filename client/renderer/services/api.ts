@@ -65,6 +65,17 @@ class ApiService {
     });
   }
 
+  // 递归列出目录结构
+  async listDirectoryRecursive(directoryPath: string, maxDepth: number = 3) {
+    return this.request('/files/list-directory-recursive', {
+      method: 'POST',
+      body: JSON.stringify({
+        directory_path: directoryPath,
+        max_depth: maxDepth,
+      }),
+    });
+  }
+
   // 文件预览
   async previewFile(filePath: string) {
     return this.request('/files/preview', {
@@ -88,35 +99,36 @@ class ApiService {
     });
   }
 
-  // 递归列出目录结构
-  async listDirectoryRecursive(directoryPath: string) {
-    return this.request('/files/list-directory-recursive', {
+  // 保存文件到目录
+  async saveFile(sourceFilePath: string, targetDirectory: string, overwrite: boolean = false) {
+    return this.request('/files/save-file', {
       method: 'POST',
       body: JSON.stringify({
-        directory_path: directoryPath,
+        source_file_path: sourceFilePath,
+        target_directory: targetDirectory,
+        overwrite,
+      }),
+    });
+  }
+
+  // 获取分类建议
+  async suggestCategory(filePath: string, directoryStructure?: Array<{ name: string; type: string }>) {
+    return this.request('/files/suggest-category', {
+      method: 'POST',
+      body: JSON.stringify({
+        file_path: filePath,
+        directory_structure: directoryStructure,
       }),
     });
   }
 
   // 推荐保存目录
-  async recommendDirectory(filePath: string, directories: string[]) {
+  async recommendDirectory(filePath: string, availableDirectories: string[]) {
     return this.request('/files/recommend-directory', {
       method: 'POST',
       body: JSON.stringify({
         file_path: filePath,
-        available_directories: directories,
-      }),
-    });
-  }
-
-  // 保存文件到指定目录
-  async saveFile(filePath: string, targetDirectory: string, overwrite: boolean = false) {
-    return this.request('/files/save-file', {
-      method: 'POST',
-      body: JSON.stringify({
-        file_path: filePath,
-        target_directory: targetDirectory,
-        overwrite,
+        available_directories: availableDirectories,
       }),
     });
   }

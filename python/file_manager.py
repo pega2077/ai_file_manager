@@ -563,6 +563,7 @@ Example response format:
         try:
             # Convert to Path objects
             source_path = Path(source_file_path)
+            target_path = Path(target_directory)
 
             # Check if source file exists
             if not source_path.exists():
@@ -571,33 +572,39 @@ Example response format:
                     error_code="SOURCE_FILE_MISSING"
                 )
 
-            # Resolve target directory - assume relative to workdir for security
-            target_dir = self.workdir / target_directory
+            # Determine target directory - handle both absolute and relative paths
+            if target_path.is_absolute():
+                # If target_directory is absolute path, use it directly
+                target_dir = target_path
+            else:
+                # If target_directory is relative, resolve relative to workdir for security
+                target_dir = self.workdir / target_directory
+            
             target_dir.mkdir(parents=True, exist_ok=True)
 
             # Determine target filename
             target_filename = source_path.name
-            target_path = target_dir / target_filename
+            final_target_path = target_dir / target_filename
 
-            if target_path.exists() and not overwrite:
+            if final_target_path.exists() and not overwrite:
                 # Add timestamp to filename
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                name_without_ext = target_path.stem
-                extension = target_path.suffix
+                name_without_ext = final_target_path.stem
+                extension = final_target_path.suffix
                 new_filename = f"{name_without_ext}_{timestamp}{extension}"
-                target_path = target_dir / new_filename
+                final_target_path = target_dir / new_filename
 
             # Copy file
-            shutil.copy2(source_path, target_path)
+            shutil.copy2(source_path, final_target_path)
 
-            logger.info(f"File saved to directory: {source_path} -> {target_path}")
+            logger.info(f"File saved to directory: {source_path} -> {final_target_path}")
 
             return create_success_response(
                 message="File saved successfully",
                 data={
                     "source_file_path": str(source_path),
-                    "saved_path": str(target_path),
-                    "filename": target_path.name,
+                    "saved_path": str(final_target_path),
+                    "filename": final_target_path.name,
                     "overwritten": overwrite and (target_dir / source_path.name).exists()
                 }
             )

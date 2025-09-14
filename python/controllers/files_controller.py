@@ -77,7 +77,7 @@ class ListDirectoryRecursiveRequest(BaseModel):
     max_depth: int = Field(3, description="Maximum depth to traverse", ge=1, le=10)
 
 class SaveFileRequest(BaseModel):
-    file_path: str = Field(..., description="Path of the source file to save")
+    source_file_path: str = Field(..., description="Path of the source file to save")
     target_directory: str = Field(..., description="Target directory path")
     overwrite: bool = Field(False, description="Whether to overwrite if file exists")
 
@@ -1067,8 +1067,17 @@ async def preview_file(request: FilePreviewRequest):
 async def save_file(request: SaveFileRequest):
     """Save file to specified directory"""
     try:
+        # 判断目标目录是否为完整的绝对路径
+        target_path = Path(request.target_directory)
+        if not target_path.is_absolute():
+            return create_error_response(
+                message="目标目录必须是完整的绝对路径",
+                error_code="INVALID_PATH",
+                error_details=f"提供的路径不是绝对路径: {request.target_directory}"
+            )
+        
         result = file_manager.save_file_to_directory(
-            source_file_path=request.file_path,
+            source_file_path=request.source_file_path,
             target_directory=request.target_directory,
             overwrite=request.overwrite
         )

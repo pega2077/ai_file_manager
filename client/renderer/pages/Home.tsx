@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Layout, Table, Spin, message, Button, Modal, Select } from 'antd';
+import { Layout, Table, Spin, message, Button, Modal, Select, TreeSelect } from 'antd';
 import { ArrowUpOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
@@ -99,6 +99,8 @@ const Home = () => {
   const [selectedDirectory, setSelectedDirectory] = useState<string>('');
   const [importFilePath, setImportFilePath] = useState<string>('');
   const [directoryOptions, setDirectoryOptions] = useState<TreeNode[]>([]);
+  const [manualSelectModalVisible, setManualSelectModalVisible] = useState(false);
+  const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
   const [selectedMenu, setSelectedMenu] = useState('files');
   const [enablePreview, setEnablePreview] = useState(true);
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -319,7 +321,12 @@ const Home = () => {
 
       if (autoClassifyWithoutConfirmation) {
         // 步骤4: 自动保存到推荐目录
-        const saveResponse = await apiService.saveFile(filePath, recommendedDirectory, false);
+        const separator = getPathSeparator();
+        const fullTargetDirectory = recommendedDirectory.startsWith(workDirectory) 
+          ? recommendedDirectory 
+          : `${workDirectory}${separator}${recommendedDirectory.replace(/\//g, separator)}`;
+        
+        const saveResponse = await apiService.saveFile(filePath, fullTargetDirectory, false);
         if (saveResponse.success) {
           message.success(`文件已自动保存到: ${recommendedDirectory}`);
           // 刷新当前目录列表
@@ -329,7 +336,7 @@ const Home = () => {
         }
       } else {
         // 步骤5: 弹出确认对话框
-        await showImportConfirmationDialog(filePath, recommendedDirectory, alternatives);
+        await showImportConfirmationDialog(filePath, recommendedDirectory, alternatives, directoryStructureResponse.data as DirectoryStructureResponse);
       }
     } catch (error) {
       message.error('文件导入失败');
@@ -358,13 +365,17 @@ const Home = () => {
   };
 
   // 显示导入确认对话框
-  const showImportConfirmationDialog = async (filePath: string, recommendedDirectory: string, alternatives: string[]) => {
+  const showImportConfirmationDialog = async (filePath: string, recommendedDirectory: string, alternatives: string[], directoryStructure: DirectoryStructureResponse) => {
     setImportFilePath(filePath);
     setSelectedDirectory(recommendedDirectory);
 
     // 构建选择数据，只包含推荐目录和备选目录
     const options = buildDirectoryOptions(recommendedDirectory, alternatives);
     setDirectoryOptions(options);
+
+    // 构建完整的目录树数据
+    const treeData = buildDirectoryTreeData(directoryStructure);
+    setDirectoryTreeData(treeData);
 
     setImportModalVisible(true);
   };
@@ -396,6 +407,45 @@ const Home = () => {
     return options;
   };
 
+  // 构建目录树数据
+  const buildDirectoryTreeData = (structureData: DirectoryStructureResponse): TreeNode[] => {
+    const treeData: TreeNode[] = [];
+    const pathMap = new Map<string, TreeNode>();
+
+    if (structureData && structureData.items) {
+      // 首先创建所有节点
+      structureData.items.forEach(item => {
+        if (item.type === 'folder' && item.relative_path && item.relative_path !== '.') {
+          const node: TreeNode = {
+            title: item.name,
+            value: item.relative_path,
+            key: item.relative_path,
+            children: [],
+          };
+          pathMap.set(item.relative_path, node);
+        }
+      });
+
+      // 然后构建树结构
+      pathMap.forEach((node, path) => {
+        const parts = path.split('/');
+        if (parts.length === 1) {
+          // 根级目录
+          treeData.push(node);
+        } else {
+          // 子目录
+          const parentPath = parts.slice(0, -1).join('/');
+          const parentNode = pathMap.get(parentPath);
+          if (parentNode) {
+            parentNode.children.push(node);
+          }
+        }
+      });
+    }
+
+    return treeData;
+  };
+
   // 处理导入确认
   const handleImportConfirm = async () => {
     if (!selectedDirectory) {
@@ -404,7 +454,13 @@ const Home = () => {
     }
 
     try {
-      const saveResponse = await apiService.saveFile(importFilePath, selectedDirectory, false);
+      // 拼接完整的目标目录路径
+      const separator = getPathSeparator();
+      const fullTargetDirectory = selectedDirectory.startsWith(workDirectory) 
+        ? selectedDirectory 
+        : `${workDirectory}${separator}${selectedDirectory.replace(/\//g, separator)}`;
+      
+      const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
       if (saveResponse.success) {
         message.success(`文件已保存到: ${selectedDirectory}`);
         loadDirectory(currentDirectory);
@@ -423,6 +479,22 @@ const Home = () => {
     setImportModalVisible(false);
     setSelectedDirectory('');
     setImportFilePath('');
+  };
+
+  // 处理手动选择目录
+  const handleManualSelectDirectory = () => {
+    setManualSelectModalVisible(true);
+  };
+
+  // 处理手动选择确认
+  const handleManualSelectConfirm = () => {
+    setManualSelectModalVisible(false);
+    // selectedDirectory 已经在TreeSelect的onChange中设置了
+  };
+
+  // 处理手动选择取消
+  const handleManualSelectCancel = () => {
+    setManualSelectModalVisible(false);
   };
 
   const handleMenuClick = ({ key }: { key: string }) => {
@@ -552,6 +624,17 @@ const Home = () => {
         onCancel={handleImportCancel}
         okText="确认保存"
         cancelText="取消"
+        footer={[
+          <Button key="cancel" onClick={handleImportCancel}>
+            取消
+          </Button>,
+          <Button key="manual" onClick={handleManualSelectDirectory}>
+            手动选择目录
+          </Button>,
+          <Button key="confirm" type="primary" onClick={handleImportConfirm}>
+            确认保存
+          </Button>,
+        ]}
       >
         <div style={{ marginBottom: 16 }}>
           <p>系统推荐保存到: <strong>{selectedDirectory}</strong></p>
@@ -568,6 +651,29 @@ const Home = () => {
               </Select.Option>
             ))}
           </Select>
+        </div>
+      </Modal>
+
+      <Modal
+        title="手动选择保存目录"
+        open={manualSelectModalVisible}
+        onOk={handleManualSelectConfirm}
+        onCancel={handleManualSelectCancel}
+        okText="确认选择"
+        cancelText="取消"
+        width={600}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p>请选择要保存文件的目标目录：</p>
+          <TreeSelect
+            style={{ width: '100%' }}
+            value={selectedDirectory}
+            dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
+            treeData={directoryTreeData}
+            placeholder="请选择目录"
+            treeDefaultExpandAll
+            onChange={(value: string) => setSelectedDirectory(value)}
+          />
         </div>
       </Modal>
     </Layout>
