@@ -58,6 +58,7 @@
 | 文件管理 | 文件预览 | POST | `/api/files/preview` | 预览文件内容（文本/图片） |
 | 文件管理 | 保存文件 | POST | `/api/files/save-file` | 保存文件到指定目录 |
 | 文件管理 | 推荐保存目录 | POST | `/api/files/recommend-directory` | 分析文件并推荐保存目录 |
+| 文件管理 | 导入RAG库 | POST | `/api/files/import-to-rag` | 将文件导入RAG库用于语义搜索 |
 | 文档分段 | 分段列表 | POST | `/api/files/chunks/list` | 获取文件分段列表 |
 | 文档分段 | 重新分段 | POST | `/api/files/reprocess` | 重新处理文件分段 |
 | 搜索检索 | 语义搜索 | POST | `/api/search/semantic` | 基于向量的语义搜索 |
@@ -441,7 +442,7 @@
 }
 ```
 
-### 1.11 递归列出目录结构
+### 1.13 递归列出目录结构
 
 **接口**: `POST /api/files/list-directory-recursive`
 
@@ -687,6 +688,83 @@
 - `LLM_NOT_AVAILABLE`: 大语言模型服务不可用
 - `LLM_ERROR`: 大语言模型调用失败
 - `ANALYSIS_ERROR`: 文件分析失败
+
+### 1.12 导入RAG库
+
+**接口**: `POST /api/files/import-to-rag`
+
+**请求参数**:
+```json
+{
+  "file_path": "string"
+}
+```
+
+**请求参数说明**:
+- `file_path`: 要导入到RAG库的文件路径
+
+**处理逻辑**:
+1. 检查文件是否存在和文件大小
+2. 如果是文档类型，使用pandoc转换为markdown格式
+3. 如果是文本文件，直接读取内容
+4. 对内容进行文本分片处理
+5. 生成embeddings并存储到向量数据库
+6. 将分片信息保存到SQLite数据库
+7. 返回导入结果
+
+**响应数据**:
+```json
+{
+  "file_id": "string",
+  "original_path": "string",
+  "filename": "string",
+  "file_size": "number",
+  "processed_size": "number",
+  "content_length": "number",
+  "import_timestamp": "string"
+}
+```
+
+**字段说明**:
+- `file_id`: RAG库中的文件唯一标识
+- `original_path`: 原始文件路径
+- `filename`: 文件名
+- `file_size`: 原始文件大小（字节）
+- `processed_size`: 处理后文件大小（字节）
+- `content_length`: 提取的内容长度
+- `import_timestamp`: 导入时间戳
+
+**示例请求**:
+```json
+{
+  "file_path": "/path/to/document.pdf"
+}
+```
+
+**示例响应**:
+```json
+{
+  "file_id": "abc123-def456-ghi789",
+  "original_path": "/path/to/document.pdf",
+  "filename": "document.pdf",
+  "file_size": 2048576,
+  "processed_size": 1536000,
+  "content_length": 45000,
+  "import_timestamp": "2025-09-14T15:30:00"
+}
+```
+
+**错误情况**:
+- `SOURCE_FILE_MISSING`: 源文件不存在
+- `INVALID_FILE_TYPE`: 路径不是文件
+- `FILE_TOO_LARGE`: 文件过大
+- `UNSUPPORTED_FILE_TYPE`: 不支持的文件类型
+- `CONVERSION_FAILED`: 文档转换失败
+- `CONVERSION_ERROR`: 转换过程出错
+- `READ_ERROR`: 读取文件失败
+- `NO_CONTENT`: 文件无内容
+- `EMBEDDING_ERROR`: 处理embeddings失败
+- `IMPORT_ERROR`: 导入过程失败
 
 ## 2. 文档分段模块接口
 
