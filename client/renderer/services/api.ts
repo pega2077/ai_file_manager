@@ -87,6 +87,39 @@ class ApiService {
       }),
     });
   }
+
+  // 递归列出目录结构
+  async listDirectoryRecursive(directoryPath: string) {
+    return this.request('/files/list-directory-recursive', {
+      method: 'POST',
+      body: JSON.stringify({
+        directory_path: directoryPath,
+      }),
+    });
+  }
+
+  // 推荐保存目录
+  async recommendDirectory(filePath: string, directories: string[]) {
+    return this.request('/files/recommend-directory', {
+      method: 'POST',
+      body: JSON.stringify({
+        file_path: filePath,
+        available_directories: directories,
+      }),
+    });
+  }
+
+  // 保存文件到指定目录
+  async saveFile(filePath: string, targetDirectory: string, overwrite: boolean = false) {
+    return this.request('/files/save-file', {
+      method: 'POST',
+      body: JSON.stringify({
+        file_path: filePath,
+        target_directory: targetDirectory,
+        overwrite,
+      }),
+    });
+  }
 }
 
 export const apiService = new ApiService();

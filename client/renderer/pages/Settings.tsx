@@ -14,6 +14,7 @@ const Settings = () => {
     autoSave: true,
     showHiddenFiles: false,
     enablePreview: true, // 新增预览开关
+    autoClassifyWithoutConfirmation: false, // 导入文件时自动分类是否不需要确认
     workDirectory: '',
   });
 
@@ -62,6 +63,7 @@ const Settings = () => {
       autoSave: true,
       showHiddenFiles: false,
       enablePreview: true,
+      autoClassifyWithoutConfirmation: false,
       workDirectory: '',
     });
     message.success('设置已重置');
@@ -124,6 +126,18 @@ const Settings = () => {
                 />
                 <Text type="secondary" style={{ marginLeft: 8 }}>
                   双击文件时显示预览而不是直接打开
+                </Text>
+              </div>
+
+              <div>
+                <Text strong>导入文件时自动分类无需确认：</Text>
+                <Switch
+                  checked={settings.autoClassifyWithoutConfirmation}
+                  onChange={(checked) => handleSettingChange('autoClassifyWithoutConfirmation', checked)}
+                  style={{ marginLeft: 16 }}
+                />
+                <Text type="secondary" style={{ marginLeft: 8 }}>
+                  启用后，导入文件时自动分类将直接应用，无需用户确认
                 </Text>
               </div>
             </div>

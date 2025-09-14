@@ -77,7 +77,7 @@ class ListDirectoryRecursiveRequest(BaseModel):
     max_depth: int = Field(3, description="Maximum depth to traverse", ge=1, le=10)
 
 class SaveFileRequest(BaseModel):
-    source_file_path: str = Field(..., description="Path of the source file to save")
+    file_path: str = Field(..., description="Path of the source file to save")
     target_directory: str = Field(..., description="Target directory path")
     overwrite: bool = Field(False, description="Whether to overwrite if file exists")
 
@@ -1068,7 +1068,7 @@ async def save_file(request: SaveFileRequest):
     """Save file to specified directory"""
     try:
         result = file_manager.save_file_to_directory(
-            source_file_path=request.source_file_path,
+            source_file_path=request.file_path,
             target_directory=request.target_directory,
             overwrite=request.overwrite
         )

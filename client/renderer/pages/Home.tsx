@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Layout, Table, Spin, message, Button } from 'antd';
+import { Layout, Table, Spin, message, Button, Modal, TreeSelect } from 'antd';
 import { ArrowUpOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
@@ -34,9 +34,28 @@ interface FileItem {
   item_count: number | null;
 }
 
+interface DirectoryItem {
+  name: string;
+  type: 'file' | 'folder';
+  children?: DirectoryItem[];
+}
+
+interface TreeNode {
+  title: string;
+  value: string;
+  key: string;
+  children: TreeNode[];
+}
+
 interface DirectoryResponse {
   directory_path: string;
   items: FileItem[];
+  total_count: number;
+}
+
+interface DirectoryStructureResponse {
+  directory_path: string;
+  items: DirectoryItem[];
   total_count: number;
 }
 
@@ -59,6 +78,7 @@ interface Settings {
   autoSave: boolean;
   showHiddenFiles: boolean;
   enablePreview: boolean;
+  autoClassifyWithoutConfirmation: boolean;
   workDirectory: string;
 }
 
@@ -68,6 +88,10 @@ const Home = () => {
   const [workDirectory, setWorkDirectory] = useState<string>('');
   const [fileList, setFileList] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [selectedDirectory, setSelectedDirectory] = useState<string>('');
+  const [importFilePath, setImportFilePath] = useState<string>('');
+  const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
   const [selectedMenu, setSelectedMenu] = useState('files');
   const [enablePreview, setEnablePreview] = useState(true);
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -262,16 +286,42 @@ const Home = () => {
         return; // 用户取消了选择
       }
 
-      // 调用API导入文件
-      const response = await apiService.importFile(filePath);
-      if (response.success) {
-        const fileData = response.data as ImportFileResponse;
-        const fileName = fileData?.name || '文件';
-        message.success(`文件导入成功: ${fileName}`);
-        // 刷新当前目录列表
-        loadDirectory(currentDirectory);
+      // 步骤1: 获取工作目录的目录结构（递归）
+      const directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
+      if (!directoryStructureResponse.success) {
+        message.error('获取目录结构失败');
+        return;
+      }
+
+      // 提取目录路径列表
+      const directories = extractDirectoriesFromStructure(directoryStructureResponse.data);
+
+      // 步骤2: 调用推荐保存目录接口
+      const recommendResponse = await apiService.recommendDirectory(filePath, directories);
+      if (!recommendResponse.success) {
+        message.error('获取推荐目录失败');
+        return;
+      }
+
+      const recommendedDirectory = recommendResponse.data?.recommended_directory;
+
+      // 步骤3: 获取设置选项 autoClassifyWithoutConfirmation
+      const settings = await window.electronStore.get('settings') as Settings;
+      const autoClassifyWithoutConfirmation = settings?.autoClassifyWithoutConfirmation || false;
+
+      if (autoClassifyWithoutConfirmation) {
+        // 步骤4: 自动保存到推荐目录
+        const saveResponse = await apiService.saveFile(filePath, recommendedDirectory, false);
+        if (saveResponse.success) {
+          message.success(`文件已自动保存到: ${recommendedDirectory}`);
+          // 刷新当前目录列表
+          loadDirectory(currentDirectory);
+        } else {
+          message.error(saveResponse.message || '文件保存失败');
+        }
       } else {
-        message.error(response.message || '文件导入失败');
+        // 步骤5: 弹出确认对话框
+        await showImportConfirmationDialog(filePath, recommendedDirectory, directories);
       }
     } catch (error) {
       message.error('文件导入失败');
@@ -282,6 +332,107 @@ const Home = () => {
   const getPathSeparator = () => {
     // 使用 userAgent 检测 Windows 平台，避免使用已弃用的 platform 属性
     return navigator.userAgent.includes('Windows') ? '\\' : '/';
+  };
+
+  // 从目录结构响应中提取目录路径列表
+  const extractDirectoriesFromStructure = (structureData: DirectoryStructureResponse): string[] => {
+    const directories: string[] = [];
+
+    const traverse = (items: DirectoryItem[], currentPath: string = '') => {
+      for (const item of items) {
+        if (item.type === 'folder') {
+          const fullPath = currentPath ? `${currentPath}${getPathSeparator()}${item.name}` : item.name;
+          directories.push(fullPath);
+          if (item.children && item.children.length > 0) {
+            traverse(item.children, fullPath);
+          }
+        }
+      }
+    };
+
+    if (structureData && structureData.items) {
+      traverse(structureData.items);
+    }
+
+    return directories;
+  };
+
+  // 显示导入确认对话框
+  const showImportConfirmationDialog = async (filePath: string, recommendedDirectory: string, directories: string[]) => {
+    setImportFilePath(filePath);
+    setSelectedDirectory(recommendedDirectory);
+
+    // 构建树形数据
+    const treeData = buildTreeData(directories);
+    setDirectoryTreeData(treeData);
+
+    setImportModalVisible(true);
+  };
+
+  // 构建树形选择数据
+  const buildTreeData = (directories: string[]): TreeNode[] => {
+    const treeData: TreeNode[] = [];
+    const pathMap: { [key: string]: TreeNode } = {};
+
+    directories.forEach(dir => {
+      const parts = dir.split(getPathSeparator());
+      let currentPath = '';
+      let parentNode: TreeNode | null = null;
+
+      parts.forEach((part) => {
+        currentPath = currentPath ? `${currentPath}${getPathSeparator()}${part}` : part;
+
+        if (!pathMap[currentPath]) {
+          const node: TreeNode = {
+            title: part,
+            value: currentPath,
+            key: currentPath,
+            children: [],
+          };
+
+          pathMap[currentPath] = node;
+
+          if (parentNode) {
+            parentNode.children.push(node);
+          } else {
+            treeData.push(node);
+          }
+        }
+
+        parentNode = pathMap[currentPath];
+      });
+    });
+
+    return treeData;
+  };
+
+  // 处理导入确认
+  const handleImportConfirm = async () => {
+    if (!selectedDirectory) {
+      message.error('请选择保存目录');
+      return;
+    }
+
+    try {
+      const saveResponse = await apiService.saveFile(importFilePath, selectedDirectory, false);
+      if (saveResponse.success) {
+        message.success(`文件已保存到: ${selectedDirectory}`);
+        loadDirectory(currentDirectory);
+        setImportModalVisible(false);
+      } else {
+        message.error(saveResponse.message || '文件保存失败');
+      }
+    } catch (error) {
+      message.error('文件保存失败');
+      console.error(error);
+    }
+  };
+
+  // 处理导入取消
+  const handleImportCancel = () => {
+    setImportModalVisible(false);
+    setSelectedDirectory('');
+    setImportFilePath('');
   };
 
   const handleMenuClick = ({ key }: { key: string }) => {
@@ -403,6 +554,28 @@ const Home = () => {
           }}
         />
       )}
+
+      <Modal
+        title="选择保存目录"
+        open={importModalVisible}
+        onOk={handleImportConfirm}
+        onCancel={handleImportCancel}
+        okText="确认保存"
+        cancelText="取消"
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p>请选择要保存文件的目标目录：</p>
+          <TreeSelect
+            style={{ width: '100%' }}
+            value={selectedDirectory}
+            dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
+            treeData={directoryTreeData}
+            placeholder="请选择目录"
+            treeDefaultExpandAll
+            onChange={(value) => setSelectedDirectory(value)}
+          />
+        </div>
+      </Modal>
     </Layout>
   );
 };
