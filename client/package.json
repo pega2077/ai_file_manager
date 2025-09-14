@@ -13,8 +13,10 @@
     "@ant-design/cssinjs": "^1.24.0",
     "@ant-design/icons": "^6.0.2",
     "antd": "^5.27.3",
+    "electron-store": "^10.1.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^7.9.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",

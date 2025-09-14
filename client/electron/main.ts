@@ -1,10 +1,14 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import Store from 'electron-store'
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// Initialize electron-store
+const store = new Store()
 
 // The built directory structure
 //
@@ -46,6 +50,23 @@ function createWindow() {
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))
   }
 }
+
+// IPC handlers for electron-store
+ipcMain.handle('store:get', (event, key) => {
+  return store.get(key)
+})
+
+ipcMain.handle('store:set', (event, key, value) => {
+  store.set(key, value)
+})
+
+ipcMain.handle('store:delete', (event, key) => {
+  store.delete(key)
+})
+
+ipcMain.handle('store:has', (event, key) => {
+  return store.has(key)
+})
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
