@@ -163,15 +163,26 @@ const Home = () => {
       render: (_text: string, record: FileItem) => (
         <div style={{ display: 'flex', gap: '8px' }}>
           {record.type === 'file' && (
-            <Button
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePreview(record);
-              }}
-            >
-              预览
-            </Button>
+            <>
+              <Button
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePreview(record);
+                }}
+              >
+                预览
+              </Button>
+              <Button
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleImportToRag(record);
+                }}
+              >
+                导入知识库
+              </Button>
+            </>
           )}
           <Button
             size="small"
@@ -258,6 +269,26 @@ const Home = () => {
     const fullPath = `${currentDirectory}${separator}${record.name}`;
     setPreviewFile({ path: fullPath, name: record.name });
     setPreviewVisible(true);
+  };
+
+  const handleImportToRag = async (record: FileItem) => {
+    const separator = getPathSeparator();
+    const fullPath = `${currentDirectory}${separator}${record.name}`;
+    
+    try {
+      const loadingKey = message.loading('正在导入知识库...', 0);
+      const ragResponse = await apiService.importToRag(fullPath);
+      loadingKey();
+      
+      if (ragResponse.success) {
+        message.success('文件已成功导入知识库');
+      } else {
+        message.warning('导入知识库失败');
+      }
+    } catch (error) {
+      message.error('导入知识库失败');
+      console.error(error);
+    }
   };
 
   const handleOpenFolder = async (record: FileItem) => {

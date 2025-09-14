@@ -365,13 +365,21 @@ async def import_file(request: FileImportRequestBody):
         
         # For content analysis, we need to get a preview first
         markdown_content = None
-        if is_document and file_manager.is_text_file(source_file_path):
+        if file_manager.is_text_file(source_file_path):
             # For text files, read content for analysis
             try:
                 with open(source_file_path, 'r', encoding='utf-8') as f:
                     markdown_content = f.read()[:2000]  # Preview for analysis
             except Exception as e:
                 logger.warning(f"Could not read file for content analysis: {e}")
+        elif is_document:
+            # For other document types, try to convert for analysis
+            try:
+                success, content = file_manager.converter.convert_to_markdown(str(source_file_path), None)
+                if success and content:
+                    markdown_content = content[:2000]
+            except Exception as e:
+                logger.warning(f"Could not convert document for content analysis: {e}")
         
         # Determine final category
         final_category = request.category

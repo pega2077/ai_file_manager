@@ -634,7 +634,14 @@ Example response format:
 
             # Extract content for analysis
             content_preview = ""
-            if self.is_document_type(source_path):
+            if self.is_text_file(source_path):
+                # Read text file directly
+                try:
+                    with open(source_path, 'r', encoding='utf-8') as f:
+                        content_preview = f.read(500)
+                except Exception as e:
+                    logger.warning(f"Could not read text file {filename}: {e}")
+            elif self.is_document_type(source_path):
                 # Convert document to text using pandoc
                 try:
                     success, converted_content = self.converter.convert_to_markdown(str(source_path), None)
@@ -645,13 +652,6 @@ Example response format:
                         logger.warning(f"Failed to convert document {filename} to text")
                 except Exception as e:
                     logger.error(f"Error converting document {filename}: {e}")
-            elif self.is_text_file(source_path):
-                # Read text file directly
-                try:
-                    with open(source_path, 'r', encoding='utf-8') as f:
-                        content_preview = f.read(500)
-                except Exception as e:
-                    logger.warning(f"Could not read text file {filename}: {e}")
 
             # Use LLM to recommend directory
             try:
@@ -819,7 +819,22 @@ If no suitable directory is found, you can suggest creating a new one by specify
             temp_md_path = None
             markdown_content = None
 
-            if self.is_document_type(source_path):
+            if self.is_text_file(source_path):
+                # For text files, read directly
+                try:
+                    with open(source_path, 'r', encoding='utf-8') as f:
+                        markdown_content = f.read()
+
+                    final_file_path = source_path
+                    final_file_size = file_size
+                except Exception as e:
+                    logger.error(f"Error reading text file {filename}: {e}")
+                    return create_error_response(
+                        message="Failed to read text file",
+                        error_code="READ_ERROR",
+                        error_details=str(e)
+                    )
+            elif self.is_document_type(source_path):
                 # For document types, convert to markdown
                 try:
                     # Create a temporary markdown file
@@ -840,21 +855,6 @@ If no suitable directory is found, you can suggest creating a new one by specify
                     return create_error_response(
                         message="Document conversion failed",
                         error_code="CONVERSION_ERROR",
-                        error_details=str(e)
-                    )
-            elif self.is_text_file(source_path):
-                # For text files, read directly
-                try:
-                    with open(source_path, 'r', encoding='utf-8') as f:
-                        markdown_content = f.read()
-
-                    final_file_path = source_path
-                    final_file_size = file_size
-                except Exception as e:
-                    logger.error(f"Error reading text file {filename}: {e}")
-                    return create_error_response(
-                        message="Failed to read text file",
-                        error_code="READ_ERROR",
                         error_details=str(e)
                     )
             else:
