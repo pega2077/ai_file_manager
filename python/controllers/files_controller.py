@@ -70,6 +70,10 @@ class DirectoryItem(BaseModel):
 class ListDirectoryRequest(BaseModel):
     directory_path: str = Field(..., description="Path to the directory to list")
 
+class ListDirectoryRecursiveRequest(BaseModel):
+    directory_path: str = Field(..., description="Path to the directory to list recursively")
+    max_depth: int = Field(3, description="Maximum depth to traverse", ge=1, le=10)
+
 # 文档类型检测
 DOCUMENT_EXTENSIONS = {
     '.txt', '.md', '.markdown', '.rst', '.tex',
@@ -214,7 +218,8 @@ class FileManager:
         self, 
         filename: str, 
         content: str, 
-        existing_categories: List[str]
+        existing_categories: List[str],
+        directory_structure: Optional[List[Dict[str, str]]] = None
     ) -> CategorySuggestion:
         """Use LLM to suggest file category"""
         try:
@@ -227,7 +232,7 @@ class FileManager:
                 return self._rule_based_categorization(filename, content, existing_categories)
             
             # Prepare prompt for LLM
-            prompt = self._create_categorization_prompt(filename, content, existing_categories)
+            prompt = self._create_categorization_prompt(filename, content, existing_categories, directory_structure)
             # logger.debug(f"LLM categorization prompt: {prompt}")
             # Get LLM response
             response = await llm.generate_response(prompt)
@@ -245,15 +250,41 @@ class FileManager:
         self, 
         filename: str, 
         content: str, 
-        existing_categories: List[str]
+        existing_categories: List[str],
+        directory_structure: Optional[List[Dict[str, str]]] = None
     ) -> str:
         """Create prompt for LLM categorization"""
         content_preview = content[:1000] if content else "No content available"
         
+        # Build directory structure info if provided
+        directory_info = ""
+        if directory_structure:
+            dir_items = []
+            for item in directory_structure:
+                item_type = item.get("type", "")
+                item_name = item.get("name", "")
+                if item_type == "folder":
+                    dir_items.append(f"📁 {item_name}")
+                elif item_type == "file":
+                    dir_items.append(f"📄 {item_name}")
+            
+            if dir_items:
+                directory_info = f"\n\nDirectory context (where this file will be placed):\n" + "\n".join(dir_items[:20])  # Limit to 20 items
+        
+        # Build the guidelines section
+        guidelines = """Guidelines:
+1. Prefer existing categories when appropriate
+2. Suggest clear, descriptive category names
+3. Consider file type, content topic, and intended use
+4. Keep category names concise and meaningful"""
+        
+        if directory_info:
+            guidelines += "\n5. Consider the directory context - suggest categories that fit well with the existing folder structure"
+        
         prompt = f"""Analyze this file and suggest the best category for organization.
 
 Filename: {filename}
-Content preview: {content_preview}
+Content preview: {content_preview}{directory_info}
 
 Existing categories: {', '.join(existing_categories) if existing_categories else 'None'}
 
@@ -263,11 +294,7 @@ Please respond with a JSON object containing:
 - "reason": Brief explanation for the categorization
 - "existing_category": The existing category name if you recommend using one, null if suggesting a new category
 
-Guidelines:
-1. Prefer existing categories when appropriate
-2. Suggest clear, descriptive category names
-3. Consider file type, content topic, and intended use
-4. Keep category names concise and meaningful
+{guidelines}
 
 Example response format:
 {{"suggested_category": "Documents", "confidence": 0.9, "reason": "Word document containing meeting notes", "existing_category": "Documents"}}
@@ -492,6 +519,88 @@ Example response format:
             logger.error(f"Error listing directory structure: {e}")
             return []
 
+    def list_directory_structure_recursive(self, directory_path: str, max_depth: int = 3) -> List[Dict[str, Any]]:
+        """Recursively list directory structure as a flat list with depth limit"""
+        try:
+            dir_path = Path(directory_path)
+            
+            if not dir_path.exists():
+                logger.warning(f"Directory does not exist: {directory_path}")
+                return []
+            
+            if not dir_path.is_dir():
+                logger.warning(f"Path is not a directory: {directory_path}")
+                return []
+            
+            result = []
+            
+            def collect_items(current_path: Path, current_depth: int = 0, relative_path: str = ""):
+                """Recursively collect all items into a flat list"""
+                if current_depth > max_depth:
+                    return
+                
+                try:
+                    stat = current_path.stat()
+                    item_info = {
+                        "name": current_path.name,
+                        "type": "folder" if current_path.is_dir() else "file",
+                        "path": str(current_path),
+                        "relative_path": relative_path or ".",
+                        "depth": current_depth
+                    }
+                    
+                    # Add file/folder specific info
+                    if current_path.is_file():
+                        item_info.update({
+                            "size": stat.st_size,
+                            "created_at": datetime.fromtimestamp(getattr(stat, 'st_birthtime', stat.st_ctime)).isoformat(),
+                            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                        })
+                    else:
+                        # For directories, add item count
+                        try:
+                            children = list(current_path.iterdir())
+                            item_info["item_count"] = len(children)
+                            
+                            # Recursively collect children
+                            for child in sorted(children):
+                                child_relative_path = f"{relative_path}/{child.name}" if relative_path != "." else child.name
+                                collect_items(child, current_depth + 1, child_relative_path)
+                                
+                        except (OSError, PermissionError) as e:
+                            logger.warning(f"Could not list contents of {current_path}: {e}")
+                            item_info["item_count"] = 0
+                            item_info["access_error"] = str(e)
+                        
+                        # Add timestamps for directories too
+                        try:
+                            item_info["created_at"] = datetime.fromtimestamp(getattr(stat, 'st_birthtime', stat.st_ctime)).isoformat()
+                            item_info["modified_at"] = datetime.fromtimestamp(stat.st_mtime).isoformat()
+                        except (AttributeError, OSError):
+                            item_info["created_at"] = None
+                            item_info["modified_at"] = None
+                    
+                    result.append(item_info)
+                    
+                except (OSError, PermissionError) as e:
+                    logger.warning(f"Could not access {current_path}: {e}")
+                    result.append({
+                        "name": current_path.name,
+                        "type": "folder" if current_path.is_dir() else "file",
+                        "path": str(current_path),
+                        "relative_path": relative_path or ".",
+                        "depth": current_depth,
+                        "access_error": str(e)
+                    })
+            
+            collect_items(dir_path, 0, ".")
+            logger.info(f"Collected {len(result)} items from recursive directory listing for {directory_path} with max_depth {max_depth}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error building recursive directory structure: {e}")
+            return []
+
 # Initialize file manager
 file_manager = FileManager()
 
@@ -689,6 +798,7 @@ class FileImportRequestBody(BaseModel):
     category: Optional[str] = Field(None, description="Manual category assignment")
     tags: Optional[List[str]] = Field(default_factory=list, description="Manual tags")
     auto_process: bool = Field(True, description="Auto process file (categorize, summarize, embedding)")
+    directory_structure: Optional[List[Dict[str, str]]] = Field(None, description="Directory structure for contextual categorization")
 
 @files_router.post("/import", 
     summary="Import file to workspace",
@@ -773,7 +883,8 @@ async def import_file(request: FileImportRequestBody):
             category_suggestion = await file_manager.suggest_category_with_llm(
                 filename, 
                 content_for_analysis, 
-                existing_categories
+                existing_categories,
+                request.directory_structure
             )
             final_category = category_suggestion.suggested_category
         
@@ -1251,6 +1362,65 @@ async def list_directory(request: ListDirectoryRequest):
         logger.error(f"Error listing directory: {e}")
         return create_error_response(
             message="Failed to list directory contents",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )
+
+@files_router.post("/list-directory-recursive",
+    summary="List directory structure recursively",
+    description="""
+    List the complete directory structure recursively with depth limit.
+    
+    **Parameters:**
+    - directory_path: Path to the directory to list recursively
+    - max_depth: Maximum depth to traverse (1-10, default 3)
+    
+    **Returns:**
+    Tree structure with nested children, sizes, and timestamps
+    """,
+    responses={
+        200: {"description": "Directory tree retrieved successfully"},
+        400: {"description": "Invalid directory path or depth"},
+        500: {"description": "Server error during directory traversal"}
+    }
+)
+async def list_directory_recursive(request: ListDirectoryRecursiveRequest):
+    """List directory structure recursively with depth limit"""
+    try:
+        # Validate max_depth
+        if request.max_depth < 1 or request.max_depth > 10:
+            return create_error_response(
+                message="max_depth must be between 1 and 10",
+                error_code="INVALID_REQUEST"
+            )
+        
+        # Validate directory path
+        if not request.directory_path or not request.directory_path.strip():
+            return create_error_response(
+                message="Directory path is required",
+                error_code="INVALID_REQUEST"
+            )
+        
+        # Build recursive directory list
+        items = file_manager.list_directory_structure_recursive(
+            request.directory_path, 
+            request.max_depth
+        )
+        
+        return create_success_response(
+            message=f"Successfully listed directory contents with max depth {request.max_depth}",
+            data={
+                "directory_path": request.directory_path,
+                "max_depth": request.max_depth,
+                "items": items,
+                "total_count": len(items)
+            }
+        )
+            
+    except Exception as e:
+        logger.error(f"Error listing directory recursively: {e}")
+        return create_error_response(
+            message="Failed to list directory tree",
             error_code="INTERNAL_ERROR",
             error_details=str(e)
         )

@@ -54,6 +54,7 @@
 | 文件管理 | 更新文件 | POST | `/api/files/update` | 更新文件信息 |
 | 文件管理 | 创建文件夹结构 | POST | `/api/files/create-folders` | 创建文件夹结构 |
 | 文件管理 | 列出目录结构 | POST | `/api/files/list-directory` | 列出目录内容 |
+| 文件管理 | 递归列出目录结构 | POST | `/api/files/list-directory-recursive` | 递归列出目录树结构 |
 | 文件管理 | 文件预览 | POST | `/api/files/preview` | 预览文件内容（文本/图片） |
 | 文档分段 | 分段列表 | POST | `/api/files/chunks/list` | 获取文件分段列表 |
 | 文档分段 | 重新分段 | POST | `/api/files/reprocess` | 重新处理文件分段 |
@@ -79,9 +80,22 @@
   "file_path": "string",
   "category": "string", // 可选，手动指定分类
   "tags": ["string"],   // 可选，手动指定标签
-  "auto_process": true  // 是否自动处理（分类、摘要、embedding）
+  "auto_process": true, // 是否自动处理（分类、摘要、embedding）
+  "directory_structure": [ // 可选，目录结构上下文，用于智能分类
+    {
+      "name": "string",
+      "type": "folder|file"
+    }
+  ]
 }
 ```
+
+**请求参数说明**:
+- `file_path`: 要导入的本地文件路径
+- `category`: 可选，手动指定分类
+- `tags`: 可选，手动指定标签数组
+- `auto_process`: 是否自动处理（分类、摘要、embedding），默认为 true
+- `directory_structure`: 可选，目录结构上下文，当提供时会用于生成更准确的分类建议
 
 **响应数据**:
 ```json
@@ -422,6 +436,115 @@
   "mime_type": "image/jpeg",
   "content": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z",
   "size": 2048576
+}
+```
+
+### 1.8 递归列出目录结构
+
+**接口**: `POST /api/files/list-directory-recursive`
+
+**请求参数**:
+```json
+{
+  "directory_path": "string",
+  "max_depth": "number"
+}
+```
+
+**请求参数说明**:
+- `directory_path`: 要递归列出的目录路径
+- `max_depth`: 最大遍历深度（1-10，默认3）
+
+**响应数据**:
+```json
+{
+  "directory_path": "string",
+  "max_depth": "number",
+  "items": [
+    {
+      "name": "string",
+      "type": "folder|file",
+      "path": "string",
+      "relative_path": "string",
+      "depth": "number",
+      "size": "number|null",
+      "created_at": "string|null",
+      "modified_at": "string|null",
+      "item_count": "number|null"
+    }
+  ],
+  "total_count": "number"
+}
+```
+
+**字段说明**:
+- `items`: 文件和文件夹的列表
+  - `name`: 项目名称
+  - `type`: 类型（"folder" 或 "file"）
+  - `path`: 完整路径
+  - `relative_path`: 相对于目标目录的相对路径
+  - `depth`: 当前深度级别
+  - `size`: 文件大小（仅文件）
+  - `created_at`: 创建时间
+  - `modified_at`: 修改时间
+  - `item_count`: 子项数量（仅文件夹）
+
+**示例请求**:
+```json
+{
+  "directory_path": "/path/to/directory",
+  "max_depth": 2
+}
+```
+
+**示例响应**:
+```json
+{
+  "directory_path": "/path/to/directory",
+  "max_depth": 2,
+  "items": [
+    {
+      "name": "directory",
+      "type": "folder",
+      "path": "/path/to/directory",
+      "relative_path": ".",
+      "depth": 0,
+      "created_at": "2025-09-14T10:30:00",
+      "modified_at": "2025-09-14T15:45:00",
+      "item_count": 2
+    },
+    {
+      "name": "Documents",
+      "type": "folder",
+      "path": "/path/to/directory/Documents",
+      "relative_path": "Documents",
+      "depth": 1,
+      "created_at": "2025-09-14T10:35:00",
+      "modified_at": "2025-09-14T14:20:00",
+      "item_count": 1
+    },
+    {
+      "name": "readme.txt",
+      "type": "file",
+      "path": "/path/to/directory/Documents/readme.txt",
+      "relative_path": "Documents/readme.txt",
+      "depth": 2,
+      "size": 1024,
+      "created_at": "2025-09-14T10:40:00",
+      "modified_at": "2025-09-14T10:40:00"
+    },
+    {
+      "name": "image.jpg",
+      "type": "file",
+      "path": "/path/to/directory/image.jpg",
+      "relative_path": "image.jpg",
+      "depth": 1,
+      "size": 2048576,
+      "created_at": "2025-09-14T11:00:00",
+      "modified_at": "2025-09-14T11:00:00"
+    }
+  ],
+  "total_count": 4
 }
 ```
 
