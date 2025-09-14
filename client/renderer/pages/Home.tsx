@@ -4,6 +4,7 @@ import { ArrowUpOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import Sidebar from '../components/Sidebar';
+import FilePreview from '../components/FilePreview';
 
 const { Content } = Layout;
 
@@ -12,6 +13,7 @@ declare global {
     electronAPI: {
       selectFolder: () => Promise<string | null>;
       openFile: (filePath: string) => Promise<boolean>;
+      openFolder: (filePath: string) => Promise<boolean>;
     };
     electronStore: {
       get: (key: string) => Promise<unknown>;
@@ -37,6 +39,15 @@ interface DirectoryResponse {
   total_count: number;
 }
 
+interface Settings {
+  theme: string;
+  language: string;
+  autoSave: boolean;
+  showHiddenFiles: boolean;
+  enablePreview: boolean;
+  workDirectory: string;
+}
+
 const Home = () => {
   const navigate = useNavigate();
   const [currentDirectory, setCurrentDirectory] = useState<string>('');
@@ -44,6 +55,9 @@ const Home = () => {
   const [fileList, setFileList] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedMenu, setSelectedMenu] = useState('files');
+  const [enablePreview, setEnablePreview] = useState(true);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{ path: string; name: string } | null>(null);
 
   const columns = [
     {
@@ -95,6 +109,43 @@ const Home = () => {
       key: 'modified_at',
       render: (date: string | null) => date ? new Date(date).toLocaleString() : '-',
     },
+    {
+      title: '操作',
+      key: 'actions',
+      render: (_text: string, record: FileItem) => (
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {record.type === 'file' && (
+            <Button
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePreview(record);
+              }}
+            >
+              预览
+            </Button>
+          )}
+          <Button
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenFolder(record);
+            }}
+          >
+            打开文件夹
+          </Button>
+          <Button
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenFile(record);
+            }}
+          >
+            直接打开
+          </Button>
+        </div>
+      ),
+    },
   ];
 
   const loadDirectory = async (directoryPath: string) => {
@@ -116,22 +167,26 @@ const Home = () => {
   };
 
   useEffect(() => {
-    // 从store读取工作目录
-    const loadWorkDirectory = async () => {
+    // 从store读取工作目录和设置
+    const loadInitialData = async () => {
       if (window.electronStore) {
         try {
           const storedWorkDirectory = await window.electronStore.get('workDirectory') as string;
-          console.log('Loaded workDirectory from store:', storedWorkDirectory);
+          const settings = await window.electronStore.get('settings') as Settings;
+          
           if (storedWorkDirectory) {
             setWorkDirectory(storedWorkDirectory);
             setCurrentDirectory(storedWorkDirectory);
           } else {
-            // 如果没有设置工作目录，使用默认的workdir
             setWorkDirectory('workdir');
             setCurrentDirectory('workdir');
           }
+          
+          if (settings && typeof settings.enablePreview === 'boolean') {
+            setEnablePreview(settings.enablePreview);
+          }
         } catch (error) {
-          console.error('Failed to load workDirectory from store:', error);
+          console.error('Failed to load initial data:', error);
           setWorkDirectory('workdir');
           setCurrentDirectory('workdir');
         }
@@ -141,7 +196,7 @@ const Home = () => {
       }
     };
 
-    loadWorkDirectory();
+    loadInitialData();
   }, []);
 
   useEffect(() => {
@@ -149,6 +204,41 @@ const Home = () => {
       loadDirectory(currentDirectory);
     }
   }, [currentDirectory]);
+
+  const handlePreview = (record: FileItem) => {
+    const separator = getPathSeparator();
+    const fullPath = `${currentDirectory}${separator}${record.name}`;
+    setPreviewFile({ path: fullPath, name: record.name });
+    setPreviewVisible(true);
+  };
+
+  const handleOpenFolder = async (record: FileItem) => {
+    const separator = getPathSeparator();
+    const fullPath = `${currentDirectory}${separator}${record.name}`;
+    try {
+      const success = await window.electronAPI.openFolder(fullPath);
+      if (!success) {
+        message.error('无法打开文件夹');
+      }
+    } catch (error) {
+      message.error('打开文件夹失败');
+      console.error(error);
+    }
+  };
+
+  const handleOpenFile = async (record: FileItem) => {
+    const separator = getPathSeparator();
+    const fullPath = `${currentDirectory}${separator}${record.name}`;
+    try {
+      const success = await window.electronAPI.openFile(fullPath);
+      if (!success) {
+        message.error('无法打开文件');
+      }
+    } catch (error) {
+      message.error('打开文件失败');
+      console.error(error);
+    }
+  };
 
   const getPathSeparator = () => {
     // 使用 userAgent 检测 Windows 平台，避免使用已弃用的 platform 属性
@@ -200,15 +290,22 @@ const Home = () => {
       // 切换到子目录
       setCurrentDirectory(fullPath);
     } else {
-      // 打开文件
-      try {
-        const success = await window.electronAPI.openFile(fullPath);
-        if (!success) {
-          message.error('无法打开文件');
+      // 根据设置决定是预览还是直接打开
+      if (enablePreview) {
+        // 启用预览，显示预览模态框
+        setPreviewFile({ path: fullPath, name: record.name });
+        setPreviewVisible(true);
+      } else {
+        // 直接打开文件
+        try {
+          const success = await window.electronAPI.openFile(fullPath);
+          if (!success) {
+            message.error('无法打开文件');
+          }
+        } catch (error) {
+          message.error('打开文件失败');
+          console.error(error);
         }
-      } catch (error) {
-        message.error('打开文件失败');
-        console.error(error);
       }
     }
   };
@@ -249,6 +346,17 @@ const Home = () => {
           </Spin>
         </Content>
       </Layout>
+      {previewFile && (
+        <FilePreview
+          filePath={previewFile.path}
+          fileName={previewFile.name}
+          visible={previewVisible}
+          onClose={() => {
+            setPreviewVisible(false);
+            setPreviewFile(null);
+          }}
+        />
+      )}
     </Layout>
   );
 };

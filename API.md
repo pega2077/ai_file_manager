@@ -54,6 +54,7 @@
 | 文件管理 | 更新文件 | POST | `/api/files/update` | 更新文件信息 |
 | 文件管理 | 创建文件夹结构 | POST | `/api/files/create-folders` | 创建文件夹结构 |
 | 文件管理 | 列出目录结构 | POST | `/api/files/list-directory` | 列出目录内容 |
+| 文件管理 | 文件预览 | POST | `/api/files/preview` | 预览文件内容（文本/图片） |
 | 文档分段 | 分段列表 | POST | `/api/files/chunks/list` | 获取文件分段列表 |
 | 文档分段 | 重新分段 | POST | `/api/files/reprocess` | 重新处理文件分段 |
 | 搜索检索 | 语义搜索 | POST | `/api/search/semantic` | 基于向量的语义搜索 |
@@ -341,6 +342,86 @@
     }
   ],
   "total_count": 3
+}
+```
+
+### 1.8 文件预览
+
+**接口**: `POST /api/files/preview`
+
+**请求参数**:
+```json
+{
+  "file_path": "string"
+}
+```
+
+**请求参数说明**:
+- `file_path`: 要预览的文件的完整路径
+
+**支持的文件类型**:
+- **文本文件**: `.txt`, `.md`, `.json`, `.py`, `.js`, `.ts`, `.html`, `.css`, `.xml`, `.yaml`, `.yml`, `.ini`, `.cfg`, `.conf`, `.log`, `.sh`, `.bat`, `.ps1`, `.sql`, `.csv`, `.rtf` 等
+- **图片文件**: `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.webp`, `.svg`, `.ico` 等
+
+**响应数据**:
+```json
+{
+  "file_path": "string",
+  "file_type": "text|image",
+  "mime_type": "string",
+  "content": "string",
+  "size": "number",
+  "truncated": "boolean"  // 仅文本文件，是否被截断
+}
+```
+
+**字段说明**:
+- `file_path`: 文件完整路径
+- `file_type`: 文件类型，"text" 或 "image"
+- `mime_type`: MIME 类型
+- `content`: 
+  - 文本文件：文件内容（前10KB）
+  - 图片文件：base64编码的数据URI（如 "data:image/jpeg;base64,/9j/4AAQ..."）
+- `size`: 文件大小（字节）
+- `truncated`: 是否被截断（仅文本文件）
+- `encoding`: 使用的文本编码（仅文本文件）
+
+**支持的文本编码**:
+- UTF-8 (默认)
+- GBK
+- GB2312
+- UTF-16
+- Latin-1
+
+如果所有编码尝试都失败，将返回错误信息。
+
+**示例请求**:
+```json
+{
+  "file_path": "/path/to/document.txt"
+}
+```
+
+**示例响应** (文本文件):
+```json
+{
+  "file_path": "/path/to/document.txt",
+  "file_type": "text",
+  "mime_type": "text/plain",
+  "content": "This is the content of the text file...",
+  "size": 1024,
+  "truncated": false
+}
+```
+
+**示例响应** (图片文件):
+```json
+{
+  "file_path": "/path/to/image.jpg",
+  "file_type": "image",
+  "mime_type": "image/jpeg",
+  "content": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+IRjWjBqO6O2mhP//Z",
+  "size": 2048576
 }
 ```
 

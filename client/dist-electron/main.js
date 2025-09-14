@@ -15379,6 +15379,16 @@ ipcMain$1.handle("open-file", async (_event, filePath) => {
     return false;
   }
 });
+ipcMain$1.handle("open-folder", async (_event, filePath) => {
+  try {
+    const folderPath = path.dirname(filePath);
+    await shell$1.openPath(folderPath);
+    return true;
+  } catch (error2) {
+    console.error("Failed to open folder:", error2);
+    return false;
+  }
+});
 app$1.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app$1.quit();

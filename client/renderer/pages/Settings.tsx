@@ -13,6 +13,7 @@ const Settings = () => {
     language: 'zh-CN',
     autoSave: true,
     showHiddenFiles: false,
+    enablePreview: true, // 新增预览开关
     workDirectory: '',
   });
 
@@ -60,6 +61,7 @@ const Settings = () => {
       language: 'zh-CN',
       autoSave: true,
       showHiddenFiles: false,
+      enablePreview: true,
       workDirectory: '',
     });
     message.success('设置已重置');
@@ -111,6 +113,18 @@ const Settings = () => {
                   onChange={(checked) => handleSettingChange('showHiddenFiles', checked)}
                   style={{ marginLeft: 16 }}
                 />
+              </div>
+
+              <div>
+                <Text strong>启用文件预览：</Text>
+                <Switch
+                  checked={settings.enablePreview}
+                  onChange={(checked) => handleSettingChange('enablePreview', checked)}
+                  style={{ marginLeft: 16 }}
+                />
+                <Text type="secondary" style={{ marginLeft: 8 }}>
+                  双击文件时显示预览而不是直接打开
+                </Text>
               </div>
             </div>
           </Card>

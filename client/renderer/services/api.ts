@@ -64,6 +64,16 @@ class ApiService {
       }),
     });
   }
+
+  // 文件预览
+  async previewFile(filePath: string) {
+    return this.request('/files/preview', {
+      method: 'POST',
+      body: JSON.stringify({
+        file_path: filePath,
+      }),
+    });
+  }
 }
 
 export const apiService = new ApiService();

@@ -1254,3 +1254,141 @@ async def list_directory(request: ListDirectoryRequest):
             error_code="INTERNAL_ERROR",
             error_details=str(e)
         )
+
+
+class FilePreviewRequest(BaseModel):
+    file_path: str = Field(..., description="Full path to the file to preview")
+
+
+@files_router.post("/preview",
+    summary="Get file preview content",
+    description="""Get preview content for text and image files.
+    
+    Supports text files (.txt, .md, .json, .py, .js, .ts, .html, .css, etc.) 
+    and image files (.jpg, .jpeg, .png, .gif, .bmp, .webp, etc.)
+    
+    For text files, returns the first 10KB of content.
+    For images, returns base64 encoded data.
+    """,
+    responses={
+        200: {"description": "File preview retrieved successfully"},
+        400: {"description": "Invalid file path or unsupported file type"},
+        404: {"description": "File not found"},
+        500: {"description": "Server error during file preview"}
+    }
+)
+async def preview_file(request: FilePreviewRequest):
+    """Get file preview content for supported file types"""
+    try:
+        # Validate file path
+        if not request.file_path or not request.file_path.strip():
+            return create_error_response(
+                message="File path is required",
+                error_code="INVALID_REQUEST"
+            )
+        
+        file_path = Path(request.file_path)
+        
+        # Check if file exists
+        if not file_path.exists():
+            return create_error_response(
+                message="File not found",
+                error_code="FILE_NOT_FOUND"
+            )
+        
+        # Check if it's a file (not directory)
+        if not file_path.is_file():
+            return create_error_response(
+                message="Path is not a file",
+                error_code="INVALID_FILE_TYPE"
+            )
+        
+        # Get file extension and MIME type
+        file_extension = file_path.suffix.lower()
+        mime_type, _ = mimetypes.guess_type(str(file_path))
+        
+        # Supported text file extensions
+        text_extensions = {'.txt', '.md', '.markdown', '.json', '.py', '.js', '.ts', '.html', '.css', 
+                          '.xml', '.yaml', '.yml', '.ini', '.cfg', '.conf', '.log', '.sh', '.bat', 
+                          '.ps1', '.sql', '.csv', '.rtf'}
+        
+        # Supported image extensions
+        image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico'}
+        
+        if file_extension in text_extensions or (mime_type and mime_type.startswith('text/')):
+            # Text file preview with multiple encoding attempts
+            encodings_to_try = ['utf-8', 'gbk', 'gb2312', 'utf-16', 'latin-1']
+            
+            content = None
+            used_encoding = None
+            
+            for encoding in encodings_to_try:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as f:
+                        content = f.read(10240)  # Read first 10KB
+                        used_encoding = encoding
+                        break
+                except UnicodeDecodeError:
+                    continue
+            
+            if content is None:
+                return create_error_response(
+                    message="文件编码不受支持，无法预览。请尝试使用系统默认程序打开文件。",
+                    error_code="UNSUPPORTED_ENCODING"
+                )
+            
+            truncated = len(content) >= 10240
+            
+            return create_success_response(
+                message="Text file preview retrieved successfully",
+                data={
+                    "file_path": str(file_path),
+                    "file_type": "text",
+                    "mime_type": mime_type,
+                    "content": content,
+                    "truncated": truncated,
+                    "size": file_path.stat().st_size,
+                    "encoding": used_encoding
+                }
+            )
+                
+        elif file_extension in image_extensions or (mime_type and mime_type.startswith('image/')):
+            # Image file preview
+            try:
+                import base64
+                
+                with open(file_path, 'rb') as f:
+                    image_data = f.read()
+                    base64_data = base64.b64encode(image_data).decode('utf-8')
+                
+                return create_success_response(
+                    message="Image file preview retrieved successfully",
+                    data={
+                        "file_path": str(file_path),
+                        "file_type": "image",
+                        "mime_type": mime_type,
+                        "content": f"data:{mime_type};base64,{base64_data}",
+                        "size": file_path.stat().st_size
+                    }
+                )
+                
+            except Exception as e:
+                return create_error_response(
+                    message="Failed to process image file",
+                    error_code="IMAGE_PROCESSING_ERROR",
+                    error_details=str(e)
+                )
+        
+        else:
+            return create_error_response(
+                message=f"File type not supported for preview. Supported: text files and images. Extension: {file_extension}, MIME: {mime_type}",
+                error_code="UNSUPPORTED_FILE_TYPE"
+            )
+            
+    except Exception as e:
+        logger.error(f"Error previewing file: {e}")
+        return create_error_response(
+            message="Failed to preview file",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )
