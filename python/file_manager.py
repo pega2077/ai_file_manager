@@ -824,7 +824,7 @@ If no suitable directory is found, you can suggest creating a new one by specify
                 try:
                     # Create a temporary markdown file
                     temp_md_path = self.temp_dir / f"{uuid.uuid4()}.md"
-                    success, content = self.converter.convert_to_markdown(source_path, temp_md_path)
+                    success, content = self.converter.convert_to_markdown(str(source_path), str(temp_md_path))
 
                     if success and content:
                         markdown_content = content

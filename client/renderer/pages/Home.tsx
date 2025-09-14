@@ -86,6 +86,7 @@ interface Settings {
   showHiddenFiles: boolean;
   enablePreview: boolean;
   autoClassifyWithoutConfirmation: boolean;
+  autoSaveRAG: boolean;
   workDirectory: string;
 }
 
@@ -105,7 +106,6 @@ const Home = () => {
   const [enablePreview, setEnablePreview] = useState(true);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ path: string; name: string } | null>(null);
-  const [globalLoading, setGlobalLoading] = useState(false);
 
   const columns = [
     {
@@ -307,9 +307,9 @@ const Home = () => {
       const directories = extractDirectoriesFromStructure(directoryStructureResponse.data as DirectoryStructureResponse);
 
       // 步骤2: 调用推荐保存目录接口
-      setGlobalLoading(true);
+      const loadingKey = message.loading('正在分析文件并推荐保存目录...', 0);
       const recommendResponse = await apiService.recommendDirectory(filePath, directories);
-      setGlobalLoading(false);
+      loadingKey();
       
       if (!recommendResponse.success) {
         message.error('获取推荐目录失败');
@@ -335,6 +335,10 @@ const Home = () => {
           message.success(`文件已自动保存到: ${recommendedDirectory}`);
           // 刷新当前目录列表
           loadDirectory(currentDirectory);
+          // 导入到RAG库
+          const fileName = getFileName(filePath);
+          const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
+          await handleRagImport(savedFilePath);
         } else {
           message.error(saveResponse.message || '文件保存失败');
         }
@@ -351,6 +355,32 @@ const Home = () => {
   const getPathSeparator = () => {
     // 使用 userAgent 检测 Windows 平台，避免使用已弃用的 platform 属性
     return navigator.userAgent.includes('Windows') ? '\\' : '/';
+  };
+
+  // 提取文件名从路径
+  const getFileName = (filePath: string) => {
+    const separator = getPathSeparator();
+    return filePath.split(separator).pop() || '';
+  };
+
+  // 处理RAG导入
+  const handleRagImport = async (savedFilePath: string) => {
+    try {
+      const settings = await window.electronStore.get('settings') as Settings;
+      if (settings?.autoSaveRAG) {
+        const loadingKey = message.loading('正在导入RAG库...', 0);
+        const ragResponse = await apiService.importToRag(savedFilePath);
+        loadingKey();
+        if (ragResponse.success) {
+          message.success('文件已成功导入RAG库');
+        } else {
+          message.warning('文件保存成功，但导入RAG库失败');
+        }
+      }
+    } catch (error) {
+      message.warning('文件保存成功，但导入RAG库失败');
+      console.error(error);
+    }
   };
 
   // 从目录结构响应中提取目录路径列表
@@ -469,6 +499,10 @@ const Home = () => {
         message.success(`文件已保存到: ${selectedDirectory}`);
         loadDirectory(currentDirectory);
         setImportModalVisible(false);
+        // 导入到RAG库
+        const fileName = getFileName(importFilePath);
+        const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
+        await handleRagImport(savedFilePath);
       } else {
         message.error(saveResponse.message || '文件保存失败');
       }
@@ -510,6 +544,10 @@ const Home = () => {
         message.success(`文件已保存到: ${selectedDirectory}`);
         loadDirectory(currentDirectory);
         setManualSelectModalVisible(false);
+        // 导入到RAG库
+        const fileName = getFileName(importFilePath);
+        const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
+        await handleRagImport(savedFilePath);
       } else {
         message.error(saveResponse.message || '文件保存失败');
       }
@@ -590,19 +628,18 @@ const Home = () => {
   };
 
   return (
-    <Spin spinning={globalLoading} tip="正在分析文件并推荐保存目录..." size="large" style={{ maxHeight: 'none' }}>
-      <Layout style={{ minHeight: '100vh' }}>
-        <Sidebar selectedMenu={selectedMenu} onMenuClick={handleMenuClick} />
-        <Layout style={{ padding: '0 24px 24px' }}>
-          <Content
-            style={{
-              padding: 24,
-              margin: 0,
-              minHeight: 280,
-              background: '#fff',
-            }}
-          >
-            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: '16px' }}>
+    <Layout style={{ minHeight: '100vh' }}>
+      <Sidebar selectedMenu={selectedMenu} onMenuClick={handleMenuClick} />
+      <Layout style={{ padding: '0 24px 24px' }}>
+        <Content
+          style={{
+            padding: 24,
+            margin: 0,
+            minHeight: 280,
+            background: '#fff',
+          }}
+        >
+          <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: '16px' }}>
               <Button
                 icon={<ArrowUpOutlined />}
                 onClick={handleGoUp}
@@ -709,8 +746,7 @@ const Home = () => {
             />
           </div>
         </Modal>
-      </Layout>
-    </Spin>
+    </Layout>
   );
 };
 

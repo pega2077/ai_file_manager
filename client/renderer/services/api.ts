@@ -132,6 +132,16 @@ class ApiService {
       }),
     });
   }
+
+  // 导入到RAG库
+  async importToRag(filePath: string) {
+    return this.request('/files/import-to-rag', {
+      method: 'POST',
+      body: JSON.stringify({
+        file_path: filePath,
+      }),
+    });
+  }
 }
 
 export const apiService = new ApiService();
