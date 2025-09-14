@@ -52,6 +52,7 @@
 | 文件管理 | 文件详情 | GET | `/api/files/{file_id}` | 获取单个文件详情 |
 | 文件管理 | 删除文件 | POST | `/api/files/delete` | 删除指定文件 |
 | 文件管理 | 更新文件 | POST | `/api/files/update` | 更新文件信息 |
+| 文件管理 | 创建文件夹结构 | POST | `/api/files/create-folders` | 创建文件夹结构 |
 | 文档分段 | 分段列表 | POST | `/api/files/chunks/list` | 获取文件分段列表 |
 | 文档分段 | 重新分段 | POST | `/api/files/reprocess` | 重新处理文件分段 |
 | 搜索检索 | 语义搜索 | POST | `/api/search/semantic` | 基于向量的语义搜索 |
@@ -206,6 +207,58 @@
   "tags": ["string"],
   "summary": "string",
   "updated_at": "string"
+}
+```
+
+### 1.6 创建文件夹结构
+
+**接口**: `POST /api/files/create-folders`
+
+**请求参数**:
+```json
+{
+  "target_folder": "string",
+  "structure": [
+    {
+      "name": "string",
+      "type": "folder"
+    }
+  ]
+}
+```
+
+**请求参数说明**:
+- `target_folder`: 目标文件夹路径，用于创建文件夹结构的根目录
+- `structure`: 文件夹结构数组
+  - `name`: 文件夹名称，支持嵌套路径（如 "Documents/Work"）
+  - `type`: 项目类型，目前仅支持 "folder"
+
+**响应数据**:
+```json
+{
+  "target_folder": "string",
+  "folders_created": "number"
+}
+```
+
+**示例请求**:
+```json
+{
+  "target_folder": "/path/to/workspace",
+  "structure": [
+    {
+      "name": "Documents",
+      "type": "folder"
+    },
+    {
+      "name": "Documents/Work",
+      "type": "folder"
+    },
+    {
+      "name": "Images",
+      "type": "folder"
+    }
+  ]
 }
 ```
 

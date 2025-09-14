@@ -51,6 +51,14 @@ class CategorySuggestion(BaseModel):
     reason: str
     existing_category: Optional[str] = None
 
+class FolderStructureItem(BaseModel):
+    name: str = Field(..., description="Folder name, can include subdirectories like 'parent/child'")
+    type: str = Field(..., description="Type of item, currently only 'folder' is supported")
+
+class CreateFolderStructureRequest(BaseModel):
+    target_folder: str = Field(..., description="Target folder path where to create the structure")
+    structure: List[FolderStructureItem] = Field(..., description="List of folders to create")
+
 # 文档类型检测
 DOCUMENT_EXTENSIONS = {
     '.txt', '.md', '.markdown', '.rst', '.tex',
@@ -374,6 +382,35 @@ Example response format:
             logger.error(f"Error converting and saving file: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to convert and save file: {str(e)}")
 
+    def create_folder_structure(self, target_folder: str, structure: List[Dict[str, str]]) -> tuple[bool, str]:
+        """Create folder structure in target directory"""
+        try:
+            target_path = Path(target_folder)
+            
+            # Ensure target directory exists
+            target_path.mkdir(parents=True, exist_ok=True)
+            
+            created_folders = []
+            for item in structure:
+                if item.get("type") != "folder":
+                    continue
+                    
+                folder_name = item.get("name", "")
+                if not folder_name:
+                    continue
+                    
+                # Create full path
+                folder_path = target_path / folder_name
+                folder_path.mkdir(parents=True, exist_ok=True)
+                created_folders.append(str(folder_path))
+            
+            logger.info(f"Created folder structure in {target_folder}: {created_folders}")
+            return True, f"Successfully created {len(created_folders)} folders"
+            
+        except Exception as e:
+            logger.error(f"Error creating folder structure: {e}")
+            return False, str(e)
+
 # Initialize file manager
 file_manager = FileManager()
 
@@ -512,6 +549,9 @@ def split_text_into_chunks_improved(text: str, max_length: int = 512) -> List[st
         chunks.append(current_chunk.strip())
 
     return [chunk for chunk in chunks if chunk]
+
+# FileManager类的实例
+file_manager = FileManager()
 
 @files_router.get("/")
 async def files_root():
@@ -730,7 +770,7 @@ async def import_file(request: FileImportRequestBody):
         
         return create_success_response(
             message="File imported and converted to markdown successfully",
-            data=file_info.dict()
+            data=file_info.model_dump()
         )
         
     except HTTPException:
@@ -1016,6 +1056,73 @@ async def update_file(request: FileUpdateRequest):
         logger.error(f"Error updating file {request.file_id}: {e}")
         return create_error_response(
             message="Failed to update file",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )
+
+@files_router.post("/create-folders",
+    summary="Create folder structure",
+    description="""
+    Create a folder structure in the specified target directory.
+    
+    **Parameters:**
+    - target_folder: The base directory where folders will be created
+    - structure: List of folder items with name and type
+    
+    **Example structure:**
+    [
+        {"name": "Documents", "type": "folder"},
+        {"name": "Documents/Work", "type": "folder"},
+        {"name": "Images", "type": "folder"}
+    ]
+    """,
+    responses={
+        200: {"description": "Folders created successfully"},
+        400: {"description": "Invalid request parameters"},
+        500: {"description": "Server error during folder creation"}
+    }
+)
+async def create_folder_structure(request: CreateFolderStructureRequest):
+    """Create folder structure in target directory"""
+    try:
+        # Validate target folder path
+        if not request.target_folder or not request.target_folder.strip():
+            return create_error_response(
+                message="Target folder path is required",
+                error_code="INVALID_REQUEST"
+            )
+        
+        # Validate structure
+        if not request.structure:
+            return create_error_response(
+                message="Folder structure cannot be empty",
+                error_code="INVALID_REQUEST"
+            )
+        
+        # Create folder structure
+        success, message = file_manager.create_folder_structure(
+            request.target_folder, 
+            [item.model_dump() for item in request.structure]
+        )
+        
+        if success:
+            return create_success_response(
+                message=message,
+                data={
+                    "target_folder": request.target_folder,
+                    "folders_created": len(request.structure)
+                }
+            )
+        else:
+            return create_error_response(
+                message=f"Failed to create folder structure: {message}",
+                error_code="INTERNAL_ERROR"
+            )
+            
+    except Exception as e:
+        logger.error(f"Error creating folder structure: {e}")
+        return create_error_response(
+            message="Failed to create folder structure",
             error_code="INTERNAL_ERROR",
             error_details=str(e)
         )
