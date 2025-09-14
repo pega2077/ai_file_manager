@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Layout, Table, Spin, message, Button, Modal, TreeSelect } from 'antd';
+import { Layout, Table, Spin, message, Button, Modal, Select } from 'antd';
 import { ArrowUpOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
@@ -37,6 +37,13 @@ interface FileItem {
 interface DirectoryItem {
   name: string;
   type: 'file' | 'folder';
+  path?: string;
+  relative_path?: string;
+  depth?: number;
+  size?: number;
+  created_at?: string;
+  modified_at?: string;
+  item_count?: number;
   children?: DirectoryItem[];
 }
 
@@ -91,7 +98,7 @@ const Home = () => {
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [selectedDirectory, setSelectedDirectory] = useState<string>('');
   const [importFilePath, setImportFilePath] = useState<string>('');
-  const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
+  const [directoryOptions, setDirectoryOptions] = useState<TreeNode[]>([]);
   const [selectedMenu, setSelectedMenu] = useState('files');
   const [enablePreview, setEnablePreview] = useState(true);
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -286,7 +293,7 @@ const Home = () => {
         return; // 用户取消了选择
       }
 
-      // 步骤1: 获取工作目录的目录结构（递归）
+      // 步骤1: 获取工作目录的目录结构
       const directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
       if (!directoryStructureResponse.success) {
         message.error('获取目录结构失败');
@@ -294,7 +301,7 @@ const Home = () => {
       }
 
       // 提取目录路径列表
-      const directories = extractDirectoriesFromStructure(directoryStructureResponse.data);
+      const directories = extractDirectoriesFromStructure(directoryStructureResponse.data as DirectoryStructureResponse);
 
       // 步骤2: 调用推荐保存目录接口
       const recommendResponse = await apiService.recommendDirectory(filePath, directories);
@@ -304,6 +311,7 @@ const Home = () => {
       }
 
       const recommendedDirectory = recommendResponse.data?.recommended_directory;
+      const alternatives = recommendResponse.data?.alternatives || [];
 
       // 步骤3: 获取设置选项 autoClassifyWithoutConfirmation
       const settings = await window.electronStore.get('settings') as Settings;
@@ -321,7 +329,7 @@ const Home = () => {
         }
       } else {
         // 步骤5: 弹出确认对话框
-        await showImportConfirmationDialog(filePath, recommendedDirectory, directories);
+        await showImportConfirmationDialog(filePath, recommendedDirectory, alternatives);
       }
     } catch (error) {
       message.error('文件导入失败');
@@ -338,72 +346,54 @@ const Home = () => {
   const extractDirectoriesFromStructure = (structureData: DirectoryStructureResponse): string[] => {
     const directories: string[] = [];
 
-    const traverse = (items: DirectoryItem[], currentPath: string = '') => {
-      for (const item of items) {
-        if (item.type === 'folder') {
-          const fullPath = currentPath ? `${currentPath}${getPathSeparator()}${item.name}` : item.name;
-          directories.push(fullPath);
-          if (item.children && item.children.length > 0) {
-            traverse(item.children, fullPath);
-          }
+    if (structureData && structureData.items) {
+      for (const item of structureData.items) {
+        if (item.type === 'folder' && item.relative_path && item.relative_path !== '.') {
+          directories.push(item.relative_path);
         }
       }
-    };
-
-    if (structureData && structureData.items) {
-      traverse(structureData.items);
     }
 
     return directories;
   };
 
   // 显示导入确认对话框
-  const showImportConfirmationDialog = async (filePath: string, recommendedDirectory: string, directories: string[]) => {
+  const showImportConfirmationDialog = async (filePath: string, recommendedDirectory: string, alternatives: string[]) => {
     setImportFilePath(filePath);
     setSelectedDirectory(recommendedDirectory);
 
-    // 构建树形数据
-    const treeData = buildTreeData(directories);
-    setDirectoryTreeData(treeData);
+    // 构建选择数据，只包含推荐目录和备选目录
+    const options = buildDirectoryOptions(recommendedDirectory, alternatives);
+    setDirectoryOptions(options);
 
     setImportModalVisible(true);
   };
 
-  // 构建树形选择数据
-  const buildTreeData = (directories: string[]): TreeNode[] => {
-    const treeData: TreeNode[] = [];
-    const pathMap: { [key: string]: TreeNode } = {};
+  // 构建目录选择选项
+  const buildDirectoryOptions = (recommendedDirectory: string, alternatives: string[]): TreeNode[] => {
+    const options: TreeNode[] = [];
 
-    directories.forEach(dir => {
-      const parts = dir.split(getPathSeparator());
-      let currentPath = '';
-      let parentNode: TreeNode | null = null;
-
-      parts.forEach((part) => {
-        currentPath = currentPath ? `${currentPath}${getPathSeparator()}${part}` : part;
-
-        if (!pathMap[currentPath]) {
-          const node: TreeNode = {
-            title: part,
-            value: currentPath,
-            key: currentPath,
-            children: [],
-          };
-
-          pathMap[currentPath] = node;
-
-          if (parentNode) {
-            parentNode.children.push(node);
-          } else {
-            treeData.push(node);
-          }
-        }
-
-        parentNode = pathMap[currentPath];
-      });
+    // 添加推荐目录
+    options.push({
+      title: `${recommendedDirectory} (推荐)`,
+      value: recommendedDirectory,
+      key: recommendedDirectory,
+      children: [],
     });
 
-    return treeData;
+    // 添加备选目录
+    alternatives.forEach(alt => {
+      if (alt !== recommendedDirectory) { // 避免重复
+        options.push({
+          title: `${alt} (备选)`,
+          value: alt,
+          key: alt,
+          children: [],
+        });
+      }
+    });
+
+    return options;
   };
 
   // 处理导入确认
@@ -564,16 +554,20 @@ const Home = () => {
         cancelText="取消"
       >
         <div style={{ marginBottom: 16 }}>
+          <p>系统推荐保存到: <strong>{selectedDirectory}</strong></p>
           <p>请选择要保存文件的目标目录：</p>
-          <TreeSelect
+          <Select
             style={{ width: '100%' }}
             value={selectedDirectory}
-            dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
-            treeData={directoryTreeData}
+            onChange={(value: string) => setSelectedDirectory(value)}
             placeholder="请选择目录"
-            treeDefaultExpandAll
-            onChange={(value) => setSelectedDirectory(value)}
-          />
+          >
+            {directoryOptions.map(option => (
+              <Select.Option key={option.key} value={option.value}>
+                {option.title}
+              </Select.Option>
+            ))}
+          </Select>
         </div>
       </Modal>
     </Layout>

@@ -723,10 +723,10 @@ Please analyze the filename and content to determine which directory would be th
 3. Common organizational patterns
 
 Respond with a JSON object containing:
-- "recommended_directory": The best directory path from the available options
+- "recommended_directory": The best directory path from the available options.The directory path not directory name.
 - "confidence": A confidence score from 0.0 to 1.0
 - "reasoning": Brief explanation for the recommendation
-- "alternatives": Array of up to 3 alternative directory suggestions (in order of preference)
+- "alternatives": Array of up to 3 alternative directory suggestions (in order of preference).The directory path not directory name.
 
 Example response:
 {{
