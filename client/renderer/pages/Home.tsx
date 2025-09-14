@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Layout, Menu, Table, Spin, message, Button } from 'antd';
-import { FolderOutlined, SettingOutlined, ArrowUpOutlined } from '@ant-design/icons';
+import { Layout, Table, Spin, message, Button } from 'antd';
+import { ArrowUpOutlined } from '@ant-design/icons';
 import { apiService } from '../services/api';
+import Sidebar from '../components/Sidebar';
 
-const { Sider, Content } = Layout;
+const { Content } = Layout;
 
 declare global {
   interface Window {
@@ -41,19 +42,6 @@ const Home = () => {
   const [fileList, setFileList] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedMenu, setSelectedMenu] = useState('files');
-
-  const menuItems = [
-    {
-      key: 'files',
-      icon: <FolderOutlined />,
-      label: '文件管理',
-    },
-    {
-      key: 'settings',
-      icon: <SettingOutlined />,
-      label: '设置',
-    },
-  ];
 
   const columns = [
     {
@@ -160,6 +148,11 @@ const Home = () => {
     }
   }, [currentDirectory]);
 
+  const getPathSeparator = () => {
+    // 使用 userAgent 检测 Windows 平台，避免使用已弃用的 platform 属性
+    return navigator.userAgent.includes('Windows') ? '\\' : '/';
+  };
+
   const handleMenuClick = ({ key }: { key: string }) => {
     setSelectedMenu(key);
     // TODO: Handle navigation for different menu items
@@ -171,7 +164,7 @@ const Home = () => {
     }
 
     // 根据平台选择分隔符来分割路径
-    const separator = navigator.platform.includes('Win') ? '\\' : '/';
+    const separator = getPathSeparator();
     const pathParts = currentDirectory.split(separator);
     
     // 移除最后一个部分（当前目录名）
@@ -187,7 +180,7 @@ const Home = () => {
 
   const handleRowDoubleClick = async (record: FileItem) => {
     // 根据平台选择合适的分隔符
-    const separator = navigator.platform.includes('Win') ? '\\' : '/';
+    const separator = getPathSeparator();
     const fullPath = `${currentDirectory}${separator}${record.name}`;
 
     if (record.type === 'folder') {
@@ -209,15 +202,7 @@ const Home = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider width={200} style={{ background: '#fff' }}>
-        <Menu
-          mode="inline"
-          selectedKeys={[selectedMenu]}
-          style={{ height: '100%', borderRight: 0 }}
-          items={menuItems}
-          onClick={handleMenuClick}
-        />
-      </Sider>
+      <Sidebar selectedMenu={selectedMenu} onMenuClick={handleMenuClick} />
       <Layout style={{ padding: '0 24px 24px' }}>
         <Content
           style={{
