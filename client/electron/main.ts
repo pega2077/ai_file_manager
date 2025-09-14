@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import Store from 'electron-store'
@@ -50,19 +50,19 @@ function createWindow() {
 }
 
 // IPC handlers for electron-store
-ipcMain.handle('store:get', (event, key) => {
+ipcMain.handle('store:get', (_event, key) => {
   return store.get(key)
 })
 
-ipcMain.handle('store:set', (event, key, value) => {
+ipcMain.handle('store:set', (_event, key, value) => {
   store.set(key, value)
 })
 
-ipcMain.handle('store:delete', (event, key) => {
+ipcMain.handle('store:delete', (_event, key) => {
   store.delete(key)
 })
 
-ipcMain.handle('store:has', (event, key) => {
+ipcMain.handle('store:has', (_event, key) => {
   return store.has(key)
 })
 
@@ -72,6 +72,17 @@ ipcMain.handle('select-folder', async () => {
     properties: ['openDirectory']
   })
   return result.canceled ? null : result.filePaths[0]
+})
+
+// IPC handler for opening files
+ipcMain.handle('open-file', async (_event, filePath: string) => {
+  try {
+    await shell.openPath(filePath)
+    return true
+  } catch (error) {
+    console.error('Failed to open file:', error)
+    return false
+  }
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common

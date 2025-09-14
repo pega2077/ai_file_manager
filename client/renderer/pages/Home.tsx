@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Layout, Menu, Table, Spin, message } from 'antd';
-import { FolderOutlined, SettingOutlined } from '@ant-design/icons';
+import { Layout, Menu, Table, Spin, message, Button } from 'antd';
+import { FolderOutlined, SettingOutlined, ArrowUpOutlined } from '@ant-design/icons';
 import { apiService } from '../services/api';
 
 const { Sider, Content } = Layout;
 
 declare global {
   interface Window {
+    electronAPI: {
+      selectFolder: () => Promise<string | null>;
+      openFile: (filePath: string) => Promise<boolean>;
+    };
     electronStore: {
       get: (key: string) => Promise<unknown>;
       set: (key: string, value: unknown) => Promise<void>;
@@ -33,6 +37,7 @@ interface DirectoryResponse {
 
 const Home = () => {
   const [currentDirectory, setCurrentDirectory] = useState<string>('');
+  const [workDirectory, setWorkDirectory] = useState<string>('');
   const [fileList, setFileList] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedMenu, setSelectedMenu] = useState('files');
@@ -125,19 +130,23 @@ const Home = () => {
     const loadWorkDirectory = async () => {
       if (window.electronStore) {
         try {
-          const workDirectory = await window.electronStore.get('workDirectory') as string;
-          console.log('Loaded workDirectory from store:', workDirectory);
-          if (workDirectory) {
-            setCurrentDirectory(workDirectory);
+          const storedWorkDirectory = await window.electronStore.get('workDirectory') as string;
+          console.log('Loaded workDirectory from store:', storedWorkDirectory);
+          if (storedWorkDirectory) {
+            setWorkDirectory(storedWorkDirectory);
+            setCurrentDirectory(storedWorkDirectory);
           } else {
             // 如果没有设置工作目录，使用默认的workdir
+            setWorkDirectory('workdir');
             setCurrentDirectory('workdir');
           }
         } catch (error) {
           console.error('Failed to load workDirectory from store:', error);
+          setWorkDirectory('workdir');
           setCurrentDirectory('workdir');
         }
       } else {
+        setWorkDirectory('workdir');
         setCurrentDirectory('workdir');
       }
     };
@@ -154,6 +163,48 @@ const Home = () => {
   const handleMenuClick = ({ key }: { key: string }) => {
     setSelectedMenu(key);
     // TODO: Handle navigation for different menu items
+  };
+
+  const handleGoUp = () => {
+    if (currentDirectory === workDirectory) {
+      return; // 已经在工作区根目录，无法返回上级
+    }
+
+    // 根据平台选择分隔符来分割路径
+    const separator = navigator.platform.includes('Win') ? '\\' : '/';
+    const pathParts = currentDirectory.split(separator);
+    
+    // 移除最后一个部分（当前目录名）
+    pathParts.pop();
+    
+    // 重新拼接路径
+    const parentPath = pathParts.join(separator);
+    
+    if (parentPath) {
+      setCurrentDirectory(parentPath);
+    }
+  };
+
+  const handleRowDoubleClick = async (record: FileItem) => {
+    // 根据平台选择合适的分隔符
+    const separator = navigator.platform.includes('Win') ? '\\' : '/';
+    const fullPath = `${currentDirectory}${separator}${record.name}`;
+
+    if (record.type === 'folder') {
+      // 切换到子目录
+      setCurrentDirectory(fullPath);
+    } else {
+      // 打开文件
+      try {
+        const success = await window.electronAPI.openFile(fullPath);
+        if (!success) {
+          message.error('无法打开文件');
+        }
+      } catch (error) {
+        message.error('打开文件失败');
+        console.error(error);
+      }
+    }
   };
 
   return (
@@ -176,8 +227,16 @@ const Home = () => {
             background: '#fff',
           }}
         >
-          <div style={{ marginBottom: 16 }}>
-            <h2>当前目录: {currentDirectory}</h2>
+          <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <h2 style={{ margin: 0 }}>当前目录: {currentDirectory}</h2>
+            <Button
+              icon={<ArrowUpOutlined />}
+              onClick={handleGoUp}
+              disabled={currentDirectory === workDirectory}
+              title="返回上级目录"
+            >
+              返回上级
+            </Button>
           </div>
           <Spin spinning={loading}>
             <Table
@@ -185,6 +244,9 @@ const Home = () => {
               dataSource={fileList}
               rowKey="name"
               pagination={false}
+              onRow={(record) => ({
+                onDoubleClick: () => handleRowDoubleClick(record),
+              })}
             />
           </Spin>
         </Content>

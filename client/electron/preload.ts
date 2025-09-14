@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 
 contextBridge.exposeInMainWorld('electronAPI', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
+  openFile: (filePath: string) => ipcRenderer.invoke('open-file', filePath),
 })
 
 contextBridge.exposeInMainWorld('electronStore', {
