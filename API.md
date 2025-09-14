@@ -53,6 +53,7 @@
 | 文件管理 | 删除文件 | POST | `/api/files/delete` | 删除指定文件 |
 | 文件管理 | 更新文件 | POST | `/api/files/update` | 更新文件信息 |
 | 文件管理 | 创建文件夹结构 | POST | `/api/files/create-folders` | 创建文件夹结构 |
+| 文件管理 | 列出目录结构 | POST | `/api/files/list-directory` | 列出目录内容 |
 | 文档分段 | 分段列表 | POST | `/api/files/chunks/list` | 获取文件分段列表 |
 | 文档分段 | 重新分段 | POST | `/api/files/reprocess` | 重新处理文件分段 |
 | 搜索检索 | 语义搜索 | POST | `/api/search/semantic` | 基于向量的语义搜索 |
@@ -259,6 +260,87 @@
       "type": "folder"
     }
   ]
+}
+```
+
+### 1.7 列出目录结构
+
+**接口**: `POST /api/files/list-directory`
+
+**请求参数**:
+```json
+{
+  "directory_path": "string"
+}
+```
+
+**请求参数说明**:
+- `directory_path`: 要列出内容的目录路径
+
+**响应数据**:
+```json
+{
+  "directory_path": "string",
+  "items": [
+    {
+      "name": "string",
+      "type": "file|folder",
+      "size": "number|null",
+      "created_at": "string|null",
+      "modified_at": "string|null",
+      "item_count": "number|null"
+    }
+  ],
+  "total_count": "number"
+}
+```
+
+**字段说明**:
+- `name`: 文件或文件夹名称
+- `type`: 类型，"file" 或 "folder"
+- `size`: 文件大小（字节），文件夹为 null
+- `created_at`: 创建时间（ISO 8601格式），获取失败时为 null
+- `modified_at`: 修改时间（ISO 8601格式），获取失败时为 null
+- `item_count`: 文件夹内项目数量，文件为 null
+
+**示例请求**:
+```json
+{
+  "directory_path": "/path/to/directory"
+}
+```
+
+**示例响应**:
+```json
+{
+  "directory_path": "/path/to/directory",
+  "items": [
+    {
+      "name": "Documents",
+      "type": "folder",
+      "size": null,
+      "created_at": "2025-09-14T10:30:00",
+      "modified_at": "2025-09-14T15:45:00",
+      "item_count": 5
+    },
+    {
+      "name": "readme.txt",
+      "type": "file",
+      "size": 1024,
+      "created_at": "2025-09-14T09:15:00",
+      "modified_at": "2025-09-14T14:20:00",
+      "item_count": null
+    },
+    {
+      "name": "image.jpg",
+      "type": "file",
+      "size": 2048576,
+      "created_at": "2025-09-14T11:00:00",
+      "modified_at": "2025-09-14T11:00:00",
+      "item_count": null
+    }
+  ],
+  "total_count": 3
 }
 ```
 

@@ -59,6 +59,17 @@ class CreateFolderStructureRequest(BaseModel):
     target_folder: str = Field(..., description="Target folder path where to create the structure")
     structure: List[FolderStructureItem] = Field(..., description="List of folders to create")
 
+class DirectoryItem(BaseModel):
+    name: str = Field(..., description="Name of the file or folder")
+    type: str = Field(..., description="Type: 'file' or 'folder'")
+    size: Optional[int] = Field(None, description="File size in bytes (None for folders)")
+    created_at: Optional[str] = Field(None, description="Creation date (ISO format)")
+    modified_at: Optional[str] = Field(None, description="Last modified date (ISO format)")
+    item_count: Optional[int] = Field(None, description="Number of items in folder (None for files)")
+
+class ListDirectoryRequest(BaseModel):
+    directory_path: str = Field(..., description="Path to the directory to list")
+
 # 文档类型检测
 DOCUMENT_EXTENSIONS = {
     '.txt', '.md', '.markdown', '.rst', '.tex',
@@ -410,6 +421,76 @@ Example response format:
         except Exception as e:
             logger.error(f"Error creating folder structure: {e}")
             return False, str(e)
+
+    def list_directory_structure(self, directory_path: str) -> List[Dict[str, Any]]:
+        """List directory structure including files and folders with detailed information"""
+        try:
+            dir_path = Path(directory_path)
+            
+            if not dir_path.exists():
+                logger.warning(f"Directory does not exist: {directory_path}")
+                return []
+            
+            if not dir_path.is_dir():
+                logger.warning(f"Path is not a directory: {directory_path}")
+                return []
+            
+            structure = []
+            
+            # List all items in the directory
+            for item in sorted(dir_path.iterdir()):
+                item_type = "folder" if item.is_dir() else "file"
+                
+                item_info = {
+                    "name": item.name,
+                    "type": item_type
+                }
+                
+                try:
+                    # Get file stats
+                    stat = item.stat()
+                    
+                    # Size (only for files)
+                    if item_type == "file":
+                        item_info["size"] = stat.st_size
+                    else:
+                        item_info["size"] = None
+                        # Count items in folder
+                        try:
+                            item_info["item_count"] = len(list(item.iterdir()))
+                        except (OSError, PermissionError):
+                            item_info["item_count"] = None
+                    
+                    # Creation time (st_birthtime on some systems, fallback to st_ctime)
+                    try:
+                        created_time = getattr(stat, 'st_birthtime', stat.st_ctime)
+                        item_info["created_at"] = datetime.fromtimestamp(created_time).isoformat()
+                    except (AttributeError, OSError):
+                        item_info["created_at"] = None
+                    
+                    # Modified time
+                    try:
+                        item_info["modified_at"] = datetime.fromtimestamp(stat.st_mtime).isoformat()
+                    except OSError:
+                        item_info["modified_at"] = None
+                        
+                except (OSError, PermissionError) as e:
+                    logger.warning(f"Could not get stats for {item}: {e}")
+                    item_info.update({
+                        "size": None,
+                        "created_at": None,
+                        "modified_at": None,
+                        "item_count": None
+                    })
+                
+                structure.append(item_info)
+            
+            logger.info(f"Listed directory structure for {directory_path}: {len(structure)} items")
+            return structure
+            
+        except Exception as e:
+            logger.error(f"Error listing directory structure: {e}")
+            return []
 
 # Initialize file manager
 file_manager = FileManager()
@@ -1123,6 +1204,53 @@ async def create_folder_structure(request: CreateFolderStructureRequest):
         logger.error(f"Error creating folder structure: {e}")
         return create_error_response(
             message="Failed to create folder structure",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )
+
+@files_router.post("/list-directory",
+    summary="List directory structure",
+    description="""
+    List the contents of a directory including files and subdirectories.
+    
+    **Parameters:**
+    - directory_path: Path to the directory to list
+    
+    **Returns:**
+    List of items with name and type (file/folder)
+    """,
+    responses={
+        200: {"description": "Directory contents retrieved successfully"},
+        400: {"description": "Invalid directory path"},
+        500: {"description": "Server error during directory listing"}
+    }
+)
+async def list_directory(request: ListDirectoryRequest):
+    """List directory structure including files and folders"""
+    try:
+        # Validate directory path
+        if not request.directory_path or not request.directory_path.strip():
+            return create_error_response(
+                message="Directory path is required",
+                error_code="INVALID_REQUEST"
+            )
+        
+        # List directory structure
+        structure = file_manager.list_directory_structure(request.directory_path)
+        
+        return create_success_response(
+            message=f"Successfully listed directory contents",
+            data={
+                "directory_path": request.directory_path,
+                "items": structure,
+                "total_count": len(structure)
+            }
+        )
+            
+    except Exception as e:
+        logger.error(f"Error listing directory: {e}")
+        return create_error_response(
+            message="Failed to list directory contents",
             error_code="INTERNAL_ERROR",
             error_details=str(e)
         )
