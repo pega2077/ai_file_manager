@@ -135,7 +135,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
           </Button>
         </Space>
       }
-      destroyOnClose
+      destroyOnHidden
     >
       <Spin spinning={loading}>
         {renderPreviewContent()}

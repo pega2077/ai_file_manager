@@ -105,6 +105,7 @@ const Home = () => {
   const [enablePreview, setEnablePreview] = useState(true);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ path: string; name: string } | null>(null);
+  const [globalLoading, setGlobalLoading] = useState(false);
 
   const columns = [
     {
@@ -306,7 +307,10 @@ const Home = () => {
       const directories = extractDirectoriesFromStructure(directoryStructureResponse.data as DirectoryStructureResponse);
 
       // 步骤2: 调用推荐保存目录接口
+      setGlobalLoading(true);
       const recommendResponse = await apiService.recommendDirectory(filePath, directories);
+      setGlobalLoading(false);
+      
       if (!recommendResponse.success) {
         message.error('获取推荐目录失败');
         return;
@@ -483,13 +487,36 @@ const Home = () => {
 
   // 处理手动选择目录
   const handleManualSelectDirectory = () => {
+    setImportModalVisible(false); // 隐藏确认对话框
     setManualSelectModalVisible(true);
   };
 
   // 处理手动选择确认
-  const handleManualSelectConfirm = () => {
-    setManualSelectModalVisible(false);
-    // selectedDirectory 已经在TreeSelect的onChange中设置了
+  const handleManualSelectConfirm = async () => {
+    if (!selectedDirectory) {
+      message.error('请选择保存目录');
+      return;
+    }
+
+    try {
+      // 拼接完整的目标目录路径
+      const separator = getPathSeparator();
+      const fullTargetDirectory = selectedDirectory.startsWith(workDirectory)
+        ? selectedDirectory
+        : `${workDirectory}${separator}${selectedDirectory.replace(/\//g, separator)}`;
+
+      const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
+      if (saveResponse.success) {
+        message.success(`文件已保存到: ${selectedDirectory}`);
+        loadDirectory(currentDirectory);
+        setManualSelectModalVisible(false);
+      } else {
+        message.error(saveResponse.message || '文件保存失败');
+      }
+    } catch (error) {
+      message.error('文件保存失败');
+      console.error(error);
+    }
   };
 
   // 处理手动选择取消
@@ -563,120 +590,122 @@ const Home = () => {
   };
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sidebar selectedMenu={selectedMenu} onMenuClick={handleMenuClick} />
-      <Layout style={{ padding: '0 24px 24px' }}>
-        <Content
-          style={{
-            padding: 24,
-            margin: 0,
-            minHeight: 280,
-            background: '#fff',
-          }}
-        >
-          <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <h2 style={{ margin: 0 }}>当前目录: {currentDirectory}</h2>
-            <Button
-              icon={<ArrowUpOutlined />}
-              onClick={handleGoUp}
-              disabled={currentDirectory === workDirectory}
-              title="返回上级目录"
-            >
-              返回上级
-            </Button>
-            <Button
-              type="primary"
-              onClick={handleImportFile}
-              title="导入文件到工作区"
-            >
-              导入文件
-            </Button>
-          </div>
-          <Spin spinning={loading}>
-            <Table
-              columns={columns}
-              dataSource={fileList}
-              rowKey="name"
-              pagination={false}
-              onRow={(record) => ({
-                onDoubleClick: () => handleRowDoubleClick(record),
-              })}
-            />
-          </Spin>
-        </Content>
-      </Layout>
-      {previewFile && (
-        <FilePreview
-          filePath={previewFile.path}
-          fileName={previewFile.name}
-          visible={previewVisible}
-          onClose={() => {
-            setPreviewVisible(false);
-            setPreviewFile(null);
-          }}
-        />
-      )}
-
-      <Modal
-        title="选择保存目录"
-        open={importModalVisible}
-        onOk={handleImportConfirm}
-        onCancel={handleImportCancel}
-        okText="确认保存"
-        cancelText="取消"
-        footer={[
-          <Button key="cancel" onClick={handleImportCancel}>
-            取消
-          </Button>,
-          <Button key="manual" onClick={handleManualSelectDirectory}>
-            手动选择目录
-          </Button>,
-          <Button key="confirm" type="primary" onClick={handleImportConfirm}>
-            确认保存
-          </Button>,
-        ]}
-      >
-        <div style={{ marginBottom: 16 }}>
-          <p>系统推荐保存到: <strong>{selectedDirectory}</strong></p>
-          <p>请选择要保存文件的目标目录：</p>
-          <Select
-            style={{ width: '100%' }}
-            value={selectedDirectory}
-            onChange={(value: string) => setSelectedDirectory(value)}
-            placeholder="请选择目录"
+    <Spin spinning={globalLoading} tip="正在分析文件并推荐保存目录..." size="large" style={{ maxHeight: 'none' }}>
+      <Layout style={{ minHeight: '100vh' }}>
+        <Sidebar selectedMenu={selectedMenu} onMenuClick={handleMenuClick} />
+        <Layout style={{ padding: '0 24px 24px' }}>
+          <Content
+            style={{
+              padding: 24,
+              margin: 0,
+              minHeight: 280,
+              background: '#fff',
+            }}
           >
-            {directoryOptions.map(option => (
-              <Select.Option key={option.key} value={option.value}>
-                {option.title}
-              </Select.Option>
-            ))}
-          </Select>
-        </div>
-      </Modal>
-
-      <Modal
-        title="手动选择保存目录"
-        open={manualSelectModalVisible}
-        onOk={handleManualSelectConfirm}
-        onCancel={handleManualSelectCancel}
-        okText="确认选择"
-        cancelText="取消"
-        width={600}
-      >
-        <div style={{ marginBottom: 16 }}>
-          <p>请选择要保存文件的目标目录：</p>
-          <TreeSelect
-            style={{ width: '100%' }}
-            value={selectedDirectory}
-            dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
-            treeData={directoryTreeData}
-            placeholder="请选择目录"
-            treeDefaultExpandAll
-            onChange={(value: string) => setSelectedDirectory(value)}
+            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <Button
+                icon={<ArrowUpOutlined />}
+                onClick={handleGoUp}
+                disabled={currentDirectory === workDirectory}
+                title="返回上级目录"
+              >
+                返回上级
+              </Button>
+              <Button
+                type="primary"
+                onClick={handleImportFile}
+                title="导入文件到工作区"
+              >
+                导入文件
+              </Button>
+              <h2 style={{ margin: 0 }}>当前目录: {currentDirectory}</h2>
+            </div>
+            <Spin spinning={loading}>
+              <Table
+                columns={columns}
+                dataSource={fileList}
+                rowKey="name"
+                pagination={false}
+                onRow={(record) => ({
+                  onDoubleClick: () => handleRowDoubleClick(record),
+                })}
+              />
+            </Spin>
+          </Content>
+        </Layout>
+        {previewFile && (
+          <FilePreview
+            filePath={previewFile.path}
+            fileName={previewFile.name}
+            visible={previewVisible}
+            onClose={() => {
+              setPreviewVisible(false);
+              setPreviewFile(null);
+            }}
           />
-        </div>
-      </Modal>
-    </Layout>
+        )}
+
+        <Modal
+          title="选择保存目录"
+          open={importModalVisible}
+          onOk={handleImportConfirm}
+          onCancel={handleImportCancel}
+          okText="确认保存"
+          cancelText="取消"
+          footer={[
+            <Button key="cancel" onClick={handleImportCancel}>
+              取消
+            </Button>,
+            <Button key="manual" onClick={handleManualSelectDirectory}>
+              手动选择目录
+            </Button>,
+            <Button key="confirm" type="primary" onClick={handleImportConfirm}>
+              确认保存
+            </Button>,
+          ]}
+        >
+          <div style={{ marginBottom: 16 }}>
+            <p>系统推荐保存到: <strong>{selectedDirectory}</strong></p>
+            <p>请选择要保存文件的目标目录：</p>
+            <Select
+              style={{ width: '100%' }}
+              value={selectedDirectory}
+              onChange={(value: string) => setSelectedDirectory(value)}
+              placeholder="请选择目录"
+            >
+              {directoryOptions.map(option => (
+                <Select.Option key={option.key} value={option.value}>
+                  {option.title}
+                </Select.Option>
+              ))}
+            </Select>
+          </div>
+        </Modal>
+
+        <Modal
+          title="手动选择保存目录"
+          open={manualSelectModalVisible}
+          onOk={handleManualSelectConfirm}
+          onCancel={handleManualSelectCancel}
+          okText="确认选择"
+          cancelText="取消"
+          width={600}
+        >
+          <div style={{ marginBottom: 16 }}>
+            <p>请选择要保存文件的目标目录：</p>
+            <TreeSelect
+              style={{ width: '100%' }}
+              value={selectedDirectory}
+              dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
+              treeData={directoryTreeData}
+              placeholder="请选择目录"
+              treeDefaultExpandAll
+              onChange={(value: string) => setSelectedDirectory(value)}
+            />
+          </div>
+        </Modal>
+      </Layout>
+    </Spin>
   );
 };
 
