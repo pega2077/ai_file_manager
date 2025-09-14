@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Layout, Table, Spin, message, Button } from 'antd';
 import { ArrowUpOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import Sidebar from '../components/Sidebar';
 
@@ -37,6 +38,7 @@ interface DirectoryResponse {
 }
 
 const Home = () => {
+  const navigate = useNavigate();
   const [currentDirectory, setCurrentDirectory] = useState<string>('');
   const [workDirectory, setWorkDirectory] = useState<string>('');
   const [fileList, setFileList] = useState<FileItem[]>([]);
@@ -155,7 +157,18 @@ const Home = () => {
 
   const handleMenuClick = ({ key }: { key: string }) => {
     setSelectedMenu(key);
-    // TODO: Handle navigation for different menu items
+
+    // 根据菜单项导航到不同页面
+    switch (key) {
+      case 'files':
+        // 已经在文件管理页面，不需要跳转
+        break;
+      case 'settings':
+        navigate('/settings');
+        break;
+      default:
+        break;
+    }
   };
 
   const handleGoUp = () => {

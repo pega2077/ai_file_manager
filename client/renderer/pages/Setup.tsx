@@ -199,7 +199,15 @@ const Setup = () => {
                   </div>
                 )}
               </div>
-
+              <Button
+                type="primary"
+                onClick={handleCreateFolders}
+                loading={loading}
+                disabled={!selectedFolder}
+                block
+              >
+                创建目录结构并完成初始化
+              </Button>  
               <Card title="将要创建的目录结构" size="small">
                 <List
                   size="small"
@@ -214,16 +222,6 @@ const Setup = () => {
                   )}
                 />
               </Card>
-
-              <Button
-                type="primary"
-                onClick={handleCreateFolders}
-                loading={loading}
-                disabled={!selectedFolder}
-                block
-              >
-                创建目录结构并完成初始化
-              </Button>
             </Space>
           </Card>
         );
