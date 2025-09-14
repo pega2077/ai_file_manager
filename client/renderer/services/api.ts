@@ -74,6 +74,19 @@ class ApiService {
       }),
     });
   }
+
+  // 导入文件
+  async importFile(filePath: string, category?: string, tags?: string[], autoProcess: boolean = true) {
+    return this.request('/files/import', {
+      method: 'POST',
+      body: JSON.stringify({
+        file_path: filePath,
+        category,
+        tags,
+        auto_process: autoProcess,
+      }),
+    });
+  }
 }
 
 export const apiService = new ApiService();

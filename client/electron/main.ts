@@ -97,6 +97,21 @@ ipcMain.handle('open-folder', async (_event, filePath: string) => {
   }
 })
 
+// IPC handler for selecting file to import
+ipcMain.handle('select-file', async () => {
+  const result = await dialog.showOpenDialog(win!, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'All Files', extensions: ['*'] },
+      { name: 'Documents', extensions: ['txt', 'md', 'doc', 'docx', 'pdf', 'rtf', 'odt'] },
+      { name: 'Spreadsheets', extensions: ['xlsx', 'xls', 'csv', 'ods'] },
+      { name: 'Presentations', extensions: ['pptx', 'ppt', 'odp'] },
+      { name: 'Web Files', extensions: ['html', 'htm', 'xhtml'] },
+    ]
+  })
+  return result.canceled ? null : result.filePaths[0]
+})
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.

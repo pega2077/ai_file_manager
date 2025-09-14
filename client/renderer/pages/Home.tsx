@@ -14,6 +14,7 @@ declare global {
       selectFolder: () => Promise<string | null>;
       openFile: (filePath: string) => Promise<boolean>;
       openFolder: (filePath: string) => Promise<boolean>;
+      selectFile: () => Promise<string | null>;
     };
     electronStore: {
       get: (key: string) => Promise<unknown>;
@@ -37,6 +38,19 @@ interface DirectoryResponse {
   directory_path: string;
   items: FileItem[];
   total_count: number;
+}
+
+interface ImportFileResponse {
+  file_id: string;
+  name: string;
+  path: string;
+  type: string;
+  size: number;
+  category: string;
+  summary: string;
+  tags: string[];
+  added_at: string;
+  processed: boolean;
 }
 
 interface Settings {
@@ -240,6 +254,31 @@ const Home = () => {
     }
   };
 
+  const handleImportFile = async () => {
+    try {
+      // 选择要导入的文件
+      const filePath = await window.electronAPI.selectFile();
+      if (!filePath) {
+        return; // 用户取消了选择
+      }
+
+      // 调用API导入文件
+      const response = await apiService.importFile(filePath);
+      if (response.success) {
+        const fileData = response.data as ImportFileResponse;
+        const fileName = fileData?.name || '文件';
+        message.success(`文件导入成功: ${fileName}`);
+        // 刷新当前目录列表
+        loadDirectory(currentDirectory);
+      } else {
+        message.error(response.message || '文件导入失败');
+      }
+    } catch (error) {
+      message.error('文件导入失败');
+      console.error(error);
+    }
+  };
+
   const getPathSeparator = () => {
     // 使用 userAgent 检测 Windows 平台，避免使用已弃用的 platform 属性
     return navigator.userAgent.includes('Windows') ? '\\' : '/';
@@ -331,6 +370,13 @@ const Home = () => {
               title="返回上级目录"
             >
               返回上级
+            </Button>
+            <Button
+              type="primary"
+              onClick={handleImportFile}
+              title="导入文件到工作区"
+            >
+              导入文件
             </Button>
           </div>
           <Spin spinning={loading}>
