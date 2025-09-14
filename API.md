@@ -56,6 +56,7 @@
 | 文件管理 | 列出目录结构 | POST | `/api/files/list-directory` | 列出目录内容 |
 | 文件管理 | 递归列出目录结构 | POST | `/api/files/list-directory-recursive` | 递归列出目录树结构 |
 | 文件管理 | 文件预览 | POST | `/api/files/preview` | 预览文件内容（文本/图片） |
+| 文件管理 | 保存文件 | POST | `/api/files/save-file` | 保存文件到指定目录 |
 | 文档分段 | 分段列表 | POST | `/api/files/chunks/list` | 获取文件分段列表 |
 | 文档分段 | 重新分段 | POST | `/api/files/reprocess` | 重新处理文件分段 |
 | 搜索检索 | 语义搜索 | POST | `/api/search/semantic` | 基于向量的语义搜索 |
@@ -439,7 +440,7 @@
 }
 ```
 
-### 1.8 递归列出目录结构
+### 1.10 递归列出目录结构
 
 **接口**: `POST /api/files/list-directory-recursive`
 
@@ -547,6 +548,70 @@
   "total_count": 4
 }
 ```
+
+### 1.9 保存文件到指定目录
+
+**接口**: `POST /api/files/save-file`
+
+**请求参数**:
+```json
+{
+  "source_file_path": "string",
+  "target_directory": "string",
+  "overwrite": "boolean"
+}
+```
+
+**请求参数说明**:
+- `source_file_path`: 要保存的源文件路径
+- `target_directory`: 目标目录路径（相对于工作目录）
+- `overwrite`: 是否覆盖同名文件，默认为 false
+
+**处理逻辑**:
+1. 检查目标目录是否存在，不存在则自动创建
+2. 检查目标目录是否已有同名文件
+3. 如果 `overwrite=true`：直接覆盖
+4. 如果 `overwrite=false` 且存在同名文件：为文件名添加时间戳（格式：`YYYYMMDD_HHMMSS`）
+5. 复制文件到目标位置
+
+**响应数据**:
+```json
+{
+  "source_file_path": "string",
+  "saved_path": "string",
+  "filename": "string",
+  "overwritten": "boolean"
+}
+```
+
+**字段说明**:
+- `source_file_path`: 源文件路径
+- `saved_path`: 保存后的完整路径
+- `filename`: 保存的文件名
+- `overwritten`: 是否覆盖了现有文件
+
+**示例请求**:
+```json
+{
+  "source_file_path": "/path/to/source/document.pdf",
+  "target_directory": "exports/backup",
+  "overwrite": false
+}
+```
+
+**示例响应**:
+```json
+{
+  "source_file_path": "/path/to/source/document.pdf",
+  "saved_path": "d:\\Projects\\ai_file_manager\\workdir\\exports\\backup\\document.pdf",
+  "filename": "document.pdf",
+  "overwritten": false
+}
+```
+
+**错误情况**:
+- `SOURCE_FILE_MISSING`: 源文件不存在
+- `SAVE_FILE_ERROR`: 保存文件失败
 
 ## 2. 文档分段模块接口
 

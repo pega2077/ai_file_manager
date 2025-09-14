@@ -74,6 +74,11 @@ class ListDirectoryRecursiveRequest(BaseModel):
     directory_path: str = Field(..., description="Path to the directory to list recursively")
     max_depth: int = Field(3, description="Maximum depth to traverse", ge=1, le=10)
 
+class SaveFileRequest(BaseModel):
+    source_file_path: str = Field(..., description="Path of the source file to save")
+    target_directory: str = Field(..., description="Target directory path")
+    overwrite: bool = Field(False, description="Whether to overwrite if file exists")
+
 # 文档类型检测
 DOCUMENT_EXTENSIONS = {
     '.txt', '.md', '.markdown', '.rst', '.tex',
@@ -600,6 +605,59 @@ Example response format:
         except Exception as e:
             logger.error(f"Error building recursive directory structure: {e}")
             return []
+
+    def save_file_to_directory(self, source_file_path: str, target_directory: str, overwrite: bool) -> dict:
+        """Save file to specified directory with overwrite handling"""
+        try:
+            # Convert to Path objects
+            source_path = Path(source_file_path)
+            
+            # Check if source file exists
+            if not source_path.exists():
+                return create_error_response(
+                    message="Source file does not exist",
+                    error_code="SOURCE_FILE_MISSING"
+                )
+            
+            # Resolve target directory - assume relative to workdir for security
+            target_dir = self.workdir / target_directory
+            target_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Determine target filename
+            target_filename = source_path.name
+            target_path = target_dir / target_filename
+            
+            if target_path.exists() and not overwrite:
+                # Add timestamp to filename
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                name_without_ext = target_path.stem
+                extension = target_path.suffix
+                new_filename = f"{name_without_ext}_{timestamp}{extension}"
+                target_path = target_dir / new_filename
+            
+            # Copy file
+            shutil.copy2(source_path, target_path)
+            
+            logger.info(f"File saved to directory: {source_path} -> {target_path}")
+            
+            return create_success_response(
+                message="File saved successfully",
+                data={
+                    "source_file_path": str(source_path),
+                    "saved_path": str(target_path),
+                    "filename": target_path.name,
+                    "overwritten": overwrite and (target_dir / source_path.name).exists()
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"Error saving file to directory: {e}")
+            return create_error_response(
+                message="Failed to save file",
+                error_code="SAVE_FILE_ERROR",
+                error_details=str(e)
+            )
+
 
 # Initialize file manager
 file_manager = FileManager()
@@ -1559,6 +1617,25 @@ async def preview_file(request: FilePreviewRequest):
         logger.error(f"Error previewing file: {e}")
         return create_error_response(
             message="Failed to preview file",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )
+
+@files_router.post("/save-file")
+async def save_file(request: SaveFileRequest):
+    """Save file to specified directory"""
+    try:
+        result = file_manager.save_file_to_directory(
+            source_file_path=request.source_file_path,
+            target_directory=request.target_directory,
+            overwrite=request.overwrite
+        )
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in save_file endpoint: {e}")
+        return create_error_response(
+            message="Internal server error",
             error_code="INTERNAL_ERROR",
             error_details=str(e)
         )
