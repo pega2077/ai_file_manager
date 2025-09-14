@@ -8,10 +8,10 @@ const { Title, Text } = Typography;
 declare global {
   interface Window {
     electronStore: {
-      get: (key: string) => unknown;
-      set: (key: string, value: unknown) => void;
-      delete: (key: string) => void;
-      has: (key: string) => boolean;
+      get: (key: string) => Promise<unknown>;
+      set: (key: string, value: unknown) => Promise<void>;
+      delete: (key: string) => Promise<void>;
+      has: (key: string) => Promise<boolean>;
     };
   }
 }

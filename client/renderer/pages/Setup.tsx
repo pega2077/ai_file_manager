@@ -18,10 +18,10 @@ declare global {
       selectFolder: () => Promise<string | null>;
     };
     electronStore: {
-      get: (key: string) => unknown;
-      set: (key: string, value: unknown) => void;
-      delete: (key: string) => void;
-      has: (key: string) => boolean;
+      get: (key: string) => Promise<unknown>;
+      set: (key: string, value: unknown) => Promise<void>;
+      delete: (key: string) => Promise<void>;
+      has: (key: string) => Promise<boolean>;
     };
   }
 }
@@ -99,9 +99,10 @@ const Setup = () => {
       const response = await apiService.createFolders(selectedFolder, structure);
 
       if (response.success) {
-        // 更新初始化状态
+        // 更新初始化状态和保存工作目录
         if (window.electronStore) {
           await window.electronStore.set('isInitialized', true);
+          await window.electronStore.set('workDirectory', selectedFolder);
         }
         message.success('目录结构创建成功，初始化完成');
         navigate('/home');

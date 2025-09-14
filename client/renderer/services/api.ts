@@ -54,6 +54,16 @@ class ApiService {
       }),
     });
   }
+
+  // 列出目录结构
+  async listDirectory(directoryPath: string) {
+    return this.request('/files/list-directory', {
+      method: 'POST',
+      body: JSON.stringify({
+        directory_path: directoryPath,
+      }),
+    });
+  }
 }
 
 export const apiService = new ApiService();
