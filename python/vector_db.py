@@ -10,13 +10,15 @@ import numpy as np
 import faiss
 from loguru import logger
 
+from config import settings
+
 
 class VectorDatabase:
     """向量数据库（基于Faiss实现）"""
     
-    def __init__(self, database_path: Path, dimension: int = 384):
-        self.database_path = database_path
-        self.dimension = dimension
+    def __init__(self, database_path: Path = None, dimension: int = None):
+        self.database_path = database_path or (settings.database_path / "vectors")
+        self.dimension = dimension or settings.embedding_dimension
         self.index = None
         self.metadata = {}  # 存储embedding对应的元数据
         self.is_loaded = False
@@ -366,5 +368,17 @@ class VectorDatabase:
             
         except Exception as e:
             logger.error(f"重建索引时添加embeddings失败: {e}")
+
+
+# Global vector database manager instance
+_vector_db_manager = None
+
+
+def get_vector_db_manager() -> VectorDatabase:
+    """Get global vector database manager instance"""
+    global _vector_db_manager
+    if _vector_db_manager is None:
+        _vector_db_manager = VectorDatabase()
+    return _vector_db_manager
 
 

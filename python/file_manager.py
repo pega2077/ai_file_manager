@@ -955,12 +955,11 @@ async def process_file_embeddings(file_id: str, content: str, file_path: str, ca
     try:
         # Import embedding and vector database modules
         from embedding import get_embedding_generator
-        from vector_db import VectorDatabase
-        from config import settings
+        from vector_db import get_vector_db_manager
 
         # Initialize components
         embedding_gen = get_embedding_generator()
-        vector_db = VectorDatabase(settings.database_path / "vectors", dimension=384)
+        vector_db = get_vector_db_manager()
 
         # Initialize vector database if not loaded
         if not vector_db.initialize():
