@@ -183,6 +183,13 @@ class ApiService {
       method: 'GET',
     });
   }
+
+  // 清空所有数据
+  async clearAllData() {
+    return this.request('/system/clear-data', {
+      method: 'POST',
+    });
+  }
 }
 
 export const apiService = new ApiService();

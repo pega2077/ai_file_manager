@@ -1,6 +1,7 @@
-import { Layout, Card, Typography, Switch, Input, Button, message } from 'antd';
+import { Layout, Card, Typography, Switch, Input, Button, message, Modal } from 'antd';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiService } from '../services/api';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -72,6 +73,29 @@ const Settings = () => {
       workDirectory: '',
     });
     message.success('设置已重置');
+  };
+
+  const handleClearAllData = () => {
+    Modal.confirm({
+      title: '确认清空所有数据',
+      content: '此操作将永久删除所有文件记录、向量数据和对话历史。此操作不可撤销，确定要继续吗？',
+      okText: '确定清空',
+      cancelText: '取消',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const response = await apiService.clearAllData();
+          if (response.success) {
+            message.success('所有数据已清空');
+          } else {
+            message.error('清空数据失败：' + response.message);
+          }
+        } catch (error) {
+          message.error('清空数据时发生错误');
+          console.error('Clear data error:', error);
+        }
+      },
+    });
   };
 
   return (
@@ -182,6 +206,9 @@ const Settings = () => {
               </Button>
               <Button onClick={handleResetSettings}>
                 重置为默认
+              </Button>
+              <Button danger onClick={handleClearAllData}>
+                清空所有数据
               </Button>
               <Button onClick={() => navigate('/home')}>
                 返回主页

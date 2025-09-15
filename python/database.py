@@ -725,6 +725,31 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Failed to delete conversation: {e}")
             return False
+    
+    def clear_all(self) -> bool:
+        """Clear all data from all tables"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Delete all data from tables (in correct order due to foreign keys)
+                cursor.execute("DELETE FROM chunks")
+                chunks_deleted = cursor.rowcount
+                
+                cursor.execute("DELETE FROM conversations")
+                conversations_deleted = cursor.rowcount
+                
+                cursor.execute("DELETE FROM files")
+                files_deleted = cursor.rowcount
+                
+                conn.commit()
+                
+                logger.info(f"Database cleared: {files_deleted} files, {chunks_deleted} chunks, {conversations_deleted} conversations")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to clear database: {e}")
+            return False
 
 
 # Global database manager instance

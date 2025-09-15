@@ -167,3 +167,51 @@ async def update_system_config(request: ConfigUpdateRequest):
                 "details": None
             }
         )
+
+@system_router.post("/clear-data")
+async def clear_all_data():
+    """清空所有数据（SQLite数据库和向量数据库）"""
+    try:
+        # 导入数据库管理器
+        from database import get_db_manager
+        from vector_db import get_vector_db_manager
+        
+        # 获取数据库管理器实例
+        db_manager = get_db_manager()
+        vector_db_manager = get_vector_db_manager()
+        
+        # 清空SQLite数据库
+        db_cleared = db_manager.clear_all()
+        
+        # 清空向量数据库
+        vector_cleared = vector_db_manager.clear_all()
+        
+        if db_cleared and vector_cleared:
+            return create_response(
+                message="All data cleared successfully",
+                data={
+                    "database_cleared": True,
+                    "vector_database_cleared": True
+                }
+            )
+        else:
+            return create_response(
+                success=False,
+                message="Failed to clear some data",
+                data={
+                    "database_cleared": db_cleared,
+                    "vector_database_cleared": vector_cleared
+                }
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to clear data: {e}")
+        return create_response(
+            success=False,
+            message="Failed to clear data",
+            error={
+                "code": "CLEAR_DATA_ERROR",
+                "message": str(e),
+                "details": None
+            }
+        )
