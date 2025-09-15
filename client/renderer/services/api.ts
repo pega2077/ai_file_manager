@@ -156,6 +156,26 @@ class ApiService {
       }),
     });
   }
+
+  // 智能问答
+  async askQuestion(question: string, contextLimit: number = 5, temperature: number = 0.7, maxTokens: number = 1000, similarityThreshold: number = 0.5, fileFilters?: {
+    file_ids?: string[];
+    categories?: string[];
+    tags?: string[];
+  }) {
+    return this.request('/chat/ask', {
+      method: 'POST',
+      body: JSON.stringify({
+        question,
+        context_limit: contextLimit,
+        temperature,
+        max_tokens: maxTokens,
+        similarity_threshold: similarityThreshold,
+        stream: false,
+        file_filters: fileFilters,
+      }),
+    });
+  }
 }
 
 export const apiService = new ApiService();
