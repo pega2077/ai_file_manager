@@ -601,6 +601,9 @@ const Home = () => {
       case 'files':
         // 已经在文件管理页面，不需要跳转
         break;
+      case 'file-list':
+        navigate('/files');
+        break;
       case 'search':
         navigate('/search');
         break;

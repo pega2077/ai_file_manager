@@ -1,5 +1,5 @@
 import { Layout, Menu } from 'antd';
-import { FolderOutlined, SettingOutlined, SearchOutlined } from '@ant-design/icons';
+import { FolderOutlined, SettingOutlined, SearchOutlined, FileTextOutlined } from '@ant-design/icons';
 
 const { Sider } = Layout;
 
@@ -14,6 +14,11 @@ const Sidebar = ({ selectedMenu, onMenuClick }: SidebarProps) => {
       key: 'files',
       icon: <FolderOutlined />,
       label: '文件管理',
+    },
+    {
+      key: 'file-list',
+      icon: <FileTextOutlined />,
+      label: '文件列表',
     },
     {
       key: 'search',

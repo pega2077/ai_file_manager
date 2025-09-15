@@ -190,6 +190,21 @@ class ApiService {
       method: 'POST',
     });
   }
+
+  // 获取文件列表
+  async getFileList(params?: {
+    page?: number;
+    limit?: number;
+    category?: string;
+    type?: string;
+    search?: string;
+    tags?: string[];
+  }) {
+    return this.request('/files/list', {
+      method: 'POST',
+      body: JSON.stringify(params || {}),
+    });
+  }
 }
 
 export const apiService = new ApiService();

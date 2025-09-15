@@ -1,0 +1,407 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Table, Button, message, Modal, Input, Select, Tag, Space, Pagination } from 'antd';
+import { EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined } from '@ant-design/icons';
+import { apiService } from '../services/api';
+
+const { Option } = Select;
+
+interface FileItem {
+  id: string;
+  name: string;
+  path: string;
+  type: string;
+  category: string;
+  summary: string;
+  tags: string[];
+  size: number;
+  added_at: string;
+  updated_at: string;
+}
+
+interface PaginationInfo {
+  current_page: number;
+  total_pages: number;
+  total_count: number;
+  limit: number;
+}
+
+interface FileListResponse {
+  files: FileItem[];
+  pagination: PaginationInfo;
+}
+
+interface FileListProps {
+  onFileSelect?: (file: FileItem) => void;
+}
+
+const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    current_page: 1,
+    total_pages: 1,
+    total_count: 0,
+    limit: 20
+  });
+
+  // 筛选条件
+  const [filters, setFilters] = useState({
+    search: '',
+    category: '',
+    type: '',
+    tags: [] as string[]
+  });
+
+  // 预览模态框
+  const [previewModalVisible, setPreviewModalVisible] = useState(false);
+  const [previewData, setPreviewData] = useState<{
+    file_path: string;
+    file_type: string;
+    mime_type: string;
+    content: string;
+    size: number;
+    truncated: boolean;
+  } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // 获取文件列表
+  const fetchFiles = useCallback(async (page: number = 1) => {
+    setLoading(true);
+    try {
+      const params = {
+        page,
+        limit: pagination.limit,
+        ...filters
+      };
+
+      const response = await apiService.getFileList(params);
+      if (response.success) {
+        const data = response.data as FileListResponse;
+        setFiles(data.files);
+        setPagination(data.pagination);
+      } else {
+        message.error(response.message || '获取文件列表失败');
+      }
+    } catch (error) {
+      console.error('获取文件列表失败:', error);
+      message.error('获取文件列表失败');
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.limit, filters]);
+
+  // 预览文件
+  const handlePreview = async (file: FileItem) => {
+    setPreviewLoading(true);
+    setPreviewModalVisible(true);
+
+    try {
+      const response = await apiService.previewFile(file.path);
+      if (response.success) {
+        setPreviewData(response.data as typeof previewData);
+      } else {
+        message.error(response.message || '预览文件失败');
+        setPreviewModalVisible(false);
+      }
+    } catch (error) {
+      console.error('预览文件失败:', error);
+      message.error('预览文件失败');
+      setPreviewModalVisible(false);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  // 打开文件目录
+  const handleOpenDirectory = async (file: FileItem) => {
+    try {
+      // 使用 path.dirname 获取目录路径
+      const dirPath = file.path.substring(0, file.path.lastIndexOf('\\')) ||
+                     file.path.substring(0, file.path.lastIndexOf('/'));
+
+      if (window.electronAPI && window.electronAPI.openFolder) {
+        const success = await window.electronAPI.openFolder(dirPath);
+        if (!success) {
+          message.error('打开目录失败');
+        }
+      } else {
+        message.error('不支持打开目录功能');
+      }
+    } catch (error) {
+      console.error('打开目录失败:', error);
+      message.error('打开目录失败');
+    }
+  };
+
+  // 打开文件
+  const handleOpenFile = async (file: FileItem) => {
+    try {
+      if (window.electronAPI && window.electronAPI.openFile) {
+        const success = await window.electronAPI.openFile(file.path);
+        if (!success) {
+          message.error('打开文件失败');
+        }
+      } else {
+        message.error('不支持打开文件功能');
+      }
+    } catch (error) {
+      console.error('打开文件失败:', error);
+      message.error('打开文件失败');
+    }
+  };
+
+  // 格式化文件大小
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // 表格列配置
+  const columns = [
+    {
+      title: '文件名',
+      dataIndex: 'name',
+      key: 'name',
+      ellipsis: true,
+      render: (name: string) => (
+        <div>
+          <FileTextOutlined style={{ marginRight: 8 }} />
+          <span>{name}</span>
+        </div>
+      ),
+    },
+    {
+      title: '类型',
+      dataIndex: 'type',
+      key: 'type',
+      width: 100,
+      render: (type: string) => (
+        <Tag color="blue">{type}</Tag>
+      ),
+    },
+    {
+      title: '分类',
+      dataIndex: 'category',
+      key: 'category',
+      width: 120,
+      render: (category: string) => (
+        <Tag color="green">{category || '未分类'}</Tag>
+      ),
+    },
+    {
+      title: '大小',
+      dataIndex: 'size',
+      key: 'size',
+      width: 100,
+      render: (size: number) => formatFileSize(size),
+    },
+    {
+      title: '标签',
+      dataIndex: 'tags',
+      key: 'tags',
+      render: (tags: string[]) => (
+        <div>
+          {tags.map(tag => (
+            <Tag key={tag}>{tag}</Tag>
+          ))}
+        </div>
+      ),
+    },
+    {
+      title: '添加时间',
+      dataIndex: 'added_at',
+      key: 'added_at',
+      width: 150,
+      render: (date: string) => new Date(date).toLocaleString(),
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 200,
+      render: (_: unknown, record: FileItem) => (
+        <Space>
+          <Button
+            type="text"
+            icon={<EyeOutlined />}
+            onClick={() => handlePreview(record)}
+            title="预览"
+          />
+          <Button
+            type="text"
+            icon={<FolderOpenOutlined />}
+            onClick={() => handleOpenDirectory(record)}
+            title="打开目录"
+          />
+          <Button
+            type="text"
+            icon={<FileTextOutlined />}
+            onClick={() => handleOpenFile(record)}
+            title="打开文件"
+          />
+        </Space>
+      ),
+    },
+  ];
+
+  // 处理筛选条件变化
+  const handleFilterChange = (key: string, value: string | string[]) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  // 处理分页变化
+  const handlePageChange = (page: number) => {
+    fetchFiles(page);
+  };
+
+  // 搜索
+  const handleSearch = () => {
+    fetchFiles(1);
+  };
+
+  // 初始化加载
+  useEffect(() => {
+    fetchFiles();
+  }, []);
+
+  return (
+    <div style={{ padding: 16 }}>
+      {/* 筛选条件 */}
+      <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <Input
+          placeholder="搜索文件名"
+          prefix={<SearchOutlined />}
+          value={filters.search}
+          onChange={(e) => handleFilterChange('search', e.target.value)}
+          onPressEnter={handleSearch}
+          style={{ width: 200 }}
+        />
+        <Select
+          placeholder="选择分类"
+          value={filters.category}
+          onChange={(value) => handleFilterChange('category', value)}
+          style={{ width: 150 }}
+          allowClear
+        >
+          <Option value="document">文档</Option>
+          <Option value="image">图片</Option>
+          <Option value="video">视频</Option>
+          <Option value="audio">音频</Option>
+          <Option value="archive">压缩包</Option>
+          <Option value="other">其他</Option>
+        </Select>
+        <Select
+          placeholder="选择类型"
+          value={filters.type}
+          onChange={(value) => handleFilterChange('type', value)}
+          style={{ width: 150 }}
+          allowClear
+        >
+          <Option value="pdf">PDF</Option>
+          <Option value="docx">Word</Option>
+          <Option value="xlsx">Excel</Option>
+          <Option value="pptx">PowerPoint</Option>
+          <Option value="txt">文本</Option>
+          <Option value="jpg">JPG</Option>
+          <Option value="png">PNG</Option>
+          <Option value="mp4">MP4</Option>
+          <Option value="zip">ZIP</Option>
+        </Select>
+        <Button type="primary" onClick={handleSearch}>
+          搜索
+        </Button>
+      </div>
+
+      {/* 文件列表表格 */}
+      <Table
+        columns={columns}
+        dataSource={files}
+        rowKey="id"
+        loading={loading}
+        pagination={false}
+        size="small"
+        onRow={(record) => ({
+          onClick: () => onFileSelect?.(record),
+        })}
+      />
+
+      {/* 分页 */}
+      {pagination.total_pages > 1 && (
+        <div style={{ marginTop: 16, textAlign: 'right' }}>
+          <Pagination
+            current={pagination.current_page}
+            total={pagination.total_count}
+            pageSize={pagination.limit}
+            onChange={handlePageChange}
+            showSizeChanger={false}
+            showQuickJumper
+            showTotal={(total, range) =>
+              `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
+            }
+          />
+        </div>
+      )}
+
+      {/* 预览模态框 */}
+      <Modal
+        title="文件预览"
+        open={previewModalVisible}
+        onCancel={() => setPreviewModalVisible(false)}
+        footer={null}
+        width={800}
+        destroyOnClose
+      >
+        {previewLoading ? (
+          <div style={{ textAlign: 'center', padding: 20 }}>
+            加载中...
+          </div>
+        ) : previewData ? (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <strong>文件路径:</strong> {previewData.file_path}
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <strong>文件大小:</strong> {formatFileSize(previewData.size)}
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <strong>文件类型:</strong> {previewData.mime_type}
+            </div>
+            {previewData.file_type === 'text' ? (
+              <pre style={{
+                backgroundColor: '#f5f5f5',
+                padding: 16,
+                borderRadius: 4,
+                maxHeight: 400,
+                overflow: 'auto',
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'monospace'
+              }}>
+                {previewData.content}
+              </pre>
+            ) : previewData.file_type === 'image' ? (
+              <img
+                src={previewData.content}
+                alt="预览"
+                style={{ maxWidth: '100%', maxHeight: 400 }}
+              />
+            ) : (
+              <div>不支持预览此文件类型</div>
+            )}
+            {previewData.truncated && (
+              <div style={{ marginTop: 8, color: '#ff4d4f' }}>
+                文件内容过长，已截断显示
+              </div>
+            )}
+          </div>
+        ) : null}
+      </Modal>
+    </div>
+  );
+};
+
+export default FileList;
