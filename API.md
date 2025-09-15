@@ -63,6 +63,7 @@
 | 文档分段 | 重新分段 | POST | `/api/files/reprocess` | 重新处理文件分段 |
 | 搜索检索 | 语义搜索 | POST | `/api/search/semantic` | 基于向量的语义搜索 |
 | 搜索检索 | 关键词搜索 | POST | `/api/search/keyword` | 基于关键词的全文搜索 |
+| 搜索检索 | 文件名搜索 | POST | `/api/search/filename` | 基于文件名的模糊搜索 |
 | RAG问答 | 智能问答 | POST | `/api/chat/ask` | 基于RAG的智能问答 |
 | RAG问答 | 对话历史 | POST | `/api/chat/history` | 获取对话历史记录 |
 | RAG问答 | 目录结构推荐 | POST | `/api/chat/directory-structure` | 基于职业和用途推荐目录结构 |
@@ -915,6 +916,54 @@
     "total_pages": "number",
     "total_count": "number",
     "limit": "number"
+  }
+}
+```
+
+### 3.3 文件名搜索
+
+**接口**: `POST /api/search/filename`
+
+**请求参数**:
+```json
+{
+  "query": "string",
+  "page": "number",        // 默认 1
+  "limit": "number",       // 默认 20
+  "file_types": ["string"], // 可选，文件类型筛选
+  "categories": ["string"]  // 可选，分类筛选
+}
+```
+
+**响应数据**:
+```json
+{
+  "results": [
+    {
+      "file_id": "string",
+      "file_name": "string",
+      "file_path": "string",
+      "file_type": "string",
+      "category": "string",
+      "size": "number",
+      "added_at": "string",
+      "tags": ["string"]
+    }
+  ],
+  "pagination": {
+    "current_page": "number",
+    "total_pages": "number",
+    "total_count": "number",
+    "limit": "number"
+  },
+  "search_metadata": {
+    "query": "string",
+    "total_results": "number",
+    "search_time_ms": "number",
+    "filters_applied": {
+      "file_types": ["string"],
+      "categories": ["string"]
+    }
   }
 }
 ```

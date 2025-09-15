@@ -39,6 +39,13 @@ class KeywordSearchRequest(BaseModel):
     file_types: Optional[List[str]] = Field(default=None, description="Filter by file types")
     categories: Optional[List[str]] = Field(default=None, description="Filter by categories")
 
+class FilenameSearchRequest(BaseModel):
+    query: str = Field(..., description="Filename search query")
+    page: int = Field(default=1, ge=1, description="Page number")
+    limit: int = Field(default=20, ge=1, le=100, description="Results per page")
+    file_types: Optional[List[str]] = Field(default=None, description="Filter by file types")
+    categories: Optional[List[str]] = Field(default=None, description="Filter by categories")
+
 class SemanticSearchResult(BaseModel):
     chunk_id: str
     file_id: str
@@ -57,6 +64,16 @@ class KeywordSearchResult(BaseModel):
     category: str
     matched_chunks: List[Dict[str, Any]]
     relevance_score: float
+
+class FilenameSearchResult(BaseModel):
+    file_id: str
+    file_name: str
+    file_path: str
+    file_type: str
+    category: str
+    size: int
+    added_at: str
+    tags: List[str]
 
 class SearchMetadata(BaseModel):
     query: str
@@ -354,6 +371,103 @@ async def keyword_search(request: KeywordSearchRequest):
         logger.error(f"Error in keyword search: {e}")
         return create_error_response(
             message="Failed to perform keyword search",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )
+
+@search_router.post("/filename",
+    summary="Filename fuzzy search",
+    description="Perform fuzzy search across filenames",
+    responses={
+        200: {"description": "Search completed successfully"},
+        400: {"description": "Invalid request parameters"},
+        500: {"description": "Server error during search"}
+    }
+)
+async def filename_search(request: FilenameSearchRequest):
+    """Perform filename-based fuzzy search"""
+    start_time = time.time()
+
+    try:
+        # 验证查询参数
+        if not request.query or not request.query.strip():
+            return create_error_response(
+                message="Query cannot be empty",
+                error_code="EMPTY_QUERY"
+            )
+
+        # 清理查询文本
+        request.query = request.query.strip()
+
+        logger.info(f"Starting filename search for query: '{request.query}'")
+
+        # 获取数据库管理器实例
+        db_manager = DatabaseManager()
+
+        # 搜索文件名匹配的文件
+        files, total_count = db_manager.search_files_by_name(
+            query=request.query,
+            page=request.page,
+            limit=request.limit
+        )
+
+        # 应用过滤器
+        filtered_files = []
+        for file_data in files:
+            # 应用文件类型过滤器
+            if request.file_types and file_data["type"] not in request.file_types:
+                continue
+            # 应用分类过滤器
+            if request.categories and file_data["category"] not in request.categories:
+                continue
+            
+            filtered_files.append(file_data)
+
+        # 转换为结果格式
+        results = []
+        for file_data in filtered_files:
+            result_item = {
+                "file_id": file_data["file_id"],
+                "file_name": file_data["name"],
+                "file_path": file_data["path"],
+                "file_type": file_data["type"],
+                "category": file_data["category"],
+                "size": file_data["size"],
+                "added_at": file_data["added_at"],
+                "tags": file_data.get("tags", [])
+            }
+            results.append(result_item)
+
+        search_time = int((time.time() - start_time) * 1000)
+
+        logger.info(f"Filename search completed in {search_time}ms, returned {len(results)} results")
+
+        return create_success_response(
+            message="Filename search completed successfully",
+            data={
+                "results": results,
+                "pagination": {
+                    "current_page": request.page,
+                    "total_pages": (total_count + request.limit - 1) // request.limit,
+                    "total_count": total_count,
+                    "limit": request.limit
+                },
+                "search_metadata": {
+                    "query": request.query,
+                    "total_results": len(results),
+                    "search_time_ms": search_time,
+                    "filters_applied": {
+                        "file_types": request.file_types,
+                        "categories": request.categories
+                    }
+                }
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error in filename search: {e}")
+        return create_error_response(
+            message="Failed to perform filename search",
             error_code="INTERNAL_ERROR",
             error_details=str(e)
         )

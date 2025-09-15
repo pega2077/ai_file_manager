@@ -483,6 +483,57 @@ class DatabaseManager:
             logger.error(f"Failed to update file: {e}")
             return False
     
+    def search_files_by_name(self, query: str, page: int = 1, limit: int = 20) -> Tuple[List[Dict[str, Any]], int]:
+        """Search files by filename with fuzzy matching"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Build fuzzy search query using LIKE with wildcards
+                search_pattern = f"%{query}%"
+                
+                # Get total count
+                cursor.execute("""
+                    SELECT COUNT(*) FROM files 
+                    WHERE name LIKE ?
+                """, (search_pattern,))
+                total_count = cursor.fetchone()[0]
+                
+                # Get paginated results
+                offset = (page - 1) * limit
+                cursor.execute("""
+                    SELECT * FROM files 
+                    WHERE name LIKE ?
+                    ORDER BY name ASC
+                    LIMIT ? OFFSET ?
+                """, (search_pattern, limit, offset))
+                
+                rows = cursor.fetchall()
+                results = []
+                
+                for row in rows:
+                    file_dict = {
+                        "id": row[0],
+                        "file_id": row[1],
+                        "path": row[2],
+                        "name": row[3],
+                        "type": row[4],
+                        "category": row[5],
+                        "summary": row[6],
+                        "tags": json.loads(row[7]) if row[7] else [],
+                        "size": row[8],
+                        "added_at": row[9],
+                        "updated_at": row[10],
+                        "processed": bool(row[11])
+                    }
+                    results.append(file_dict)
+                
+                return results, total_count
+                
+        except Exception as e:
+            logger.error(f"Failed to search files by name: {e}")
+            return [], 0
+    
     def get_statistics(self) -> Dict[str, Any]:
         """Get database statistics"""
         try:
