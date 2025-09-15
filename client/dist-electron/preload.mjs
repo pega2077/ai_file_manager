@@ -24,7 +24,8 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   selectFolder: () => electron.ipcRenderer.invoke("select-folder"),
   openFile: (filePath) => electron.ipcRenderer.invoke("open-file", filePath),
   openFolder: (filePath) => electron.ipcRenderer.invoke("open-folder", filePath),
-  selectFile: () => electron.ipcRenderer.invoke("select-file")
+  selectFile: () => electron.ipcRenderer.invoke("select-file"),
+  copyToClipboard: (text) => electron.ipcRenderer.invoke("copy-to-clipboard", text)
 });
 electron.contextBridge.exposeInMainWorld("electronStore", {
   get: (key) => electron.ipcRenderer.invoke("store:get", key),

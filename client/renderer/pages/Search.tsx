@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Layout, Input, Button, List, Spin, message, Tag, Pagination, Card, Tabs } from 'antd';
-import { SearchOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { Layout, Input, Button, List, Spin, message, Tag, Pagination, Card, Tabs, Modal } from 'antd';
+import { SearchOutlined, QuestionCircleOutlined, EyeOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { apiService } from '../services/api';
 import Sidebar from '../components/Sidebar';
 import { useNavigate } from 'react-router-dom';
@@ -61,6 +61,20 @@ interface QuestionResponse {
   };
 }
 
+interface ChunkContent {
+  id: string;
+  file_id: string;
+  chunk_index: number;
+  content: string;
+  content_type: string;
+  char_count: number;
+  token_count: number;
+  embedding_id: string;
+  created_at: string;
+  file_name: string;
+  file_path: string;
+}
+
 const SearchPage = () => {
   const navigate = useNavigate();
   const [selectedMenu, setSelectedMenu] = useState('search');
@@ -78,6 +92,11 @@ const SearchPage = () => {
 
   // 标签页状态
   const [activeTab, setActiveTab] = useState('search');
+
+  // 分段预览状态
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewChunk, setPreviewChunk] = useState<ChunkContent | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const handleMenuClick = ({ key }: { key: string }) => {
     setSelectedMenu(key);
@@ -150,6 +169,61 @@ const SearchPage = () => {
     } finally {
       setAsking(false);
     }
+  };
+
+  const handlePreviewChunk = async (chunkId: string) => {
+    setPreviewLoading(true);
+    setPreviewVisible(true);
+    try {
+      const response = await apiService.getChunkContent(chunkId);
+      if (response.success) {
+        const data = response.data as ChunkContent;
+        setPreviewChunk(data);
+      } else {
+        message.error(response.message || '获取分段内容失败');
+        setPreviewVisible(false);
+      }
+    } catch (error) {
+      console.error('Preview chunk error:', error);
+      message.error('获取分段内容失败');
+      setPreviewVisible(false);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleOpenFile = async (filePath: string, chunkContent?: string) => {
+    // 如果提供了chunk内容，先复制前20个字符到剪贴板
+    if (chunkContent && window.electronAPI?.copyToClipboard) {
+      const textToCopy = chunkContent.length > 20 ? chunkContent.substring(0, 20) : chunkContent;
+      try {
+        const success = await window.electronAPI.copyToClipboard(textToCopy);
+        if (success) {
+          message.success(`已复制"${textToCopy}"到剪贴板`);
+        } else {
+          message.warning('复制到剪贴板失败');
+        }
+      } catch (error) {
+        console.error('Copy to clipboard error:', error);
+        message.warning('复制到剪贴板失败');
+      }
+    }
+
+    // 然后打开文件
+    if (window.electronAPI?.openFile) {
+      window.electronAPI.openFile(filePath).then(success => {
+        if (!success) {
+          message.error('打开文件失败');
+        }
+      });
+    } else {
+      message.error('不支持的文件打开功能');
+    }
+  };
+
+  const handleClosePreview = () => {
+    setPreviewVisible(false);
+    setPreviewChunk(null);
   };
 
   const formatFileSize = (size: number) => {
@@ -361,11 +435,27 @@ const SearchPage = () => {
                               }
                               description={
                                 <div>
-                                  <div style={{ marginBottom: '4px', color: '#666', fontSize: '12px' }}>
+                                  <div style={{ marginBottom: '8px', color: '#666', fontSize: '12px' }}>
                                     路径: {source.file_path}
                                   </div>
-                                  <div style={{ color: '#999', fontSize: '12px' }}>
+                                  <div style={{ marginBottom: '8px', color: '#999', fontSize: '12px' }}>
                                     分段 {source.chunk_index + 1}
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '8px' }}>
+                                    <Button
+                                      size="small"
+                                      icon={<EyeOutlined />}
+                                      onClick={() => handlePreviewChunk(source.chunk_id)}
+                                    >
+                                      预览内容
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      icon={<FolderOpenOutlined />}
+                                      onClick={() => handleOpenFile(source.file_path, source.chunk_content)}
+                                    >
+                                      打开文件
+                                    </Button>
                                   </div>
                                 </div>
                               }
@@ -381,6 +471,69 @@ const SearchPage = () => {
           )}
         </Content>
       </Layout>
+
+      {/* 分段内容预览模态框 */}
+      <Modal
+        title={
+          previewChunk ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <EyeOutlined />
+              <span>{previewChunk.file_name} - 分段 {previewChunk.chunk_index + 1}</span>
+            </div>
+          ) : '分段内容预览'
+        }
+        open={previewVisible}
+        onCancel={handleClosePreview}
+        footer={[
+          <Button key="close" onClick={handleClosePreview}>
+            关闭
+          </Button>,
+          previewChunk && (
+            <Button
+              key="openFile"
+              icon={<FolderOpenOutlined />}
+              onClick={() => handleOpenFile(previewChunk.file_path, previewChunk.content)}
+            >
+              打开文件
+            </Button>
+          ),
+        ]}
+        width={800}
+        style={{ maxHeight: '80vh' }}
+      >
+        {previewLoading ? (
+          <div style={{ textAlign: 'center', padding: '50px' }}>
+            <Spin size="large" />
+            <div style={{ marginTop: '16px' }}>正在加载分段内容...</div>
+          </div>
+        ) : previewChunk ? (
+          <div>
+            <div style={{ marginBottom: '16px', padding: '12px', background: '#f5f5f5', borderRadius: '4px' }}>
+              <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#666' }}>
+                <span>内容类型: {previewChunk.content_type}</span>
+                <span>字符数: {previewChunk.char_count}</span>
+                <span>Token数: {previewChunk.token_count}</span>
+              </div>
+            </div>
+            <div
+              style={{
+                maxHeight: '400px',
+                overflow: 'auto',
+                padding: '16px',
+                border: '1px solid #d9d9d9',
+                borderRadius: '4px',
+                background: '#fafafa',
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'monospace',
+                fontSize: '14px',
+                lineHeight: '1.6'
+              }}
+            >
+              {previewChunk.content}
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </Layout>
   );
 };

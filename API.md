@@ -60,6 +60,7 @@
 | 文件管理 | 推荐保存目录 | POST | `/api/files/recommend-directory` | 分析文件并推荐保存目录 |
 | 文件管理 | 导入RAG库 | POST | `/api/files/import-to-rag` | 将文件导入RAG库用于语义搜索 |
 | 文档分段 | 分段列表 | POST | `/api/files/chunks/list` | 获取文件分段列表 |
+| 文档分段 | 分段内容 | GET | `/api/files/chunks/{chunk_id}` | 获取单个分段的完整内容 |
 | 文档分段 | 重新分段 | POST | `/api/files/reprocess` | 重新处理文件分段 |
 | 搜索检索 | 语义搜索 | POST | `/api/search/semantic` | 基于向量的语义搜索 |
 | 搜索检索 | 关键词搜索 | POST | `/api/search/keyword` | 基于关键词的全文搜索 |
@@ -804,6 +805,57 @@
     "total_count": "number",
     "limit": "number"
   }
+}
+```
+
+### 2.1.1 获取分段内容
+
+**接口**: `GET /api/files/chunks/{chunk_id}`
+
+**响应数据**:
+```json
+{
+  "id": "string",
+  "file_id": "string",
+  "chunk_index": "number",
+  "content": "string",
+  "content_type": "text|heading|code|table",
+  "char_count": "number",
+  "token_count": "number",
+  "embedding_id": "string",
+  "created_at": "string",
+  "file_name": "string",
+  "file_path": "string"
+}
+```
+
+**字段说明**:
+- `id`: 分段唯一标识
+- `file_id`: 所属文件ID
+- `chunk_index`: 分段索引（从0开始）
+- `content`: 分段完整内容
+- `content_type`: 内容类型（text/heading/code/table）
+- `char_count`: 字符数
+- `token_count`: Token数
+- `embedding_id`: 对应的embedding ID
+- `created_at`: 创建时间
+- `file_name`: 源文件名称
+- `file_path`: 源文件路径
+
+**示例响应**:
+```json
+{
+  "id": "chunk_123456789",
+  "file_id": "file_abcdef123",
+  "chunk_index": 5,
+  "content": "这是分段的完整内容，可能包含较长的文本...",
+  "content_type": "text",
+  "char_count": 150,
+  "token_count": 38,
+  "embedding_id": "emb_987654321",
+  "created_at": "2025-09-15T10:30:00Z",
+  "file_name": "document.pdf",
+  "file_path": "/path/to/document.pdf"
 }
 ```
 

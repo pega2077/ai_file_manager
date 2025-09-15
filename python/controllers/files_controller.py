@@ -88,6 +88,39 @@ class RecommendDirectoryRequest(BaseModel):
 class ImportToRagRequest(BaseModel):
     file_path: str = Field(..., description="Path of the file to import to RAG library")
 
+class ChunkInfo(BaseModel):
+    id: str
+    file_id: str
+    chunk_index: int
+    content: str
+    content_type: str
+    char_count: int
+    token_count: int
+    embedding_id: str
+    created_at: str
+
+class ChunkListRequest(BaseModel):
+    file_id: str = Field(..., description="File ID to get chunks for")
+    page: int = Field(1, description="Page number", ge=1)
+    limit: int = Field(50, description="Number of chunks per page", ge=1, le=100)
+
+class ChunkListResponse(BaseModel):
+    chunks: List[ChunkInfo]
+    pagination: Dict[str, Any]
+
+class ChunkContentResponse(BaseModel):
+    id: str
+    file_id: str
+    chunk_index: int
+    content: str
+    content_type: str
+    char_count: int
+    token_count: int
+    embedding_id: str
+    created_at: str
+    file_name: str
+    file_path: str
+
 # 文档类型检测
 DOCUMENT_EXTENSIONS = {
     '.txt', '.md', '.markdown', '.rst', '.tex',
@@ -1126,6 +1159,108 @@ async def import_to_rag(request: ImportToRagRequest):
         
     except Exception as e:
         logger.error(f"Error in import_to_rag endpoint: {e}")
+        return create_error_response(
+            message="Internal server error",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )
+
+@files_router.post("/chunks/list")
+async def list_chunks(request: ChunkListRequest):
+    """Get chunks list for a file"""
+    try:
+        from database import DatabaseManager
+        db_manager = DatabaseManager()
+        
+        # Get chunks with pagination
+        chunks = db_manager.get_chunks_by_file_id_paginated(
+            file_id=request.file_id,
+            page=request.page,
+            limit=request.limit
+        )
+        
+        # Get total count
+        total_count = db_manager.get_chunks_count_by_file_id(request.file_id)
+        
+        # Format response
+        chunks_data = []
+        for chunk in chunks:
+            chunks_data.append(ChunkInfo(
+                id=chunk['chunk_id'],
+                file_id=chunk['file_id'],
+                chunk_index=chunk['chunk_index'],
+                content=chunk['content'][:200] + "..." if len(chunk['content']) > 200 else chunk['content'],  # Truncate for list view
+                content_type=chunk['content_type'],
+                char_count=chunk['char_count'],
+                token_count=chunk['token_count'],
+                embedding_id=chunk['embedding_id'],
+                created_at=chunk['created_at']
+            ))
+        
+        pagination = {
+            "current_page": request.page,
+            "total_pages": (total_count + request.limit - 1) // request.limit,
+            "total_count": total_count,
+            "limit": request.limit
+        }
+        
+        return create_success_response(
+            data=ChunkListResponse(
+                chunks=chunks_data,
+                pagination=pagination
+            ).dict()
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in list_chunks endpoint: {e}")
+        return create_error_response(
+            message="Internal server error",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )
+
+@files_router.get("/chunks/{chunk_id}")
+async def get_chunk_content(chunk_id: str):
+    """Get full content of a specific chunk"""
+    try:
+        from database import DatabaseManager
+        db_manager = DatabaseManager()
+        
+        # Get chunk by ID
+        chunk = db_manager.get_chunk_by_id(chunk_id)
+        if not chunk:
+            return create_error_response(
+                message="Chunk not found",
+                error_code="RESOURCE_NOT_FOUND"
+            )
+        
+        # Get file info
+        file_info = db_manager.get_file_by_id(chunk['file_id'])
+        if not file_info:
+            return create_error_response(
+                message="File not found",
+                error_code="RESOURCE_NOT_FOUND"
+            )
+        
+        # Format response
+        response_data = ChunkContentResponse(
+            id=chunk['chunk_id'],
+            file_id=chunk['file_id'],
+            chunk_index=chunk['chunk_index'],
+            content=chunk['content'],
+            content_type=chunk['content_type'],
+            char_count=chunk['char_count'],
+            token_count=chunk['token_count'],
+            embedding_id=chunk['embedding_id'],
+            created_at=chunk['created_at'],
+            file_name=file_info['name'],
+            file_path=file_info['path']
+        )
+        
+        return create_success_response(data=response_data.dict())
+        
+    except Exception as e:
+        logger.error(f"Error in get_chunk_content endpoint: {e}")
         return create_error_response(
             message="Internal server error",
             error_code="INTERNAL_ERROR",

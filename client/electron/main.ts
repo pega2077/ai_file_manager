@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, clipboard } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import Store from 'electron-store'
@@ -110,6 +110,17 @@ ipcMain.handle('select-file', async () => {
     ]
   })
   return result.canceled ? null : result.filePaths[0]
+})
+
+// IPC handler for copying text to clipboard
+ipcMain.handle('copy-to-clipboard', async (_event, text: string) => {
+  try {
+    clipboard.writeText(text)
+    return true
+  } catch (error) {
+    console.error('Failed to copy to clipboard:', error)
+    return false
+  }
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common

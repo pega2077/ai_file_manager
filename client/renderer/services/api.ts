@@ -176,6 +176,13 @@ class ApiService {
       }),
     });
   }
+
+  // 获取分段内容
+  async getChunkContent(chunkId: string) {
+    return this.request(`/files/chunks/${chunkId}`, {
+      method: 'GET',
+    });
+  }
 }
 
 export const apiService = new ApiService();

@@ -277,6 +277,43 @@ class DatabaseManager:
             logger.error(f"Failed to get chunks for file: {e}")
             return []
     
+    def get_chunks_by_file_id_paginated(self, file_id: str, page: int = 1, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get chunks for a file with pagination"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                offset = (page - 1) * limit
+                cursor.execute("""
+                    SELECT * FROM chunks 
+                    WHERE file_id = ? 
+                    ORDER BY chunk_index
+                    LIMIT ? OFFSET ?
+                """, (file_id, limit, offset))
+                
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+                
+        except Exception as e:
+            logger.error(f"Failed to get chunks for file with pagination: {e}")
+            return []
+    
+    def get_chunks_count_by_file_id(self, file_id: str) -> int:
+        """Get total count of chunks for a file"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT COUNT(*) FROM chunks 
+                    WHERE file_id = ?
+                """, (file_id,))
+                
+                row = cursor.fetchone()
+                return row[0] if row else 0
+                
+        except Exception as e:
+            logger.error(f"Failed to get chunks count for file: {e}")
+            return 0
+    
     def get_chunk_by_id(self, chunk_id: str) -> Optional[Dict[str, Any]]:
         """Get a specific chunk by its ID"""
         try:
