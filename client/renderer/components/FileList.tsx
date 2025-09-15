@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Table, Button, message, Input, Select, Tag, Space, Pagination } from 'antd';
-import { EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined } from '@ant-design/icons';
 import { apiService } from '../services/api';
 import FilePreview from './FilePreview';
 
@@ -39,6 +39,7 @@ interface FileListProps {
 const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [workDirectory, setWorkDirectory] = useState<string>('workdir');
   const [pagination, setPagination] = useState<PaginationInfo>({
     current_page: 1,
     total_pages: 1,
@@ -128,6 +129,43 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
     }
   };
 
+  // 导入到知识库
+  const handleImportToRag = async (file: FileItem) => {
+    try {
+      const loadingKey = message.loading(`正在导入文件 "${file.name}" 到知识库...`, 0);
+      
+      const response = await apiService.importToRag(file.path);
+      loadingKey();
+      
+      if (response.success) {
+        message.success(`文件 "${file.name}" 已成功导入知识库`);
+        // 刷新文件列表以更新状态
+        fetchFiles(pagination.current_page);
+      } else {
+        message.error(response.message || `导入文件 "${file.name}" 失败`);
+      }
+    } catch (error) {
+      message.error(`导入文件 "${file.name}" 失败`);
+      console.error('导入知识库失败:', error);
+    }
+  };
+
+  // 获取相对于工作目录的路径
+  const getRelativePath = (fullPath: string): string => {
+    // 规范化路径分隔符
+    const normalizedPath = fullPath.replace(/\\/g, '/');
+    const normalizedWorkDir = workDirectory.replace(/\\/g, '/');
+
+    // 如果路径以工作目录开头，返回相对路径
+    if (normalizedPath.startsWith(normalizedWorkDir)) {
+      const relativePath = normalizedPath.substring(normalizedWorkDir.length);
+      return relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
+    }
+
+    // 如果不以工作目录开头，返回原路径
+    return fullPath;
+  };
+
   // 格式化文件大小
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 B';
@@ -143,7 +181,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
       title: '文件名',
       dataIndex: 'name',
       key: 'name',
-      ellipsis: true,
+      ellipsis: false,
       render: (name: string) => (
         <div>
           <FileTextOutlined style={{ marginRight: 8 }} />
@@ -159,7 +197,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
       width: 200,
       render: (path: string) => (
         <span style={{ fontSize: '12px', color: '#666' }} title={path}>
-          {path}
+          {getRelativePath(path)}
         </span>
       ),
     },
@@ -252,6 +290,13 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
             onClick={() => handleOpenFile(record)}
             title="打开文件"
           />
+          <Button
+            type="text"
+            icon={<DatabaseOutlined />}
+            onClick={() => handleImportToRag(record)}
+            title="导入知识库"
+            disabled={record.processed}
+          />
         </Space>
       ),
     },
@@ -277,6 +322,21 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
 
   // 初始化加载
   useEffect(() => {
+    // 获取工作目录设置
+    const loadWorkDirectory = async () => {
+      if (window.electronStore) {
+        try {
+          const storedWorkDirectory = await window.electronStore.get('workDirectory') as string;
+          if (storedWorkDirectory) {
+            setWorkDirectory(storedWorkDirectory);
+          }
+        } catch (error) {
+          console.error('Failed to load workDirectory:', error);
+        }
+      }
+    };
+
+    loadWorkDirectory();
     fetchFiles();
   }, [fetchFiles]);
 
