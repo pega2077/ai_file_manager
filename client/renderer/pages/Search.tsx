@@ -441,6 +441,15 @@ const SearchPage = () => {
                                   <div style={{ marginBottom: '8px', color: '#999', fontSize: '12px' }}>
                                     分段 {source.chunk_index + 1}
                                   </div>
+                                  {source.chunk_content && (
+                                    <div style={{ marginBottom: '12px' }}>
+                                      <div style={{ fontSize: '13px', color: '#333', lineHeight: '1.5', padding: '8px', background: '#f9f9f9', borderRadius: '4px', border: '1px solid #e8e8e8' }}>
+                                        {source.chunk_content.length > 150 
+                                          ? `${source.chunk_content.substring(0, 150)}...` 
+                                          : source.chunk_content}
+                                      </div>
+                                    </div>
+                                  )}
                                   <div style={{ display: 'flex', gap: '8px' }}>
                                     <Button
                                       size="small"
