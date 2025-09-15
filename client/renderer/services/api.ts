@@ -142,6 +142,20 @@ class ApiService {
       }),
     });
   }
+
+  // 文件名搜索
+  async filenameSearch(query: string, page: number = 1, limit: number = 20, fileTypes?: string[], categories?: string[]) {
+    return this.request('/search/filename', {
+      method: 'POST',
+      body: JSON.stringify({
+        query,
+        page,
+        limit,
+        file_types: fileTypes,
+        categories,
+      }),
+    });
+  }
 }
 
 export const apiService = new ApiService();
