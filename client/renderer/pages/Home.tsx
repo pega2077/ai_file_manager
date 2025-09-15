@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Layout, Table, Spin, message, Button, Modal, Select, TreeSelect } from 'antd';
-import { ArrowUpOutlined } from '@ant-design/icons';
+import { ArrowUpOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, DatabaseOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import Sidebar from '../components/Sidebar';
@@ -161,47 +161,51 @@ const Home = () => {
       title: '操作',
       key: 'actions',
       render: (_text: string, record: FileItem) => (
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '4px' }}>
           {record.type === 'file' && (
             <>
               <Button
+                type="text"
                 size="small"
+                icon={<EyeOutlined />}
                 onClick={(e) => {
                   e.stopPropagation();
                   handlePreview(record);
                 }}
-              >
-                预览
-              </Button>
+                title="预览"
+              />
               <Button
+                type="text"
                 size="small"
+                icon={<DatabaseOutlined />}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleImportToRag(record);
                 }}
-              >
-                导入知识库
-              </Button>
+                title="导入知识库"
+              />
             </>
           )}
           <Button
+            type="text"
             size="small"
+            icon={<FolderOpenOutlined />}
             onClick={(e) => {
               e.stopPropagation();
               handleOpenFolder(record);
             }}
-          >
-            打开文件夹
-          </Button>
+            title="打开文件夹"
+          />
           <Button
+            type="text"
             size="small"
+            icon={<FileTextOutlined />}
             onClick={(e) => {
               e.stopPropagation();
               handleOpenFile(record);
             }}
-          >
-            直接打开
-          </Button>
+            title="直接打开"
+          />
         </div>
       ),
     },

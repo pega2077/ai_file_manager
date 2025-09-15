@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Button, message, Modal, Input, Select, Tag, Space, Pagination } from 'antd';
-import { EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined } from '@ant-design/icons';
+import { Table, Button, message, Input, Select, Tag, Space, Pagination } from 'antd';
+import { EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { apiService } from '../services/api';
+import FilePreview from './FilePreview';
 
 const { Option } = Select;
 
@@ -16,6 +17,7 @@ interface FileItem {
   size: number;
   added_at: string;
   updated_at: string;
+  processed: boolean;
 }
 
 interface PaginationInfo {
@@ -52,17 +54,9 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
     tags: [] as string[]
   });
 
-  // 预览模态框
-  const [previewModalVisible, setPreviewModalVisible] = useState(false);
-  const [previewData, setPreviewData] = useState<{
-    file_path: string;
-    file_type: string;
-    mime_type: string;
-    content: string;
-    size: number;
-    truncated: boolean;
-  } | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
+  // 预览状态
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{ path: string; name: string } | null>(null);
 
   // 获取文件列表
   const fetchFiles = useCallback(async (page: number = 1) => {
@@ -91,25 +85,9 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
   }, [pagination.limit, filters]);
 
   // 预览文件
-  const handlePreview = async (file: FileItem) => {
-    setPreviewLoading(true);
-    setPreviewModalVisible(true);
-
-    try {
-      const response = await apiService.previewFile(file.path);
-      if (response.success) {
-        setPreviewData(response.data as typeof previewData);
-      } else {
-        message.error(response.message || '预览文件失败');
-        setPreviewModalVisible(false);
-      }
-    } catch (error) {
-      console.error('预览文件失败:', error);
-      message.error('预览文件失败');
-      setPreviewModalVisible(false);
-    } finally {
-      setPreviewLoading(false);
-    }
+  const handlePreview = (file: FileItem) => {
+    setPreviewFile({ path: file.path, name: file.name });
+    setPreviewVisible(true);
   };
 
   // 打开文件目录
@@ -174,6 +152,18 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
       ),
     },
     {
+      title: '文件路径',
+      dataIndex: 'path',
+      key: 'path',
+      ellipsis: true,
+      width: 200,
+      render: (path: string) => (
+        <span style={{ fontSize: '12px', color: '#666' }} title={path}>
+          {path}
+        </span>
+      ),
+    },
+    {
       title: '类型',
       dataIndex: 'type',
       key: 'type',
@@ -216,6 +206,27 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
       key: 'added_at',
       width: 150,
       render: (date: string) => new Date(date).toLocaleString(),
+    },
+    {
+      title: '知识库状态',
+      dataIndex: 'processed',
+      key: 'processed',
+      width: 120,
+      render: (processed: boolean) => (
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {processed ? (
+            <>
+              <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
+              <span style={{ color: '#52c41a' }}>已导入</span>
+            </>
+          ) : (
+            <>
+              <CloseCircleOutlined style={{ color: '#ff4d4f', marginRight: 8 }} />
+              <span style={{ color: '#ff4d4f' }}>未导入</span>
+            </>
+          )}
+        </div>
+      ),
     },
     {
       title: '操作',
@@ -267,7 +278,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
   // 初始化加载
   useEffect(() => {
     fetchFiles();
-  }, []);
+  }, [fetchFiles]);
 
   return (
     <div style={{ padding: 16 }}>
@@ -348,58 +359,17 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
       )}
 
       {/* 预览模态框 */}
-      <Modal
-        title="文件预览"
-        open={previewModalVisible}
-        onCancel={() => setPreviewModalVisible(false)}
-        footer={null}
-        width={800}
-        destroyOnClose
-      >
-        {previewLoading ? (
-          <div style={{ textAlign: 'center', padding: 20 }}>
-            加载中...
-          </div>
-        ) : previewData ? (
-          <div>
-            <div style={{ marginBottom: 16 }}>
-              <strong>文件路径:</strong> {previewData.file_path}
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <strong>文件大小:</strong> {formatFileSize(previewData.size)}
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <strong>文件类型:</strong> {previewData.mime_type}
-            </div>
-            {previewData.file_type === 'text' ? (
-              <pre style={{
-                backgroundColor: '#f5f5f5',
-                padding: 16,
-                borderRadius: 4,
-                maxHeight: 400,
-                overflow: 'auto',
-                whiteSpace: 'pre-wrap',
-                fontFamily: 'monospace'
-              }}>
-                {previewData.content}
-              </pre>
-            ) : previewData.file_type === 'image' ? (
-              <img
-                src={previewData.content}
-                alt="预览"
-                style={{ maxWidth: '100%', maxHeight: 400 }}
-              />
-            ) : (
-              <div>不支持预览此文件类型</div>
-            )}
-            {previewData.truncated && (
-              <div style={{ marginTop: 8, color: '#ff4d4f' }}>
-                文件内容过长，已截断显示
-              </div>
-            )}
-          </div>
-        ) : null}
-      </Modal>
+      {previewFile && (
+        <FilePreview
+          filePath={previewFile.path}
+          fileName={previewFile.name}
+          visible={previewVisible}
+          onClose={() => {
+            setPreviewVisible(false);
+            setPreviewFile(null);
+          }}
+        />
+      )}
     </div>
   );
 };
