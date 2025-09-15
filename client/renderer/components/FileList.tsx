@@ -182,6 +182,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
       dataIndex: 'name',
       key: 'name',
       ellipsis: false,
+      width: 200,
       render: (name: string) => (
         <div>
           <FileTextOutlined style={{ marginRight: 8 }} />
@@ -392,7 +393,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
       <Table
         columns={columns}
         dataSource={files}
-        rowKey="id"
+        rowKey="name"
         loading={loading}
         pagination={false}
         size="small"
