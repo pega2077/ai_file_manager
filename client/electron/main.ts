@@ -31,6 +31,116 @@ let win: BrowserWindow | null
 let botWin: BrowserWindow | null
 let importService: ImportService
 
+function setupIpcHandlers() {
+  // IPC handlers for electron-store
+  ipcMain.handle('store:get', (_event, key) => {
+    return store.get(key)
+  })
+
+  ipcMain.handle('store:set', (_event, key, value) => {
+    store.set(key, value)
+  })
+
+  ipcMain.handle('store:delete', (_event, key) => {
+    store.delete(key)
+  })
+
+  ipcMain.handle('store:has', (_event, key) => {
+    return store.has(key)
+  })
+
+  // IPC handler for folder selection
+  ipcMain.handle('select-folder', async () => {
+    const result = await dialog.showOpenDialog(win!, {
+      properties: ['openDirectory']
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
+  // IPC handler for opening files
+  ipcMain.handle('open-file', async (_event, filePath: string) => {
+    try {
+      await shell.openPath(filePath)
+      return true
+    } catch (error) {
+      console.error('Failed to open file:', error)
+      return false
+    }
+  })
+
+  // IPC handler for opening folder containing a file
+  ipcMain.handle('open-folder', async (_event, filePath: string) => {
+    try {
+      const folderPath = path.dirname(filePath)
+      await shell.openPath(folderPath)
+      return true
+    } catch (error) {
+      console.error('Failed to open folder:', error)
+      return false
+    }
+  })
+
+  // IPC handler for selecting file to import
+  ipcMain.handle('select-file', async () => {
+    const result = await dialog.showOpenDialog(win!, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'All Files', extensions: ['*'] },
+        { name: 'Documents', extensions: ['txt', 'md', 'doc', 'docx', 'pdf', 'rtf', 'odt'] },
+        { name: 'Spreadsheets', extensions: ['xlsx', 'xls', 'csv', 'ods'] },
+        { name: 'Presentations', extensions: ['pptx', 'ppt', 'odp'] },
+        { name: 'Web Files', extensions: ['html', 'htm', 'xhtml'] },
+      ]
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
+  // IPC handler for copying text to clipboard
+  ipcMain.handle('copy-to-clipboard', async (_event, text: string) => {
+    try {
+      clipboard.writeText(text)
+      return true
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error)
+      return false
+    }
+  })
+
+  // IPC handler for importing file
+  ipcMain.handle('import-file', async () => {
+    if (importService) {
+      return await importService.addFileToQueue()
+    }
+    return { success: false, message: 'Import service not initialized' }
+  })
+
+  // IPC handler for getting API base URL
+  ipcMain.handle('get-api-base-url', () => {
+    return store.get('apiBaseUrl', 'http://localhost:8000')
+  })
+
+  // IPC handler for setting API base URL
+  ipcMain.handle('set-api-base-url', (_event, url: string) => {
+    store.set('apiBaseUrl', url)
+    // Reinitialize import service with new URL
+    const apiBaseUrl = store.get('apiBaseUrl', 'http://localhost:8000') as string
+    importService = new ImportService(store, win, apiBaseUrl)
+    return true
+  })
+
+  // IPC handler for showing main window
+  ipcMain.handle('show-main-window', () => {
+    if (!win || win.isDestroyed()) {
+      createWindow()
+    }
+    if (win && !win.isDestroyed()) {
+      win.show()
+      win.focus()
+    }
+    return true
+  })
+}
+
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
@@ -100,114 +210,6 @@ function createBotWindow() {
     })
   }
 }
-
-// IPC handlers for electron-store
-ipcMain.handle('store:get', (_event, key) => {
-  return store.get(key)
-})
-
-ipcMain.handle('store:set', (_event, key, value) => {
-  store.set(key, value)
-})
-
-ipcMain.handle('store:delete', (_event, key) => {
-  store.delete(key)
-})
-
-ipcMain.handle('store:has', (_event, key) => {
-  return store.has(key)
-})
-
-// IPC handler for folder selection
-ipcMain.handle('select-folder', async () => {
-  const result = await dialog.showOpenDialog(win!, {
-    properties: ['openDirectory']
-  })
-  return result.canceled ? null : result.filePaths[0]
-})
-
-// IPC handler for opening files
-ipcMain.handle('open-file', async (_event, filePath: string) => {
-  try {
-    await shell.openPath(filePath)
-    return true
-  } catch (error) {
-    console.error('Failed to open file:', error)
-    return false
-  }
-})
-
-// IPC handler for opening folder containing a file
-ipcMain.handle('open-folder', async (_event, filePath: string) => {
-  try {
-    const folderPath = path.dirname(filePath)
-    await shell.openPath(folderPath)
-    return true
-  } catch (error) {
-    console.error('Failed to open folder:', error)
-    return false
-  }
-})
-
-// IPC handler for selecting file to import
-ipcMain.handle('select-file', async () => {
-  const result = await dialog.showOpenDialog(win!, {
-    properties: ['openFile'],
-    filters: [
-      { name: 'All Files', extensions: ['*'] },
-      { name: 'Documents', extensions: ['txt', 'md', 'doc', 'docx', 'pdf', 'rtf', 'odt'] },
-      { name: 'Spreadsheets', extensions: ['xlsx', 'xls', 'csv', 'ods'] },
-      { name: 'Presentations', extensions: ['pptx', 'ppt', 'odp'] },
-      { name: 'Web Files', extensions: ['html', 'htm', 'xhtml'] },
-    ]
-  })
-  return result.canceled ? null : result.filePaths[0]
-})
-
-// IPC handler for copying text to clipboard
-ipcMain.handle('copy-to-clipboard', async (_event, text: string) => {
-  try {
-    clipboard.writeText(text)
-    return true
-  } catch (error) {
-    console.error('Failed to copy to clipboard:', error)
-    return false
-  }
-})
-
-// IPC handler for importing file
-ipcMain.handle('import-file', async () => {
-  if (importService) {
-    return await importService.addFileToQueue()
-  }
-  return { success: false, message: 'Import service not initialized' }
-})
-
-// IPC handler for getting API base URL
-ipcMain.handle('get-api-base-url', () => {
-  return store.get('apiBaseUrl', 'http://localhost:8000')
-})
-
-// IPC handler for setting API base URL
-ipcMain.handle('set-api-base-url', (_event, url: string) => {
-  store.set('apiBaseUrl', url)
-  // Reinitialize import service with new URL
-  const apiBaseUrl = store.get('apiBaseUrl', 'http://localhost:8000') as string
-  importService = new ImportService(store, win, apiBaseUrl)
-  return true
-})
-
-// IPC handler for showing main window
-ipcMain.handle('show-main-window', () => {
-  if (!win || win.isDestroyed()) {
-    createWindow()
-  }
-  if (win && !win.isDestroyed()) {
-    win.show()
-    win.focus()
-  }
-  return true
-})
 
 // Create application menu
 function createMenu() {
@@ -366,6 +368,7 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(() => {
+  setupIpcHandlers()
   createWindow()
   createBotWindow()
 })
