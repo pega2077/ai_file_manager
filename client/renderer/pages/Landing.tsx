@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout, Typography, Space, Button, message } from 'antd';
+import reactLogo from '../assets/react.svg';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -38,7 +39,7 @@ const Landing = () => {
       <Content style={{ padding: '50px', textAlign: 'center' }}>
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <div>
-            <img src="/electron-vite.svg" alt="Logo" style={{ width: '100px', height: '100px' }} />
+            <img src={reactLogo} alt="Logo" style={{ width: '100px', height: '100px' }} />
           </div>
           <Title level={1}>AI File Manager</Title>
           <Text type="secondary" style={{ fontSize: '16px' }}>
