@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
-import reactLogo from '../assets/react.svg';
+import botLoadingImage from '../assets/mona-loading-default.gif';
+import botStaticImage from '../assets/mona-loading-default-static.svg';
 import { message } from 'antd';
 import { apiService } from '../services/api';
 
@@ -44,6 +45,7 @@ const Bot: React.FC = () => {
   const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
   const [workDirectory, setWorkDirectory] = useState<string>('workdir');
   const [debugMessage, setDebugMessage] = useState<string>('');
+  const [processing, setProcessing] = useState<boolean>(false);
 
   useEffect(() => {
     // 从store读取工作目录
@@ -142,6 +144,7 @@ const Bot: React.FC = () => {
   // 处理文件导入
   const handleFileImport = async (filePath: string) => {
     try {
+      setProcessing(true);
       setDebugMessage(`Importing file: ${filePath}`);
       // 步骤1: 获取工作目录的目录结构
       const directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
@@ -207,6 +210,8 @@ const Bot: React.FC = () => {
     } catch (error) {
       message.error('文件导入失败');
       console.error(error);
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -246,10 +251,16 @@ const Bot: React.FC = () => {
           setToast({ visible: false, message: '' });
         }, 3000);
 
+        // Set processing state
+        setProcessing(true);
+
         // Process the dropped files
         for (const filePath of filePaths) {
           await handleFileImport(filePath);
         }
+
+        // Reset processing state after all files are processed
+        setProcessing(false);
       }
     } catch (error) {
       console.error('Error processing dropped files:', error);
@@ -257,6 +268,7 @@ const Bot: React.FC = () => {
       setTimeout(() => {
         setToast({ visible: false, message: '' });
       }, 3000);
+      setProcessing(false);
     }
   };
 
@@ -280,7 +292,7 @@ const Bot: React.FC = () => {
       width: '100vw',
       position: 'relative'
     }}>
-        <div>{debugMessage}</div>
+       
       {toast.visible && (
         <div style={{
           position: 'absolute',
@@ -300,8 +312,8 @@ const Bot: React.FC = () => {
       )}
       <img
         id="bot-image"
-        src={reactLogo}
-        alt="React Logo"
+        src={processing ? botLoadingImage : botStaticImage}
+        alt="Bot"
         onDoubleClick={handleDoubleClick}
         onMouseDown={handleMouseDown}
         onDragStart={(e) => e.preventDefault()}
@@ -314,6 +326,7 @@ const Bot: React.FC = () => {
           cursor: 'pointer'
         }}
       />
+      <div>{debugMessage}</div>
     </div>
   );
 };
