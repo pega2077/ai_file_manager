@@ -42,6 +42,12 @@ function createWindow() {
     },
   })
 
+  // Handle window close to hide instead of close
+  win.on('close', (e) => {
+    e.preventDefault()
+    win?.hide()
+  })
+
   // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', (new Date).toLocaleString())
@@ -193,7 +199,10 @@ ipcMain.handle('set-api-base-url', (_event, url: string) => {
 
 // IPC handler for showing main window
 ipcMain.handle('show-main-window', () => {
-  if (win) {
+  if (!win || win.isDestroyed()) {
+    createWindow()
+  }
+  if (win && !win.isDestroyed()) {
     win.show()
     win.focus()
   }
