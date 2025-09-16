@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import Landing from './pages/Landing';
 import Home from './pages/Home';
 import Files from './pages/Files';
@@ -8,7 +8,7 @@ import Settings from './pages/Settings';
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/home" element={<Home />} />
@@ -17,7 +17,7 @@ function App() {
         <Route path="/setup" element={<Setup />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 
