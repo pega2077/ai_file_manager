@@ -1,7 +1,7 @@
 import { Layout, Card, Typography, Switch, Input, Button, message, Modal } from 'antd';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiService } from '../services/api';
+import { apiService, updateApiBaseUrl } from '../services/api';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -19,6 +19,7 @@ const Settings = () => {
     autoClassifyWithoutConfirmation: false, // 新增自动分类开关
     workDirectory: '',
   });
+  const [apiBaseUrl, setApiBaseUrl] = useState('http://localhost:8000');
 
   useEffect(() => {
     // 从store加载设置
@@ -35,6 +36,16 @@ const Settings = () => {
           }));
         } catch (error) {
           console.error('Failed to load settings:', error);
+        }
+      }
+
+      // 加载 API 地址
+      if (window.electronAPI) {
+        try {
+          const url = await window.electronAPI.getApiBaseUrl();
+          setApiBaseUrl(url);
+        } catch (error) {
+          console.error('Failed to load API base URL:', error);
         }
       }
     };
@@ -57,6 +68,19 @@ const Settings = () => {
       }
     } catch (error) {
       message.error('保存设置失败');
+      console.error(error);
+    }
+  };
+
+  const handleSaveApiBaseUrl = async () => {
+    try {
+      if (window.electronAPI) {
+        await window.electronAPI.setApiBaseUrl(apiBaseUrl);
+        updateApiBaseUrl(apiBaseUrl);
+        message.success('API 地址已保存');
+      }
+    } catch (error) {
+      message.error('保存 API 地址失败');
       console.error(error);
     }
   };
@@ -196,6 +220,24 @@ const Settings = () => {
               <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
                 工作目录在初始化时设置，如需修改请重新运行初始化流程。
               </Text>
+            </div>
+          </Card>
+
+          <Card title="API 配置" style={{ marginBottom: 24 }}>
+            <div>
+              <Text strong>API 基础地址：</Text>
+              <Input
+                value={apiBaseUrl}
+                onChange={(e) => setApiBaseUrl(e.target.value)}
+                placeholder="http://localhost:8000"
+                style={{ marginTop: 8, marginBottom: 8 }}
+              />
+              <Text type="secondary" style={{ display: 'block' }}>
+                Python 后端服务的地址，用于文件导入和搜索功能。
+              </Text>
+              <Button type="primary" onClick={handleSaveApiBaseUrl} style={{ marginTop: 8 }}>
+                保存 API 地址
+              </Button>
             </div>
           </Card>
 

@@ -56,8 +56,8 @@ function createWindow() {
   createMenu()
 
   // Initialize import service
-  importService = new ImportService(store, win)
-}
+  const apiBaseUrl = store.get('apiBaseUrl', 'http://localhost:8000') as string
+  importService = new ImportService(store, win, apiBaseUrl)
 }
 
 // IPC handlers for electron-store
@@ -140,6 +140,20 @@ ipcMain.handle('import-file', async () => {
     return await importService.addFileToQueue()
   }
   return { success: false, message: 'Import service not initialized' }
+})
+
+// IPC handler for getting API base URL
+ipcMain.handle('get-api-base-url', () => {
+  return store.get('apiBaseUrl', 'http://localhost:8000')
+})
+
+// IPC handler for setting API base URL
+ipcMain.handle('set-api-base-url', (_event, url: string) => {
+  store.set('apiBaseUrl', url)
+  // Reinitialize import service with new URL
+  const apiBaseUrl = store.get('apiBaseUrl', 'http://localhost:8000') as string
+  importService = new ImportService(store, win, apiBaseUrl)
+  return true
 })
 
 // Create application menu

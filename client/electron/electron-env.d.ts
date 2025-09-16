@@ -30,6 +30,9 @@ interface Window {
     openFolder: (filePath: string) => Promise<boolean>
     selectFile: () => Promise<string | null>
     copyToClipboard: (text: string) => Promise<boolean>
+    importFile: () => Promise<{ success: boolean; message: string }>
+    getApiBaseUrl: () => Promise<string>
+    setApiBaseUrl: (url: string) => Promise<boolean>
   }
   electronStore: {
     get: (key: string) => Promise<unknown>

@@ -18,10 +18,12 @@ export class ImportService {
   private isProcessing = false
   private store: Store
   private win: BrowserWindow | null
+  private apiBaseUrl: string
 
-  constructor(store: Store, win: BrowserWindow | null) {
+  constructor(store: Store, win: BrowserWindow | null, apiBaseUrl: string = 'http://localhost:8000') {
     this.store = store
     this.win = win
+    this.apiBaseUrl = apiBaseUrl
   }
 
   // Add file to import queue
@@ -93,7 +95,7 @@ export class ImportService {
     const workDirectory = this.store.get('workDirectory', 'workdir') as string
 
     // Step 1: Get directory structure
-    const directoryStructureResponse = await fetch('http://localhost:8000/api/files/list-directory-recursive', {
+    const directoryStructureResponse = await fetch(`${this.apiBaseUrl}/api/files/list-directory-recursive`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ directory_path: workDirectory, max_depth: 3 })
@@ -112,7 +114,7 @@ export class ImportService {
     const directories = this.extractDirectoriesFromStructure(directoryStructureData.data)
 
     // Step 2: Get recommended directory
-    const recommendResponse = await fetch('http://localhost:8000/api/files/recommend-directory', {
+    const recommendResponse = await fetch(`${this.apiBaseUrl}/api/files/recommend-directory`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ file_path: filePath, available_directories: directories })
@@ -147,7 +149,7 @@ export class ImportService {
       ? targetDirectory
       : `${workDirectory}${separator}${targetDirectory.replace(/\//g, separator)}`
 
-    const saveResponse = await fetch('http://localhost:8000/api/files/save-file', {
+    const saveResponse = await fetch(`${this.apiBaseUrl}/api/files/save-file`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -171,7 +173,7 @@ export class ImportService {
       const fileName = path.basename(filePath)
       const savedFilePath = path.join(fullTargetDirectory, fileName)
 
-      await fetch('http://localhost:8000/api/files/import-to-rag', {
+      await fetch(`${this.apiBaseUrl}/api/files/import-to-rag`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file_path: savedFilePath })

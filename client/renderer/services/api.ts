@@ -1,4 +1,26 @@
-const API_BASE_URL = 'http://localhost:8000/api';
+// Dynamic API base URL - will be initialized from electron store
+let API_BASE_URL = 'http://localhost:8000/api';
+
+// Function to update API base URL
+export const updateApiBaseUrl = (url: string) => {
+  API_BASE_URL = `${url}/api`;
+};
+
+// Initialize API base URL from electron store
+const initializeApiBaseUrl = async () => {
+  if (window.electronAPI) {
+    try {
+      const url = await window.electronAPI.getApiBaseUrl();
+      updateApiBaseUrl(url);
+    } catch (error) {
+      console.warn('Failed to get API base URL from store, using default:', error);
+      API_BASE_URL = 'http://localhost:8000/api';
+    }
+  }
+};
+
+// Initialize immediately
+initializeApiBaseUrl();
 
 interface ApiResponse<T = unknown> {
   success: boolean;
