@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, clipboard, Menu, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, clipboard, Menu, screen, Tray, nativeImage } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import Store from 'electron-store'
@@ -30,6 +30,7 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 let win: BrowserWindow | null
 let botWin: BrowserWindow | null
 let importService: ImportService
+let tray: Tray | null
 
 function setupIpcHandlers() {
   // IPC handlers for electron-store
@@ -359,6 +360,48 @@ function createMenu() {
   Menu.setApplicationMenu(menu)
 }
 
+// Create system tray
+function createTray() {
+  tray = new Tray(nativeImage.createFromPath(path.join(__dirname, '../renderer/assets/mona-loading-default-static.png')))
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: '显示主窗口',
+      click: () => {
+        if (!win || win.isDestroyed()) {
+          createWindow()
+        }
+        if (win && !win.isDestroyed()) {
+          win.show()
+          win.focus()
+        }
+      }
+    },
+    {
+      label: '显示bot窗口',
+      click: () => {
+        if (!botWin || botWin.isDestroyed()) {
+          createBotWindow()
+        }
+        if (botWin && !botWin.isDestroyed()) {
+          botWin.show()
+          botWin.focus()
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: '退出程序',
+      click: () => {
+        win?.destroy()
+        botWin?.destroy() 
+        app.quit()
+      }
+    }
+  ])
+  tray.setContextMenu(contextMenu)
+  tray.setToolTip('AI File Manager')
+}
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
@@ -382,4 +425,5 @@ app.whenReady().then(() => {
   setupBotWindowHandlers()
   createWindow()
   createBotWindow()
+  createTray()
 })

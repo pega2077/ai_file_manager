@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import botLoadingImage from '../assets/mona-loading-default.gif';
-import botStaticImage from '../assets/mona-loading-default-static.svg';
+import botStaticImage from '../assets/mona-loading-default-static.png';
 import { message } from 'antd';
 import { apiService } from '../services/api';
 
