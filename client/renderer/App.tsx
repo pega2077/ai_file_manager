@@ -5,6 +5,7 @@ import Files from './pages/Files';
 import Search from './pages/Search';
 import Setup from './pages/Setup';
 import Settings from './pages/Settings';
+import Bot from './pages/Bot';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/search" element={<Search />} />
         <Route path="/setup" element={<Setup />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/bot" element={<Bot />} />
       </Routes>
     </HashRouter>
   );

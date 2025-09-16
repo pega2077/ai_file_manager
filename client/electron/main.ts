@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, clipboard, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, clipboard, Menu, screen } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import Store from 'electron-store'
@@ -28,6 +28,7 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
 let win: BrowserWindow | null
+let botWin: BrowserWindow | null
 let importService: ImportService
 
 function createWindow() {
@@ -35,6 +36,7 @@ function createWindow() {
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
     width: 1920,
     height: 1080,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
     },
@@ -58,6 +60,39 @@ function createWindow() {
   // Initialize import service
   const apiBaseUrl = store.get('apiBaseUrl', 'http://localhost:8000') as string
   importService = new ImportService(store, win, apiBaseUrl)
+}
+
+function createBotWindow() {
+  const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize
+  const windowWidth = 400
+  const windowHeight = 400
+  const x = screenWidth - windowWidth
+  const y = screenHeight - windowHeight
+
+  botWin = new BrowserWindow({
+    width: windowWidth,
+    height: windowHeight,
+    x: x,
+    y: y,
+    transparent: true,
+    frame: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.mjs'),
+    },
+  })
+
+  botWin.on('closed', () => {
+    botWin = null
+  })
+
+  if (VITE_DEV_SERVER_URL) {
+    botWin.loadURL(VITE_DEV_SERVER_URL + '#/bot')
+  } else {
+    botWin.loadFile(path.join(RENDERER_DIST, 'index.html'))
+    botWin.webContents.on('did-finish-load', () => {
+      botWin?.webContents.executeJavaScript('window.location.hash = "#/bot"')
+    })
+  }
 }
 
 // IPC handlers for electron-store
@@ -156,6 +191,15 @@ ipcMain.handle('set-api-base-url', (_event, url: string) => {
   return true
 })
 
+// IPC handler for showing main window
+ipcMain.handle('show-main-window', () => {
+  if (win) {
+    win.show()
+    win.focus()
+  }
+  return true
+})
+
 // Create application menu
 function createMenu() {
   const template: Electron.MenuItemConstructorOptions[] = [
@@ -207,6 +251,13 @@ function createMenu() {
           label: 'Close',
           accelerator: 'CmdOrCtrl+W',
           role: 'close'
+        },
+        { type: 'separator' },
+        {
+          label: 'Open Bot Window',
+          click: () => {
+            createBotWindow()
+          }
         }
       ]
     },
@@ -305,4 +356,7 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  createWindow()
+  createBotWindow()
+})

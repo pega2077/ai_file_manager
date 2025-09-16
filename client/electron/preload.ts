@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   importFile: () => ipcRenderer.invoke('import-file'),
   getApiBaseUrl: () => ipcRenderer.invoke('get-api-base-url'),
   setApiBaseUrl: (url: string) => ipcRenderer.invoke('set-api-base-url', url),
+  showMainWindow: () => ipcRenderer.invoke('show-main-window'),
 })
 
 contextBridge.exposeInMainWorld('electronStore', {
