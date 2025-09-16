@@ -11,11 +11,6 @@ interface SidebarProps {
 const Sidebar = ({ selectedMenu, onMenuClick }: SidebarProps) => {
   const menuItems = [
     {
-      key: 'files',
-      icon: <FolderOutlined />,
-      label: '文件管理',
-    },
-    {
       key: 'file-list',
       icon: <FileTextOutlined />,
       label: '文件列表',
@@ -24,6 +19,11 @@ const Sidebar = ({ selectedMenu, onMenuClick }: SidebarProps) => {
       key: 'search',
       icon: <SearchOutlined />,
       label: '搜索',
+    },
+    {
+      key: 'files',
+      icon: <FolderOutlined />,
+      label: '文件管理',
     },
     {
       key: 'settings',

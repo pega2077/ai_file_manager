@@ -27,7 +27,7 @@ const Landing = () => {
           const isInitialized = await window.electronStore.get('isInitialized');
           console.log('isInitialized:', isInitialized);
           if (isInitialized === true) {
-            navigate('/home');
+            navigate('/files');
           } else {
             navigate('/setup');
           }
@@ -39,7 +39,7 @@ const Landing = () => {
         console.error('Error checking initialization status:', error);
         navigate('/setup');
       }
-    }, 3000);
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, [navigate]);
