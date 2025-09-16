@@ -59,6 +59,7 @@ const FilesPage: React.FC = () => {
   const [directoryOptions, setDirectoryOptions] = useState<TreeNode[]>([]);
   const [manualSelectModalVisible, setManualSelectModalVisible] = useState(false);
   const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   useEffect(() => {
     // 从store读取工作目录和设置
     const loadInitialData = async () => {
@@ -129,6 +130,7 @@ const FilesPage: React.FC = () => {
         if (saveResponse.success) {
           message.success(`文件已自动保存到: ${recommendedDirectory}`);
           // 刷新文件列表
+          setRefreshTrigger(prev => prev + 1);
           // 导入到RAG库
           const fileName = getFileName(filePath);
           const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
@@ -292,6 +294,8 @@ const FilesPage: React.FC = () => {
       if (saveResponse.success) {
         message.success(`文件已保存到: ${selectedDirectory}`);
         setImportModalVisible(false);
+        // 刷新文件列表
+        setRefreshTrigger(prev => prev + 1);
         // 导入到RAG库
         const fileName = getFileName(importFilePath);
         const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
@@ -336,6 +340,8 @@ const FilesPage: React.FC = () => {
       if (saveResponse.success) {
         message.success(`文件已保存到: ${selectedDirectory}`);
         setManualSelectModalVisible(false);
+        // 刷新文件列表
+        setRefreshTrigger(prev => prev + 1);
         // 导入到RAG库
         const fileName = getFileName(importFilePath);
         const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
@@ -383,7 +389,7 @@ const FilesPage: React.FC = () => {
             </div>
           </div>
 
-          <FileList />
+          <FileList refreshTrigger={refreshTrigger} />
         </Content>
       </Layout>
 

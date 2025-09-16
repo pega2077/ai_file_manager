@@ -34,9 +34,10 @@ interface FileListResponse {
 
 interface FileListProps {
   onFileSelect?: (file: FileItem) => void;
+  refreshTrigger?: number;
 }
 
-const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
+const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [workDirectory, setWorkDirectory] = useState<string>('workdir');
@@ -340,6 +341,13 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect }) => {
     loadWorkDirectory();
     fetchFiles();
   }, [fetchFiles]);
+
+  // 监听刷新触发器
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      fetchFiles();
+    }
+  }, [refreshTrigger, fetchFiles]);
 
   return (
     <div style={{ padding: 16 }}>
