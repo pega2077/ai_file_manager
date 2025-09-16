@@ -141,6 +141,15 @@ function setupIpcHandlers() {
   })
 }
 
+function setupBotWindowHandlers() {
+  ipcMain.on('move-bot-window', (_event, deltaX: number, deltaY: number) => {
+    if (botWin && !botWin.isDestroyed()) {
+      const [currentX, currentY] = botWin.getPosition()
+      botWin.setPosition(currentX + deltaX, currentY + deltaY)
+    }
+  })
+}
+
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
@@ -369,6 +378,7 @@ app.on('activate', () => {
 
 app.whenReady().then(() => {
   setupIpcHandlers()
+  setupBotWindowHandlers()
   createWindow()
   createBotWindow()
 })
