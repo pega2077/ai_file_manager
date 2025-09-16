@@ -7,23 +7,6 @@ import FilePreview from '../components/FilePreview';
 
 const { Content } = Layout;
 
-declare global {
-  interface Window {
-    electronAPI: {
-      selectFolder: () => Promise<string | null>;
-      openFile: (filePath: string) => Promise<boolean>;
-      openFolder: (filePath: string) => Promise<boolean>;
-      selectFile: () => Promise<string | null>;
-    };
-    electronStore: {
-      get: (key: string) => Promise<unknown>;
-      set: (key: string, value: unknown) => Promise<void>;
-      delete: (key: string) => Promise<void>;
-      has: (key: string) => Promise<boolean>;
-    };
-  }
-}
-
 interface FileItem {
   name: string;
   type: 'file' | 'folder';

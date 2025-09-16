@@ -12,20 +12,6 @@ interface DirectoryStructure {
   description: string;
 }
 
-declare global {
-  interface Window {
-    electronAPI: {
-      selectFolder: () => Promise<string | null>;
-    };
-    electronStore: {
-      get: (key: string) => Promise<unknown>;
-      set: (key: string, value: unknown) => Promise<void>;
-      delete: (key: string) => Promise<void>;
-      has: (key: string) => Promise<boolean>;
-    };
-  }
-}
-
 const Setup = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);

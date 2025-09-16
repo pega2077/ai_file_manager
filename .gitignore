@@ -10,3 +10,4 @@ bin
 .env
 models
 client/dist-electron/
+client/release/

@@ -1,29 +1,12 @@
 import React from 'react';
 import { Layout, Button, message, Modal, Select, TreeSelect } from 'antd';
-import { DatabaseOutlined, FileAddOutlined } from '@ant-design/icons';
+import { FileAddOutlined } from '@ant-design/icons';
 import Sidebar from '../components/Sidebar';
 import FileList from '../components/FileList';
 import { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
 
 const { Content } = Layout;
-
-declare global {
-  interface Window {
-    electronAPI: {
-      selectFolder: () => Promise<string | null>;
-      openFile: (filePath: string) => Promise<boolean>;
-      openFolder: (filePath: string) => Promise<boolean>;
-      selectFile: () => Promise<string | null>;
-    };
-    electronStore: {
-      get: (key: string) => Promise<unknown>;
-      set: (key: string, value: unknown) => Promise<void>;
-      delete: (key: string) => Promise<void>;
-      has: (key: string) => Promise<boolean>;
-    };
-  }
-}
 
 interface DirectoryItem {
   name: string;

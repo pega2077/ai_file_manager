@@ -5,17 +5,6 @@ import { Layout, Typography, Space, Button, message } from 'antd';
 const { Content } = Layout;
 const { Title, Text } = Typography;
 
-declare global {
-  interface Window {
-    electronStore: {
-      get: (key: string) => Promise<unknown>;
-      set: (key: string, value: unknown) => Promise<void>;
-      delete: (key: string) => Promise<void>;
-      has: (key: string) => Promise<boolean>;
-    };
-  }
-}
-
 const Landing = () => {
   const navigate = useNavigate();
   const version = '0.0.1'; // Version from package.json

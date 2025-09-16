@@ -35,6 +35,11 @@ interface ApiResponse<T = unknown> {
   request_id: string;
 }
 
+interface RecommendDirectoryResponse {
+  recommended_directory: string;
+  alternatives: string[];
+}
+
 class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const url = `${API_BASE_URL}${endpoint}`;
@@ -145,8 +150,8 @@ class ApiService {
   }
 
   // 推荐保存目录
-  async recommendDirectory(filePath: string, availableDirectories: string[]) {
-    return this.request('/files/recommend-directory', {
+  async recommendDirectory(filePath: string, availableDirectories: string[]): Promise<ApiResponse<RecommendDirectoryResponse>> {
+    return this.request<RecommendDirectoryResponse>('/files/recommend-directory', {
       method: 'POST',
       body: JSON.stringify({
         file_path: filePath,
