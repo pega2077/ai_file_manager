@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Layout, Table, Spin, message, Button, Modal, Select, TreeSelect } from 'antd';
 import { ArrowUpOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, DatabaseOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import Sidebar from '../components/Sidebar';
 import FilePreview from '../components/FilePreview';
@@ -91,7 +90,6 @@ interface Settings {
 }
 
 const Home = () => {
-  const navigate = useNavigate();
   const [currentDirectory, setCurrentDirectory] = useState<string>('');
   const [workDirectory, setWorkDirectory] = useState<string>('');
   const [fileList, setFileList] = useState<FileItem[]>([]);
@@ -102,7 +100,7 @@ const Home = () => {
   const [directoryOptions, setDirectoryOptions] = useState<TreeNode[]>([]);
   const [manualSelectModalVisible, setManualSelectModalVisible] = useState(false);
   const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
-  const [selectedMenu, setSelectedMenu] = useState('files');
+  const selectedMenu = 'files';
   const [enablePreview, setEnablePreview] = useState(true);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ path: string; name: string } | null>(null);
@@ -597,28 +595,6 @@ const Home = () => {
     setManualSelectModalVisible(false);
   };
 
-  const handleMenuClick = ({ key }: { key: string }) => {
-    setSelectedMenu(key);
-
-    // 根据菜单项导航到不同页面
-    switch (key) {
-      case 'files':
-        // 已经在文件管理页面，不需要跳转
-        break;
-      case 'file-list':
-        navigate('/files');
-        break;
-      case 'search':
-        navigate('/search');
-        break;
-      case 'settings':
-        navigate('/settings');
-        break;
-      default:
-        break;
-    }
-  };
-
   const handleGoUp = () => {
     if (currentDirectory === workDirectory) {
       return; // 已经在工作区根目录，无法返回上级
@@ -670,7 +646,7 @@ const Home = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sidebar selectedMenu={selectedMenu} onMenuClick={handleMenuClick} />
+      <Sidebar selectedMenu={selectedMenu} />
       <Layout style={{ padding: '0 24px 24px' }}>
         <Content
           style={{

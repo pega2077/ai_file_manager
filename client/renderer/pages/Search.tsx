@@ -3,7 +3,6 @@ import { Layout, Input, Button, List, Spin, message, Tag, Pagination, Card, Tabs
 import { SearchOutlined, QuestionCircleOutlined, EyeOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { apiService } from '../services/api';
 import Sidebar from '../components/Sidebar';
-import { useNavigate } from 'react-router-dom';
 
 const { Content } = Layout;
 const { Search } = Input;
@@ -76,8 +75,7 @@ interface ChunkContent {
 }
 
 const SearchPage = () => {
-  const navigate = useNavigate();
-  const [selectedMenu, setSelectedMenu] = useState('search');
+  const selectedMenu = 'search';
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -97,24 +95,6 @@ const SearchPage = () => {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewChunk, setPreviewChunk] = useState<ChunkContent | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-
-  const handleMenuClick = ({ key }: { key: string }) => {
-    setSelectedMenu(key);
-
-    switch (key) {
-      case 'files':
-        navigate('/home');
-        break;
-      case 'search':
-        // 已经在搜索页面
-        break;
-      case 'settings':
-        navigate('/settings');
-        break;
-      default:
-        break;
-    }
-  };
 
   const handleSearch = async (value: string) => {
     if (!value.trim()) {
@@ -243,7 +223,7 @@ const SearchPage = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sidebar selectedMenu={selectedMenu} onMenuClick={handleMenuClick} />
+      <Sidebar selectedMenu={selectedMenu} />
       <Layout>
         <Content style={{ padding: '24px', background: '#fff' }}>
           <div style={{ marginBottom: '24px' }}>

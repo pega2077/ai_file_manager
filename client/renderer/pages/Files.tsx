@@ -3,7 +3,6 @@ import { Layout, Button, message, Modal, Select, TreeSelect } from 'antd';
 import { DatabaseOutlined, FileAddOutlined } from '@ant-design/icons';
 import Sidebar from '../components/Sidebar';
 import FileList from '../components/FileList';
-import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
 
@@ -69,8 +68,7 @@ interface Settings {
 }
 
 const FilesPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [selectedMenu, setSelectedMenu] = useState('file-list');
+  const selectedMenu = 'file-list';
   const [workDirectory, setWorkDirectory] = useState<string>('workdir');
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [selectedDirectory, setSelectedDirectory] = useState<string>('');
@@ -373,31 +371,9 @@ const FilesPage: React.FC = () => {
     setManualSelectModalVisible(false);
   };
 
-  const handleMenuClick = ({ key }: { key: string }) => {
-    setSelectedMenu(key);
-
-    // 根据菜单项导航到不同页面
-    switch (key) {
-      case 'files':
-        navigate('/home');
-        break;
-      case 'file-list':
-        // 已经在文件列表页面，不需要跳转
-        break;
-      case 'search':
-        navigate('/search');
-        break;
-      case 'settings':
-        navigate('/settings');
-        break;
-      default:
-        break;
-    }
-  };
-
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sidebar selectedMenu={selectedMenu} onMenuClick={handleMenuClick} />
+      <Sidebar selectedMenu={selectedMenu} />
       <Layout style={{ padding: '0 24px 24px' }}>
         <Content
           style={{

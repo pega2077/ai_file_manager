@@ -1,14 +1,35 @@
 import { Layout, Menu } from 'antd';
 import { FolderOutlined, SettingOutlined, SearchOutlined, FileTextOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 
 const { Sider } = Layout;
 
 interface SidebarProps {
   selectedMenu: string;
-  onMenuClick: ({ key }: { key: string }) => void;
 }
 
-const Sidebar = ({ selectedMenu, onMenuClick }: SidebarProps) => {
+const Sidebar = ({ selectedMenu }: SidebarProps) => {
+  const navigate = useNavigate();
+
+  const handleMenuClick = ({ key }: { key: string }) => {
+    switch (key) {
+      case 'file-list':
+        navigate('/files');
+        break;
+      case 'search':
+        navigate('/search');
+        break;
+      case 'files':
+        navigate('/home');
+        break;
+      case 'settings':
+        navigate('/settings');
+        break;
+      default:
+        break;
+    }
+  };
+
   const menuItems = [
     {
       key: 'file-list',
@@ -39,7 +60,7 @@ const Sidebar = ({ selectedMenu, onMenuClick }: SidebarProps) => {
         selectedKeys={[selectedMenu]}
         style={{ height: '100%', borderRight: 0 }}
         items={menuItems}
-        onClick={onMenuClick}
+        onClick={handleMenuClick}
       />
     </Sider>
   );
