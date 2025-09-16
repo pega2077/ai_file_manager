@@ -20,6 +20,7 @@ declare global {
       delete: (key: string) => Promise<void>
       has: (key: string) => Promise<boolean>
     }
+    webUtils: typeof import('electron').webUtils
   }
 }
 

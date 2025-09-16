@@ -1,4 +1,5 @@
 import { ipcRenderer, contextBridge } from 'electron'
+import { webUtils } from 'electron'
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
@@ -42,3 +43,5 @@ contextBridge.exposeInMainWorld('electronStore', {
   delete: (key: string) => ipcRenderer.invoke('store:delete', key),
   has: (key: string) => ipcRenderer.invoke('store:has', key),
 })
+
+contextBridge.exposeInMainWorld('webUtils', webUtils)

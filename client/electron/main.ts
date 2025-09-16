@@ -201,6 +201,7 @@ function createBotWindow() {
     y: y,
     transparent: true,
     frame: false,
+    alwaysOnTop: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
     },
