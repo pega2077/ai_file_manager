@@ -16,3 +16,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 window.ipcRenderer.on('main-process-message', (_event, message) => {
   console.log(message)
 })
+
+window.ipcRenderer.on('import-result', (_event, result) => {
+  console.log('Import result:', result)
+  // You could show a notification or update UI here
+  
+})

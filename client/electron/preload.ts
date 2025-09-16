@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFolder: (filePath: string) => ipcRenderer.invoke('open-folder', filePath),
   selectFile: () => ipcRenderer.invoke('select-file'),
   copyToClipboard: (text: string) => ipcRenderer.invoke('copy-to-clipboard', text),
+  importFile: () => ipcRenderer.invoke('import-file'),
 })
 
 contextBridge.exposeInMainWorld('electronStore', {
