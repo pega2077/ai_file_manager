@@ -75,14 +75,23 @@ class ApiService {
   }
 
   // 获取目录结构推荐
-  async getDirectoryStructure(profession: string, purpose: string) {
+  async getDirectoryStructure(params: {
+    profession: string;
+    purpose: string;
+    max_depth?: number;
+    min_directories?: number;
+    max_directories?: number;
+    temperature?: number;
+  }) {
     return this.request('/chat/directory-structure', {
       method: 'POST',
       body: JSON.stringify({
-        profession,
-        purpose,
-        min_directories: 6,
-        max_directories: 20,
+        profession: params.profession,
+        purpose: params.purpose,
+        max_depth: params.max_depth || 2,
+        min_directories: params.min_directories || 6,
+        max_directories: params.max_directories || 20,
+        temperature: params.temperature || 0.7,
       }),
     });
   }
@@ -216,26 +225,6 @@ class ApiService {
         limit,
         file_types: fileTypes,
         categories,
-      }),
-    });
-  }
-
-  // 智能问答
-  async askQuestion(question: string, contextLimit: number = 5, temperature: number = 0.7, maxTokens: number = 1000, similarityThreshold: number = 0.5, fileFilters?: {
-    file_ids?: string[];
-    categories?: string[];
-    tags?: string[];
-  }) {
-    return this.request('/chat/ask', {
-      method: 'POST',
-      body: JSON.stringify({
-        question,
-        context_limit: contextLimit,
-        temperature,
-        max_tokens: maxTokens,
-        similarity_threshold: similarityThreshold,
-        stream: false,
-        file_filters: fileFilters,
       }),
     });
   }

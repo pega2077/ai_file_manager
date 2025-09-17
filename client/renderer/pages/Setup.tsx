@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Steps, Form, Input, Button, Card, Space, message, AutoComplete, Tree } from 'antd';
+import { Layout, Steps, Form, Input, Button, Card, Space, message, AutoComplete, Tree, Collapse } from 'antd';
 import { apiService } from '../services/api';
 
 const { Content } = Layout;
@@ -68,7 +68,14 @@ const Setup = () => {
     try {
       setLoading(true);
       const values = await form.validateFields();
-      const response = await apiService.getDirectoryStructure(values.profession, values.purpose);
+      const response = await apiService.getDirectoryStructure({
+        profession: values.profession,
+        purpose: values.purpose,
+        max_depth: values.max_depth || 2,
+        min_directories: values.min_directories || 6,
+        max_directories: values.max_directories || 20,
+        temperature: values.temperature || 0.7
+      });
 
       if (response.success) {
         setDirectoryStructure((response.data as { directories: DirectoryStructure[] }).directories);
@@ -169,6 +176,39 @@ const Setup = () => {
                   rows={3}
                 />
               </Form.Item>
+
+              <Collapse ghost>
+                <Collapse.Panel header="高级选项" key="advanced">
+                  <Form.Item
+                    name="max_depth"
+                    label="目录层级"
+                    initialValue={2}
+                  >
+                    <Input type="number" min={1} max={5} />
+                  </Form.Item>
+                  <Form.Item
+                    name="min_directories"
+                    label="最少目录数量"
+                    initialValue={6}
+                  >
+                    <Input type="number" min={1} max={50} />
+                  </Form.Item>
+                  <Form.Item
+                    name="max_directories"
+                    label="最多目录数量"
+                    initialValue={20}
+                  >
+                    <Input type="number" min={1} max={50} />
+                  </Form.Item>
+                  <Form.Item
+                    name="temperature"
+                    label="温度"
+                    initialValue={0.7}
+                  >
+                    <Input type="number" step={0.1} min={0} max={2} />
+                  </Form.Item>
+                </Collapse.Panel>
+              </Collapse>
 
               <Space>
                 <Button
