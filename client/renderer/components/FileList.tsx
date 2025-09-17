@@ -3,22 +3,9 @@ import { Table, Button, message, Input, Select, Tag, Space, Pagination } from 'a
 import { EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined } from '@ant-design/icons';
 import { apiService } from '../services/api';
 import FilePreview from './FilePreview';
+import { ImportedFileItem } from '../shared/types';
 
 const { Option } = Select;
-
-interface FileItem {
-  id: string;
-  name: string;
-  path: string;
-  type: string;
-  category: string;
-  summary: string;
-  tags: string[];
-  size: number;
-  added_at: string;
-  updated_at: string;
-  processed: boolean;
-}
 
 interface PaginationInfo {
   current_page: number;
@@ -28,17 +15,17 @@ interface PaginationInfo {
 }
 
 interface FileListResponse {
-  files: FileItem[];
+  files: ImportedFileItem[];
   pagination: PaginationInfo;
 }
 
 interface FileListProps {
-  onFileSelect?: (file: FileItem) => void;
+  onFileSelect?: (file: ImportedFileItem) => void;
   refreshTrigger?: number;
 }
 
 const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => {
-  const [files, setFiles] = useState<FileItem[]>([]);
+  const [files, setFiles] = useState<ImportedFileItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [workDirectory, setWorkDirectory] = useState<string>('workdir');
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -87,13 +74,13 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
   }, [pagination.limit, filters]);
 
   // 预览文件
-  const handlePreview = (file: FileItem) => {
+  const handlePreview = (file: ImportedFileItem) => {
     setPreviewFile({ path: file.path, name: file.name });
     setPreviewVisible(true);
   };
 
   // 打开文件目录
-  const handleOpenDirectory = async (file: FileItem) => {
+  const handleOpenDirectory = async (file: ImportedFileItem) => {
     try {
       // 使用 path.dirname 获取目录路径
       const dirPath = file.path.substring(0, file.path.lastIndexOf('\\')) ||
@@ -114,7 +101,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
   };
 
   // 打开文件
-  const handleOpenFile = async (file: FileItem) => {
+  const handleOpenFile = async (file: ImportedFileItem) => {
     try {
       if (window.electronAPI && window.electronAPI.openFile) {
         const success = await window.electronAPI.openFile(file.path);
@@ -131,7 +118,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
   };
 
   // 导入到知识库
-  const handleImportToRag = async (file: FileItem) => {
+  const handleImportToRag = async (file: ImportedFileItem) => {
     try {
       const loadingKey = message.loading(`正在导入文件 "${file.name}" 到知识库...`, 0);
       
@@ -272,7 +259,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       title: '操作',
       key: 'actions',
       width: 200,
-      render: (_: unknown, record: FileItem) => (
+      render: (_: unknown, record: ImportedFileItem) => (
         <Space>
           <Button
             type="text"

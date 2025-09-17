@@ -4,73 +4,9 @@ import { ArrowUpOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, Dat
 import { apiService } from '../services/api';
 import Sidebar from '../components/Sidebar';
 import FilePreview from '../components/FilePreview';
+import { DirectoryItem, DirectoryStructureResponse, Settings, TreeNode, FileItem, DirectoryResponse, ImportFileResponse } from '../shared/types';
 
 const { Content } = Layout;
-
-interface FileItem {
-  name: string;
-  type: 'file' | 'folder';
-  size: number | null;
-  created_at: string | null;
-  modified_at: string | null;
-  item_count: number | null;
-}
-
-interface DirectoryItem {
-  name: string;
-  type: 'file' | 'folder';
-  path?: string;
-  relative_path?: string;
-  depth?: number;
-  size?: number;
-  created_at?: string;
-  modified_at?: string;
-  item_count?: number;
-  children?: DirectoryItem[];
-}
-
-interface TreeNode {
-  title: string;
-  value: string;
-  key: string;
-  children: TreeNode[];
-}
-
-interface DirectoryResponse {
-  directory_path: string;
-  items: FileItem[];
-  total_count: number;
-}
-
-interface DirectoryStructureResponse {
-  directory_path: string;
-  items: DirectoryItem[];
-  total_count: number;
-}
-
-interface ImportFileResponse {
-  file_id: string;
-  name: string;
-  path: string;
-  type: string;
-  size: number;
-  category: string;
-  summary: string;
-  tags: string[];
-  added_at: string;
-  processed: boolean;
-}
-
-interface Settings {
-  theme: string;
-  language: string;
-  autoSave: boolean;
-  showHiddenFiles: boolean;
-  enablePreview: boolean;
-  autoClassifyWithoutConfirmation: boolean;
-  autoSaveRAG: boolean;
-  workDirectory: string;
-}
 
 const Home = () => {
   const [currentDirectory, setCurrentDirectory] = useState<string>('');

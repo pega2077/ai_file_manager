@@ -1,43 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import botLoadingImage from '../assets/mona-loading-default.gif';
 import botStaticImage from '../assets/mona-loading-default-static.png';
-import { message } from 'antd';
+import { message, Modal, Select, TreeSelect, Button } from 'antd';
 import { apiService } from '../services/api';
-
-interface DirectoryItem {
-  name: string;
-  type: 'file' | 'folder';
-  path?: string;
-  relative_path?: string;
-  depth?: number;
-  size?: number;
-  created_at?: string;
-  modified_at?: string;
-  item_count?: number;
-  children?: DirectoryItem[];
-}
-
-interface DirectoryStructureResponse {
-  directory_path: string;
-  items: DirectoryItem[];
-  total_count: number;
-}
-
-interface RecommendDirectoryResponse {
-  recommended_directory: string;
-  alternatives: string[];
-}
-
-interface Settings {
-  theme: string;
-  language: string;
-  autoSave: boolean;
-  showHiddenFiles: boolean;
-  enablePreview: boolean;
-  autoClassifyWithoutConfirmation: boolean;
-  autoSaveRAG: boolean;
-  workDirectory: string;
-}
+import { DirectoryItem, DirectoryStructureResponse, RecommendDirectoryResponse, Settings, TreeNode } from '../shared/types';
 
 const Bot: React.FC = () => {
   const isDragging = useRef(false);
@@ -45,6 +11,12 @@ const Bot: React.FC = () => {
   const [workDirectory, setWorkDirectory] = useState<string>('workdir');
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [processing, setProcessing] = useState<boolean>(false);
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [selectedDirectory, setSelectedDirectory] = useState<string>('');
+  const [importFilePath, setImportFilePath] = useState<string>('');
+  const [directoryOptions, setDirectoryOptions] = useState<TreeNode[]>([]);
+  const [manualSelectModalVisible, setManualSelectModalVisible] = useState(false);
+  const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
 
   useEffect(() => {
     // 从store读取工作目录
@@ -140,6 +112,168 @@ const Bot: React.FC = () => {
     return directories;
   };
 
+  // 显示导入确认对话框
+  const showImportConfirmationDialog = async (filePath: string, recommendedDirectory: string, alternatives: string[], directoryStructure: DirectoryStructureResponse) => {
+    setImportFilePath(filePath);
+    setSelectedDirectory(recommendedDirectory);
+
+    // 构建选择数据，只包含推荐目录和备选目录
+    const options = buildDirectoryOptions(recommendedDirectory, alternatives);
+    setDirectoryOptions(options);
+
+    // 构建完整的目录树数据
+    const treeData = buildDirectoryTreeData(directoryStructure);
+    setDirectoryTreeData(treeData);
+
+    setImportModalVisible(true);
+  };
+
+  // 构建目录选择选项
+  const buildDirectoryOptions = (recommendedDirectory: string, alternatives: string[]): TreeNode[] => {
+    const options: TreeNode[] = [];
+
+    // 添加推荐目录
+    options.push({
+      title: `${recommendedDirectory} (推荐)`,
+      value: recommendedDirectory,
+      key: recommendedDirectory,
+      children: [],
+    });
+
+    // 添加备选目录
+    alternatives.forEach(alt => {
+      if (alt !== recommendedDirectory) { // 避免重复
+        options.push({
+          title: `${alt} (备选)`,
+          value: alt,
+          key: alt,
+          children: [],
+        });
+      }
+    });
+
+    return options;
+  };
+
+  // 构建目录树数据
+  const buildDirectoryTreeData = (structureData: DirectoryStructureResponse): TreeNode[] => {
+    const treeData: TreeNode[] = [];
+    const pathMap = new Map<string, TreeNode>();
+
+    if (structureData && structureData.items) {
+      // 首先创建所有节点
+      structureData.items.forEach(item => {
+        if (item.type === 'folder' && item.relative_path && item.relative_path !== '.') {
+          const node: TreeNode = {
+            title: item.name,
+            value: item.relative_path,
+            key: item.relative_path,
+            children: [],
+          };
+          pathMap.set(item.relative_path, node);
+        }
+      });
+
+      // 然后构建树结构
+      pathMap.forEach((node, path) => {
+        const parts = path.split('/');
+        if (parts.length === 1) {
+          // 根级目录
+          treeData.push(node);
+        } else {
+          // 子目录
+          const parentPath = parts.slice(0, -1).join('/');
+          const parentNode = pathMap.get(parentPath);
+          if (parentNode) {
+            parentNode.children.push(node);
+          }
+        }
+      });
+    }
+
+    return treeData;
+  };
+
+  // 处理导入确认
+  const handleImportConfirm = async () => {
+    if (!selectedDirectory) {
+      message.error('请选择保存目录');
+      return;
+    }
+
+    try {
+      // 拼接完整的目标目录路径
+      const separator = getPathSeparator();
+      const fullTargetDirectory = selectedDirectory.startsWith(workDirectory) 
+        ? selectedDirectory 
+        : `${workDirectory}${separator}${selectedDirectory.replace(/\//g, separator)}`;
+      
+      const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
+      if (saveResponse.success) {
+        message.success(`文件已保存到: ${selectedDirectory}`);
+        setImportModalVisible(false);
+        // 导入到RAG库
+        const fileName = getFileName(importFilePath);
+        const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
+        await handleRagImport(savedFilePath);
+      } else {
+        message.error(saveResponse.message || '文件保存失败');
+      }
+    } catch (error) {
+      message.error('文件保存失败');
+      console.error(error);
+    }
+  };
+
+  // 处理导入取消
+  const handleImportCancel = () => {
+    setImportModalVisible(false);
+    setSelectedDirectory('');
+    setImportFilePath('');
+  };
+
+  // 处理手动选择目录
+  const handleManualSelectDirectory = () => {
+    setImportModalVisible(false); // 隐藏确认对话框
+    setManualSelectModalVisible(true);
+  };
+
+  // 处理手动选择确认
+  const handleManualSelectConfirm = async () => {
+    if (!selectedDirectory) {
+      message.error('请选择保存目录');
+      return;
+    }
+
+    try {
+      // 拼接完整的目标目录路径
+      const separator = getPathSeparator();
+      const fullTargetDirectory = selectedDirectory.startsWith(workDirectory)
+        ? selectedDirectory
+        : `${workDirectory}${separator}${selectedDirectory.replace(/\//g, separator)}`;
+
+      const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
+      if (saveResponse.success) {
+        message.success(`文件已保存到: ${selectedDirectory}`);
+        setManualSelectModalVisible(false);
+        // 导入到RAG库
+        const fileName = getFileName(importFilePath);
+        const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
+        await handleRagImport(savedFilePath);
+      } else {
+        message.error(saveResponse.message || '文件保存失败');
+      }
+    } catch (error) {
+      message.error('文件保存失败');
+      console.error(error);
+    }
+  };
+
+  // 处理手动选择取消
+  const handleManualSelectCancel = () => {
+    setManualSelectModalVisible(false);
+  };
+
   // 处理文件导入
   const handleFileImport = async (filePath: string) => {
     try {
@@ -189,22 +323,9 @@ const Bot: React.FC = () => {
           message.error(saveResponse.message || '文件保存失败');
         }
       } else {
-        // 对于Bot窗口，我们直接保存到推荐目录，不显示确认对话框
-        const separator = getPathSeparator();
-        const fullTargetDirectory = recommendedDirectory.startsWith(workDirectory) 
-          ? recommendedDirectory 
-          : `${workDirectory}${separator}${recommendedDirectory.replace(/\//g, separator)}`;
-        
-        const saveResponse = await apiService.saveFile(filePath, fullTargetDirectory, false);
-        if (saveResponse.success) {
-          message.success(`文件已保存到: ${recommendedDirectory}`);
-          // 导入到RAG库
-          const fileName = getFileName(filePath);
-          const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-          await handleRagImport(savedFilePath);
-        } else {
-          message.error(saveResponse.message || '文件保存失败');
-        }
+        // 步骤5: 弹出确认对话框
+        const alternatives = (recommendResponse.data as RecommendDirectoryResponse)?.alternatives || [];
+        await showImportConfirmationDialog(filePath, recommendedDirectory, alternatives, directoryStructureResponse.data as DirectoryStructureResponse);
       }
     } catch (error) {
       message.error('文件导入失败');
@@ -300,6 +421,70 @@ const Bot: React.FC = () => {
         }}
       />
       <div>{debugMessage}</div>
+
+      <Modal
+        title="选择保存目录"
+        open={importModalVisible}
+        onOk={handleImportConfirm}
+        onCancel={handleImportCancel}
+        okText="确认保存"
+        cancelText="取消"
+        footer={[
+          <Button key="cancel" onClick={handleImportCancel}>
+            取消
+          </Button>,
+          <Button key="manual" onClick={handleManualSelectDirectory}>
+            手动选择目录
+          </Button>,
+          <Button key="confirm" type="primary" onClick={handleImportConfirm}>
+            确认保存
+          </Button>,
+        ]}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p>系统推荐保存到: <strong>{selectedDirectory}</strong></p>
+          <p>请选择要保存文件的目标目录：</p>
+          <Select
+            style={{ width: '100%' }}
+            value={selectedDirectory}
+            onChange={(value: string) => setSelectedDirectory(value)}
+            placeholder="请选择目录"
+          >
+            {directoryOptions.map(option => (
+              <Select.Option key={option.key} value={option.value}>
+                {option.title}
+              </Select.Option>
+            ))}
+          </Select>
+        </div>
+      </Modal>
+
+      <Modal
+        title="手动选择保存目录"
+        open={manualSelectModalVisible}
+        onOk={handleManualSelectConfirm}
+        onCancel={handleManualSelectCancel}
+        okText="确认选择"
+        cancelText="取消"
+        width={600}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p>请选择要保存文件的目标目录：</p>
+          <TreeSelect
+            style={{ width: '100%' }}
+            value={selectedDirectory}
+            treeData={directoryTreeData}
+            placeholder="请选择目录"
+            treeDefaultExpandAll
+            treeLine
+            showSearch
+            filterTreeNode={(input, treeNode) =>
+              String(treeNode?.title).toLowerCase().includes(input.toLowerCase())
+            }
+            onChange={(value: string) => setSelectedDirectory(value)}
+          />
+        </div>
+      </Modal>
     </div>
   );
 };

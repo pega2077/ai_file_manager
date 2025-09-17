@@ -5,50 +5,9 @@ import Sidebar from '../components/Sidebar';
 import FileList from '../components/FileList';
 import { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
+import { DirectoryItem, DirectoryStructureResponse, RecommendDirectoryResponse, Settings, TreeNode } from '../shared/types';
 
 const { Content } = Layout;
-
-interface DirectoryItem {
-  name: string;
-  type: 'file' | 'folder';
-  path?: string;
-  relative_path?: string;
-  depth?: number;
-  size?: number;
-  created_at?: string;
-  modified_at?: string;
-  item_count?: number;
-  children?: DirectoryItem[];
-}
-
-interface TreeNode {
-  title: string;
-  value: string;
-  key: string;
-  children: TreeNode[];
-}
-
-interface DirectoryStructureResponse {
-  directory_path: string;
-  items: DirectoryItem[];
-  total_count: number;
-}
-
-interface RecommendDirectoryResponse {
-  recommended_directory: string;
-  alternatives: string[];
-}
-
-interface Settings {
-  theme: string;
-  language: string;
-  autoSave: boolean;
-  showHiddenFiles: boolean;
-  enablePreview: boolean;
-  autoClassifyWithoutConfirmation: boolean;
-  autoSaveRAG: boolean;
-  workDirectory: string;
-}
 
 const FilesPage: React.FC = () => {
   const selectedMenu = 'file-list';
