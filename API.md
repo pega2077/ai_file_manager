@@ -58,6 +58,8 @@
 | 文件管理 | 文件预览 | POST | `/api/files/preview` | 预览文件内容（文本/图片） |
 | 文件管理 | 保存文件 | POST | `/api/files/save-file` | 保存文件到指定目录 |
 | 文件管理 | 推荐保存目录 | POST | `/api/files/recommend-directory` | 分析文件并推荐保存目录 |
+| 文件管理 | 文件转换格式 | GET | `/api/files/convert/formats` | 获取支持的文件转换格式 |
+| 文件管理 | 文件格式转换 | POST | `/api/files/convert` | 将文件转换为指定格式 |
 | 文件管理 | 导入RAG库 | POST | `/api/files/import-to-rag` | 将文件导入RAG库用于语义搜索 |
 | 文档分段 | 分段列表 | POST | `/api/files/chunks/list` | 获取文件分段列表 |
 | 文档分段 | 分段内容 | GET | `/api/files/chunks/{chunk_id}` | 获取单个分段的完整内容 |
@@ -444,7 +446,7 @@
 }
 ```
 
-### 1.13 递归列出目录结构
+### 1.7.1 递归列出目录结构
 
 **接口**: `POST /api/files/list-directory-recursive`
 
@@ -691,7 +693,94 @@
 - `LLM_ERROR`: 大语言模型调用失败
 - `ANALYSIS_ERROR`: 文件分析失败
 
-### 1.12 导入RAG库
+### 1.11 获取文件转换支持格式
+
+**接口**: `GET /api/files/convert/formats`
+
+**请求参数**: 无
+
+**响应数据**:
+```json
+{
+  "input_formats": ["string"],
+  "output_formats": ["string"],
+  "default_output_directory": "string",
+  "pandoc_available": true,
+  "markitdown_available": true
+}
+```
+
+**字段说明**:
+- `input_formats`: 支持识别的输入文件扩展名列表（含点，如 `.pdf`、`.docx`）
+- `output_formats`: 支持输出的目标格式列表（不含点，如 `md`、`pdf` 等）
+- `default_output_directory`: 默认的转换结果输出目录（绝对路径）
+- `pandoc_available`: 是否检测到 Pandoc，可用于非 Markdown 转换
+- `markitdown_available`: 是否可以使用 MarkItDown，将文件转换为 Markdown
+
+**说明**:
+- 当 `pandoc_available=false` 时，仅支持导出为 Markdown
+- 输入、输出格式列表会随着后端能力动态调整
+
+### 1.12 文件格式转换
+
+**接口**: `POST /api/files/convert`
+
+**请求参数**:
+```json
+{
+  "file_path": "string",
+  "target_format": "string",
+  "output_directory": "string",
+  "overwrite": false
+}
+```
+
+**请求参数说明**:
+- `file_path`: 需要转换的本地文件绝对路径
+- `target_format`: 目标格式（不含点，大小写不敏感，如 `md`、`pdf`）
+- `output_directory`: 可选，自定义输出目录（绝对路径）。未提供时使用默认转换目录
+- `overwrite`: 是否允许覆盖已存在的同名文件，默认为 `false`
+
+**处理逻辑**:
+1. 校验源文件是否存在且可读
+2. 校验目标格式是否合法
+3. 当目标格式为 `md`/`markdown` 时，使用 MarkItDown 进行转换
+4. 其他格式依赖 Pandoc，若未检测到 Pandoc 将返回错误
+5. 写入输出文件并返回转换结果概要
+
+**响应数据**:
+```json
+{
+  "source_file_path": "string",
+  "output_file_path": "string",
+  "output_format": "string",
+  "size": 0,
+  "message": "string"
+}
+```
+
+**字段说明**:
+- `source_file_path`: 源文件绝对路径
+- `output_file_path`: 转换后文件的绝对路径
+- `output_format`: 实际输出的格式（不含点）
+- `size`: 转换结果文件大小（字节）
+- `message`: 转换成功时的提示信息
+
+**注意事项**:
+- 转换过程中会在后台创建必要的输出目录
+- 若 `overwrite=false` 且输出文件已存在，将返回错误
+- 建议在调用前通过 `/api/files/convert/formats` 获取最新支持的格式
+
+**可能的错误码**:
+- `RESOURCE_NOT_FOUND`: 源文件不存在
+- `UNSUPPORTED_FORMAT`: 目标格式不受支持
+- `PANDOC_NOT_AVAILABLE`: 目标格式需要 Pandoc，但未检测到 Pandoc
+- `FILE_EXISTS`: 输出文件已存在且未允许覆盖
+- `CONVERSION_FAILED`: 转换执行失败
+
+
+
+### 1.13 导入RAG库
 
 **接口**: `POST /api/files/import-to-rag`
 

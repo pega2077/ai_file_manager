@@ -6,6 +6,7 @@ import Search from './pages/Search';
 import Setup from './pages/Setup';
 import Settings from './pages/Settings';
 import Bot from './pages/Bot';
+import Convert from './pages/Convert';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/setup" element={<Setup />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/bot" element={<Bot />} />
+        <Route path="/convert" element={<Convert />} />
       </Routes>
     </HashRouter>
   );

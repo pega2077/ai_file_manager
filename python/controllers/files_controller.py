@@ -23,6 +23,7 @@ from commons import create_response, create_error_response, create_success_respo
 from config import settings
 # 导入文件转换器
 from file_converter_mid import FileConverterMid
+from file_converter import FileConverter
 # 导入文件管理器
 from file_manager import FileManager, process_file_embeddings, split_text_into_chunks_improved
 
@@ -121,6 +122,28 @@ class ChunkContentResponse(BaseModel):
     file_name: str
     file_path: str
 
+class FileConvertRequest(BaseModel):
+    file_path: str = Field(..., description="Path of the source file to convert")
+    target_format: str = Field(..., description="Desired output format, e.g. pdf, markdown")
+    output_directory: Optional[str] = Field(None, description="Absolute output directory for the converted file")
+    overwrite: bool = Field(False, description="Overwrite existing output file when it exists")
+
+
+class FileConvertResponse(BaseModel):
+    source_file_path: str
+    output_file_path: str
+    output_format: str
+    size: int
+    message: str
+
+
+class FileConversionFormatsResponse(BaseModel):
+    input_formats: List[str]
+    output_formats: List[str]
+    default_output_directory: str
+    pandoc_available: bool
+    markitdown_available: bool
+
 # 文档类型检测
 DOCUMENT_EXTENSIONS = {
     '.txt', '.md', '.markdown', '.rst', '.tex',
@@ -136,6 +159,9 @@ TEXT_EXTENSIONS = {
 
 # Initialize file manager
 file_manager = FileManager()
+conversion_output_dir = settings.workdir_path / 'Converted Documents'
+conversion_output_dir.mkdir(parents=True, exist_ok=True)
+pandoc_converter = FileConverter(settings.pandoc_path or None)
 
 async def process_file_embeddings(file_id: str, content: str, file_path: str, category: str):
     """Process file content to generate embeddings and store in vector database"""
@@ -275,6 +301,9 @@ def split_text_into_chunks_improved(text: str, max_length: int = 512) -> List[st
 
 # FileManager类的实例
 file_manager = FileManager()
+conversion_output_dir = settings.workdir_path / 'Converted Documents'
+conversion_output_dir.mkdir(parents=True, exist_ok=True)
+pandoc_converter = FileConverter(settings.pandoc_path or None)
 
 @files_router.get("/")
 async def files_root():
@@ -1164,6 +1193,155 @@ async def import_to_rag(request: ImportToRagRequest):
             error_code="INTERNAL_ERROR",
             error_details=str(e)
         )
+
+@files_router.get("/convert/formats")
+async def get_conversion_formats():
+    """Retrieve supported file conversion formats."""
+    try:
+        markitdown_available = True
+        try:
+            markitdown_formats = set(file_manager.converter.get_supported_formats())
+        except Exception as converter_error:
+            markitdown_available = False
+            markitdown_formats = set()
+            logger.warning(f"MarkItDown format discovery failed: {converter_error}")
+        pandoc_available, pandoc_status = pandoc_converter.check_pandoc_availability()
+        input_formats = sorted(set(FileConverter.FILE_TYPE_MAPPING.keys()).union(markitdown_formats))
+        output_formats = set(FileConverter.PANDOC_FORMAT_MAPPING.keys())
+        output_formats.update({'markdown', 'md'})
+        response = FileConversionFormatsResponse(
+            input_formats=input_formats,
+            output_formats=sorted(output_formats),
+            default_output_directory=str(conversion_output_dir),
+            pandoc_available=pandoc_available,
+            markitdown_available=markitdown_available
+        )
+        if not pandoc_available:
+            logger.warning(f"Pandoc availability check failed: {pandoc_status}")
+        return create_success_response(
+            message="Conversion formats retrieved successfully",
+            data=response.dict()
+        )
+    except Exception as e:
+        logger.error(f"Error retrieving conversion formats: {e}")
+        return create_error_response(
+            message="Failed to retrieve conversion formats",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )
+
+
+@files_router.post("/convert")
+async def convert_file(request: FileConvertRequest):
+    """Convert a file into the specified format."""
+    try:
+        input_path = Path(request.file_path).expanduser()
+        if not input_path.exists() or not input_path.is_file():
+            return create_error_response(
+                message="Source file not found",
+                error_code="RESOURCE_NOT_FOUND",
+                error_details=request.file_path
+            )
+
+        normalized_format = request.target_format.strip().lower()
+        if not normalized_format:
+            return create_error_response(
+                message="Target format is required",
+                error_code="INVALID_REQUEST"
+            )
+
+        if normalized_format.startswith('.'):
+            normalized_format = normalized_format[1:]
+
+        output_dir = Path(request.output_directory).expanduser() if request.output_directory else conversion_output_dir
+        if not output_dir.is_absolute():
+            return create_error_response(
+                message="Output directory must be an absolute path",
+                error_code="INVALID_PATH",
+                error_details=str(output_dir)
+            )
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        extension_map = {'markdown': 'md', 'md': 'md', 'plain': 'txt'}
+        output_extension = extension_map.get(normalized_format, normalized_format)
+        output_path = output_dir / f"{input_path.stem}.{output_extension}"
+
+        if output_path.exists() and not request.overwrite:
+            return create_error_response(
+                message="Output file already exists",
+                error_code="FILE_EXISTS",
+                error_details=str(output_path)
+            )
+
+        if normalized_format in {'md', 'markdown'}:
+            def run_conversion():
+                return file_manager.converter.convert_to_markdown(str(input_path), str(output_path))
+        else:
+            if normalized_format not in FileConverter.PANDOC_FORMAT_MAPPING:
+                return create_error_response(
+                    message="Target format is not supported",
+                    error_code="UNSUPPORTED_FORMAT",
+                    error_details=normalized_format
+                )
+
+            pandoc_available, pandoc_status = pandoc_converter.check_pandoc_availability()
+            if not pandoc_available:
+                logger.error(f"Pandoc is not available: {pandoc_status}")
+                return create_error_response(
+                    message="Pandoc is not available on this system",
+                    error_code="PANDOC_NOT_AVAILABLE",
+                    error_details=pandoc_status
+                )
+
+            def run_conversion():
+                return pandoc_converter.convert_file(
+                    str(input_path),
+                    normalized_format,
+                    str(output_path)
+                )
+
+        logger.info(f"Starting file conversion: {input_path} -> {output_path} ({normalized_format})")
+        success, info_message = await asyncio.to_thread(run_conversion)
+
+        if not success:
+            logger.error(f"File conversion failed: {info_message}")
+            return create_error_response(
+                message="File conversion failed",
+                error_code="CONVERSION_FAILED",
+                error_details=info_message
+            )
+
+        if not output_path.exists():
+            logger.error(f"Conversion succeeded but output file missing: {output_path}")
+            return create_error_response(
+                message="Converted file was not created",
+                error_code="CONVERSION_FAILED",
+                error_details=str(output_path)
+            )
+
+        size = output_path.stat().st_size
+        response = FileConvertResponse(
+            source_file_path=str(input_path),
+            output_file_path=str(output_path),
+            output_format=output_extension,
+            size=size,
+            message=info_message
+        )
+
+        return create_success_response(
+            message="File converted successfully",
+            data=response.dict()
+        )
+
+    except Exception as e:
+        logger.error(f"Error during file conversion: {e}")
+        return create_error_response(
+            message="Internal server error",
+            error_code="INTERNAL_ERROR",
+            error_details=str(e)
+        )
+
 
 @files_router.post("/chunks/list")
 async def list_chunks(request: ChunkListRequest):

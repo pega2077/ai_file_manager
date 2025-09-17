@@ -40,6 +40,22 @@ interface RecommendDirectoryResponse {
   alternatives: string[];
 }
 
+interface FileConversionFormats {
+  input_formats: string[];
+  output_formats: string[];
+  default_output_directory: string;
+  pandoc_available: boolean;
+  markitdown_available: boolean;
+}
+
+interface FileConversionResult {
+  source_file_path: string;
+  output_file_path: string;
+  output_format: string;
+  size: number;
+  message: string;
+}
+
 class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const url = `${API_BASE_URL}${endpoint}`;
@@ -171,6 +187,26 @@ class ApiService {
   }
 
   // 文件名搜索
+  // 获取文件格式转换支持的格式
+  async getConversionFormats() {
+    return this.request<FileConversionFormats>('/files/convert/formats', {
+      method: 'GET',
+    });
+  }
+
+  // 将文件转换为指定格式
+  async convertFile(payload: { filePath: string; targetFormat: string; outputDirectory?: string; overwrite?: boolean }) {
+    return this.request<FileConversionResult>('/files/convert', {
+      method: 'POST',
+      body: JSON.stringify({
+        file_path: payload.filePath,
+        target_format: payload.targetFormat,
+        output_directory: payload.outputDirectory,
+        overwrite: payload.overwrite ?? false,
+      }),
+    });
+  }
+
   async filenameSearch(query: string, page: number = 1, limit: number = 20, fileTypes?: string[], categories?: string[]) {
     return this.request('/search/filename', {
       method: 'POST',

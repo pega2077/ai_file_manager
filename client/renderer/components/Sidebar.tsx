@@ -1,5 +1,5 @@
 import { Layout, Menu } from 'antd';
-import { FolderOutlined, SettingOutlined, SearchOutlined, FileTextOutlined } from '@ant-design/icons';
+import { FolderOutlined, SettingOutlined, SearchOutlined, FileTextOutlined, SwapOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
 const { Sider } = Layout;
@@ -25,6 +25,9 @@ const Sidebar = ({ selectedMenu }: SidebarProps) => {
       case 'settings':
         navigate('/settings');
         break;
+      case 'convert':
+        navigate('/convert');
+        break;
       default:
         break;
     }
@@ -45,6 +48,11 @@ const Sidebar = ({ selectedMenu }: SidebarProps) => {
       key: 'files',
       icon: <FolderOutlined />,
       label: '文件管理',
+    },
+    {
+      key: 'convert',
+      icon: <SwapOutlined />,
+      label: '文件转换',
     },
     {
       key: 'settings',
