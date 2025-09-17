@@ -37,6 +37,7 @@ class ConfigUpdateRequest(BaseModel):
     similarity_threshold: Optional[float] = None
     max_file_size_mb: Optional[int] = None
     pandoc_path: Optional[str] = None
+    workdir_path: Optional[str] = None
 
 @system_router.get("/status")
 async def get_system_status():
@@ -143,6 +144,13 @@ async def update_system_config(request: ConfigUpdateRequest):
         
         # 使用配置文件的更新方法
         result = settings.update_config(updates)
+        if 'workdir_path' in updates:
+            try:
+                from file_manager import file_manager as global_file_manager
+                global_file_manager.update_workdir(settings.workdir_path)
+            except Exception as manager_error:
+                logger.error(f"Failed to update file manager workdir: {manager_error}")
+
         
         # 获取更新后的配置
         updated_config = settings.get_config_dict()

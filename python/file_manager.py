@@ -49,7 +49,7 @@ class FileManager:
 
     def __init__(self):
         self.converter = FileConverterMid()
-        self.workdir = settings.workdir_path
+        self.workdir = Path(settings.workdir_path) if not isinstance(settings.workdir_path, Path) else settings.workdir_path
         self.temp_dir = self.workdir / "temp"
         self._ensure_directories()
 
@@ -58,6 +58,13 @@ class FileManager:
         self.workdir.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Ensured directories: workdir={self.workdir}, temp={self.temp_dir}")
+
+    def update_workdir(self, new_workdir: Path) -> None:
+        """Update workdir and ensure temp directory exists"""
+        self.workdir = Path(new_workdir)
+        self.temp_dir = self.workdir / "temp"
+        self._ensure_directories()
+        logger.info(f"FileManager workdir updated to {self.workdir}")
 
     def is_document_type(self, file_path: Path) -> bool:
         """Check if file is a document type"""
@@ -559,54 +566,83 @@ Example response format:
             return []
 
     def save_file_to_directory(self, source_file_path: str, target_directory: str, overwrite: bool) -> dict:
-        """Save file to specified directory with overwrite handling"""
+        """Save file to specified directory with metadata for downstream processing"""
         try:
-            # Convert to Path objects
             source_path = Path(source_file_path)
             target_path = Path(target_directory)
 
-            # Check if source file exists
             if not source_path.exists():
                 return create_error_response(
                     message="Source file does not exist",
                     error_code="SOURCE_FILE_MISSING"
                 )
 
-            # Determine target directory - handle both absolute and relative paths
             if target_path.is_absolute():
-                # If target_directory is absolute path, use it directly
                 target_dir = target_path
             else:
-                # If target_directory is relative, resolve relative to workdir for security
                 target_dir = self.workdir / target_directory
-            
+
             target_dir.mkdir(parents=True, exist_ok=True)
 
-            # Determine target filename
             target_filename = source_path.name
             final_target_path = target_dir / target_filename
 
-            if final_target_path.exists() and not overwrite:
-                # Add timestamp to filename
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                name_without_ext = final_target_path.stem
-                extension = final_target_path.suffix
-                new_filename = f"{name_without_ext}_{timestamp}{extension}"
-                final_target_path = target_dir / new_filename
+            overwritten = False
+            if final_target_path.exists():
+                if overwrite:
+                    overwritten = True
+                else:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    name_without_ext = final_target_path.stem
+                    extension = final_target_path.suffix
+                    new_filename = f"{name_without_ext}_{timestamp}{extension}"
+                    final_target_path = target_dir / new_filename
 
-            # Copy file
             shutil.copy2(source_path, final_target_path)
 
             logger.info(f"File saved to directory: {source_path} -> {final_target_path}")
 
+            mime_type, _ = mimetypes.guess_type(str(final_target_path))
+            size = final_target_path.stat().st_size
+
+            relative_path = None
+            try:
+                relative_path = str(final_target_path.relative_to(self.workdir))
+            except ValueError:
+                relative_path = None
+
+            temp_markdown_path: Optional[Path] = None
+            markdown_generated = False
+            if self.is_text_file(final_target_path) or self.is_document_type(final_target_path):
+                temp_filename = f"{uuid.uuid4()}.md"
+                temp_markdown_path = self.temp_dir / temp_filename
+                conversion_success, _ = self.convert_to_markdown(final_target_path, temp_markdown_path)
+                if conversion_success and temp_markdown_path.exists():
+                    markdown_generated = True
+                else:
+                    if temp_markdown_path and temp_markdown_path.exists():
+                        try:
+                            temp_markdown_path.unlink()
+                        except Exception as cleanup_error:
+                            logger.warning(f"Failed to remove temp markdown file: {cleanup_error}")
+                    temp_markdown_path = None
+
+            data = {
+                "source_file_path": str(source_path),
+                "saved_path": str(final_target_path),
+                "relative_path": relative_path,
+                "filename": final_target_path.name,
+                "size": size,
+                "mime_type": mime_type or "application/octet-stream",
+                "overwritten": overwritten,
+                "target_directory": str(target_dir),
+                "temp_markdown_path": str(temp_markdown_path) if temp_markdown_path else None,
+                "markdown_available": markdown_generated
+            }
+
             return create_success_response(
                 message="File saved successfully",
-                data={
-                    "source_file_path": str(source_path),
-                    "saved_path": str(final_target_path),
-                    "filename": final_target_path.name,
-                    "overwritten": overwrite and (target_dir / source_path.name).exists()
-                }
+                data=data
             )
 
         except Exception as e:

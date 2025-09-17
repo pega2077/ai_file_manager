@@ -1,6 +1,6 @@
 import React from 'react';
 import { Layout, Button, message, Modal, Select, TreeSelect } from 'antd';
-import { FileAddOutlined } from '@ant-design/icons';
+import { FileAddOutlined, ReloadOutlined } from '@ant-design/icons';
 import Sidebar from '../components/Sidebar';
 import FileList from '../components/FileList';
 import { useState, useEffect } from 'react';
@@ -355,6 +355,10 @@ const FilesPage: React.FC = () => {
     }
   };
 
+  const handleRefresh = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   // 处理手动选择取消
   const handleManualSelectCancel = () => {
     setManualSelectModalVisible(false);
@@ -378,6 +382,13 @@ const FilesPage: React.FC = () => {
               <p>查看和管理已导入到系统的文件</p>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={handleRefresh}
+                size="large"
+              >
+                刷新
+              </Button>
               <Button
                 type="primary"
                 icon={<FileAddOutlined />}

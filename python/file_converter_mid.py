@@ -121,8 +121,8 @@ class FileConverterMid:
 
     def convert_to_markdown(
         self,
-        input_file_path: str,
-        output_file_path: Optional[str] = None
+        input_file_path: str | Path,
+        output_file_path: Optional[str | Path] = None
     ) -> Tuple[bool, str]:
         """
         将文件转换为 Markdown 格式
@@ -143,7 +143,7 @@ class FileConverterMid:
                 return False, error_msg
 
             # 检查输入文件类型
-            input_format = self.detect_file_type_by_extension(input_file_path)
+            input_format = self.detect_file_type_by_extension(str(input_path))
             if not input_format:
                 error_msg = f"无法识别输入文件格式: {input_file_path}"
                 logger.error(error_msg)
@@ -152,6 +152,8 @@ class FileConverterMid:
             # 确定输出文件路径
             if output_file_path is None:
                 output_file_path = str(input_path.with_suffix('.md'))
+            else:
+                output_file_path = str(output_file_path)
 
             # 创建输出目录
             output_path = Path(output_file_path)

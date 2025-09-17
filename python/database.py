@@ -488,6 +488,11 @@ class DatabaseManager:
                 if "tags" in updates:
                     update_fields.append("tags = ?")
                     values.append(json.dumps(updates["tags"]))
+
+                if "processed" in updates:
+                    update_fields.append("processed = ?")
+                    values.append(1 if updates["processed"] else 0)
+
                 
                 if not update_fields:
                     logger.warning(f"No valid fields to update for file {file_id}")
