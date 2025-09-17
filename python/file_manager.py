@@ -22,7 +22,7 @@ from commons import create_response, create_error_response, create_success_respo
 # 导入配置
 from config import settings
 # 导入文件转换器
-from file_converter import FileConverter
+from file_converter_mid import FileConverterMid
 
 # 请求/响应模型
 class CategorySuggestion(BaseModel):
@@ -48,7 +48,7 @@ class FileManager:
     """File management helper class"""
 
     def __init__(self):
-        self.converter = FileConverter()
+        self.converter = FileConverterMid()
         self.workdir = settings.workdir_path
         self.temp_dir = self.workdir / "temp"
         self._ensure_directories()

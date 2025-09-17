@@ -6,21 +6,21 @@ from typing import List, Optional, Tuple, Dict
 from pathlib import Path
 
 from loguru import logger
-from file_converter import FileConverter
+from file_converter_mid import FileConverterMid
 
 
 class DocumentProcessor:
     """文档处理器 - 简化版，专注于文件类型检测和转换为Markdown"""
     
     def __init__(self, pandoc_path: Optional[str] = None):
-        self.file_converter = FileConverter(pandoc_path)
+        self.file_converter = FileConverterMid()
         
         # 检查文件转换器可用性
-        is_available, version_info = self.file_converter.check_pandoc_availability()
+        is_available, version_info = self.file_converter.check_availability()
         if is_available:
-            logger.info(f"文档处理器初始化完成，Pandoc 版本: {version_info}")
+            logger.info(f"文档处理器初始化完成，MarkItDown 可用")
         else:
-            logger.warning(f"Pandoc 不可用: {version_info}，文档转换功能将无法使用")
+            logger.warning(f"MarkItDown 不可用: {version_info}，文档转换功能将无法使用")
         
     def detect_file_type(self, file_path: Path) -> Optional[str]:
         """
@@ -144,4 +144,4 @@ class DocumentProcessor:
         Returns:
             (是否可用, 状态信息)
         """
-        return self.file_converter.check_pandoc_availability()
+        return self.file_converter.check_availability()

@@ -22,7 +22,7 @@ from commons import create_response, create_error_response, create_success_respo
 # 导入配置
 from config import settings
 # 导入文件转换器
-from file_converter import FileConverter
+from file_converter_mid import FileConverterMid
 # 导入文件管理器
 from file_manager import FileManager, process_file_embeddings, split_text_into_chunks_improved
 
