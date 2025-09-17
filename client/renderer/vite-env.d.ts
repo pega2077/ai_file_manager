@@ -12,6 +12,7 @@ declare global {
       getApiBaseUrl: () => Promise<string>
       setApiBaseUrl: (url: string) => Promise<boolean>
       showMainWindow: () => Promise<boolean>
+      hideBotWindow: () => Promise<boolean>
       moveBotWindow: (deltaX: number, deltaY: number) => void
     }
     electronStore: {

@@ -197,6 +197,15 @@ function setupIpcHandlers() {
 
     return true;
   });
+
+  // IPC handler for hiding bot window
+  ipcMain.handle("hide-bot-window", () => {
+    if (botWin && !botWin.isDestroyed()) {
+      botWin.hide();
+    }
+
+    return true;
+  });
 }
 
 function setupBotWindowHandlers() {

@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getApiBaseUrl: () => ipcRenderer.invoke('get-api-base-url'),
   setApiBaseUrl: (url: string) => ipcRenderer.invoke('set-api-base-url', url),
   showMainWindow: () => ipcRenderer.invoke('show-main-window'),
+  hideBotWindow: () => ipcRenderer.invoke('hide-bot-window'),
   moveBotWindow: (deltaX: number, deltaY: number) => ipcRenderer.send('move-bot-window', deltaX, deltaY),
 })
 

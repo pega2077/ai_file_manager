@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import botLoadingImage from '../assets/mona-loading-default.gif';
 import botStaticImage from '../assets/mona-loading-default-static.png';
-import { message, Modal, Select, TreeSelect, Button } from 'antd';
+import { message, Modal, Select, TreeSelect, Button, Menu } from 'antd';
 import { apiService } from '../services/api';
 import { DirectoryItem, DirectoryStructureResponse, RecommendDirectoryResponse, Settings, TreeNode } from '../shared/types';
 
@@ -17,6 +17,8 @@ const Bot: React.FC = () => {
   const [directoryOptions, setDirectoryOptions] = useState<TreeNode[]>([]);
   const [manualSelectModalVisible, setManualSelectModalVisible] = useState(false);
   const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     // 从store读取工作目录
@@ -47,6 +49,29 @@ const Bot: React.FC = () => {
       await window.electronAPI.showMainWindow();
     } catch (error) {
       console.error('Failed to show main window:', error);
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setMenuPosition({ x: e.clientX, y: e.clientY });
+    setMenuVisible(true);
+  };
+
+  const handleMenuClick = async (key: string) => {
+    setMenuVisible(false);
+    if (key === 'showMain') {
+      try {
+        await window.electronAPI.showMainWindow();
+      } catch (error) {
+        console.error('Failed to show main window:', error);
+      }
+    } else if (key === 'hideBot') {
+      try {
+        await window.electronAPI.hideBotWindow();
+      } catch (error) {
+        console.error('Failed to hide bot window:', error);
+      }
     }
   };
 
@@ -399,6 +424,26 @@ const Bot: React.FC = () => {
     };
   }, []);
 
+  // 处理点击其他区域隐藏菜单
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuVisible) {
+        const menuElement = document.querySelector('.context-menu');
+        if (menuElement && !menuElement.contains(e.target as Node)) {
+          setMenuVisible(false);
+        }
+      }
+    };
+
+    if (menuVisible) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [menuVisible]);
+
   return (
     <div style={{
       display: 'flex',
@@ -415,6 +460,7 @@ const Bot: React.FC = () => {
         alt="Bot"
         onDoubleClick={handleDoubleClick}
         onMouseDown={handleMouseDown}
+        onContextMenu={handleContextMenu}
         onDragStart={(e) => e.preventDefault()}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
@@ -425,8 +471,7 @@ const Bot: React.FC = () => {
           cursor: 'pointer'
         }}
       />
-      <div>{debugMessage}</div>
-
+      {/* <div>{debugMessage}</div> */}
       <Modal
         title="选择保存目录"
         open={importModalVisible}
@@ -490,6 +535,28 @@ const Bot: React.FC = () => {
           />
         </div>
       </Modal>
+
+      {menuVisible && (
+        <div
+          className="context-menu"
+          style={{
+            position: 'fixed',
+            top: menuPosition.y,
+            left: menuPosition.x,
+            zIndex: 1000,
+            background: 'white',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          }}
+          onClick={() => setMenuVisible(false)}
+        >
+          <Menu onClick={({ key }) => handleMenuClick(key as string)}>
+            <Menu.Item key="showMain">显示主窗口</Menu.Item>
+            <Menu.Item key="hideBot">隐藏机器人</Menu.Item>
+          </Menu>
+        </div>
+      )}
     </div>
   );
 };
