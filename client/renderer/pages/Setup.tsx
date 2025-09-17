@@ -177,38 +177,44 @@ const Setup = () => {
                 />
               </Form.Item>
 
-              <Collapse ghost>
-                <Collapse.Panel header="高级选项" key="advanced">
-                  <Form.Item
-                    name="max_depth"
-                    label="目录层级"
-                    initialValue={2}
-                  >
-                    <Input type="number" min={1} max={5} />
-                  </Form.Item>
-                  <Form.Item
-                    name="min_directories"
-                    label="最少目录数量"
-                    initialValue={6}
-                  >
-                    <Input type="number" min={1} max={50} />
-                  </Form.Item>
-                  <Form.Item
-                    name="max_directories"
-                    label="最多目录数量"
-                    initialValue={20}
-                  >
-                    <Input type="number" min={1} max={50} />
-                  </Form.Item>
-                  <Form.Item
-                    name="temperature"
-                    label="温度"
-                    initialValue={0.7}
-                  >
-                    <Input type="number" step={0.1} min={0} max={2} />
-                  </Form.Item>
-                </Collapse.Panel>
-              </Collapse>
+              <Collapse ghost items={[
+                {
+                  key: 'advanced',
+                  label: '高级选项',
+                  children: (
+                    <>
+                      <Form.Item
+                        name="max_depth"
+                        label="目录层级"
+                        initialValue={2}
+                      >
+                        <Input type="number" min={1} max={5} />
+                      </Form.Item>
+                      <Form.Item
+                        name="min_directories"
+                        label="最少目录数量"
+                        initialValue={6}
+                      >
+                        <Input type="number" min={1} max={50} />
+                      </Form.Item>
+                      <Form.Item
+                        name="max_directories"
+                        label="最多目录数量"
+                        initialValue={20}
+                      >
+                        <Input type="number" min={1} max={50} />
+                      </Form.Item>
+                      <Form.Item
+                        name="temperature"
+                        label="温度"
+                        initialValue={0.7}
+                      >
+                        <Input type="number" step={0.1} min={0} max={2} />
+                      </Form.Item>
+                    </>
+                  )
+                }
+              ]} />
 
               <Space>
                 <Button

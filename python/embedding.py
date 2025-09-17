@@ -402,6 +402,8 @@ class LLMClient:
                 return await self._call_claude(prompt, temperature, max_tokens)
             elif self.llm_type == "aliyun":
                 return await self._call_aliyun(prompt, temperature, max_tokens)
+            elif self.llm_type == "openrouter":
+                return await self._call_openrouter(prompt, temperature, max_tokens)
             elif self.llm_type == "local":
                 return await self._call_local(prompt, temperature, max_tokens)
             else:
@@ -422,6 +424,9 @@ class LLMClient:
             elif self.llm_type == "ollama":
                 async for chunk in self._call_ollama_stream(prompt, temperature, max_tokens):
                     yield chunk
+            elif self.llm_type == "openrouter":
+                async for chunk in self._call_openrouter_stream(prompt, temperature, max_tokens):
+                    yield chunk
             else:
                 logger.error(f"Streaming not supported for LLM type: {self.llm_type}")
                 yield self._fallback_response(prompt)
@@ -430,7 +435,7 @@ class LLMClient:
             logger.error(f"Error generating streaming LLM response: {e}")
             yield self._fallback_response(prompt)
     
-    async def generate_structured_response(self, messages: List[Dict[str, Any]], temperature: float = 0.7, max_tokens: int = 1000, response_format: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def generate_structured_response(self, messages: List[Dict[str, Any]], temperature: float = 0.7, max_tokens: int = 2000, response_format: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate structured response from LLM with messages and response format"""
         logger.debug(f"Generating structured response using {self.llm_type} model")
         try:
@@ -438,6 +443,8 @@ class LLMClient:
                 return await self._call_openai_structured(messages, temperature, max_tokens, response_format)
             elif self.llm_type == "ollama":
                 return await self._call_ollama_structured(messages, temperature, max_tokens, response_format)
+            elif self.llm_type == "openrouter":
+                return await self._call_openrouter_structured(messages, temperature, max_tokens, response_format)
             else:
                 logger.error(f"Structured response not supported for LLM type: {self.llm_type}")
                 return {"error": f"Structured response not supported for {self.llm_type}"}
@@ -559,6 +566,35 @@ class LLMClient:
             logger.error(f"Error calling OpenAI: {e}")
             return self._fallback_response(prompt)
     
+    async def _call_openrouter(self, prompt: str, temperature: float, max_tokens: int) -> str:
+        """Call OpenRouter API"""
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        
+        headers = {
+            "Authorization": f"Bearer {self.llm_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": self.llm_model or "openai/gpt-3.5-turbo",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, headers=headers) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return result["choices"][0]["message"]["content"]
+                    else:
+                        logger.error(f"OpenRouter API error: {response.status}")
+                        return self._fallback_response(prompt)
+        except Exception as e:
+            logger.error(f"Error calling OpenRouter: {e}")
+            return self._fallback_response(prompt)
+    
     async def _call_openai_structured(self, messages: List[Dict[str, Any]], temperature: float, max_tokens: int, response_format: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Call OpenAI API with structured response"""
         url = f"{self.llm_endpoint}/chat/completions"
@@ -594,6 +630,48 @@ class LLMClient:
                         return {"error": f"API error: {response.status}"}
         except Exception as e:
             logger.error(f"Error calling OpenAI structured: {e}")
+            return {"error": str(e)}
+    
+    async def _call_openrouter_structured(self, messages: List[Dict[str, Any]], temperature: float, max_tokens: int, response_format: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Call OpenRouter API with structured response"""
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        
+        headers = {
+            "Authorization": f"Bearer {self.llm_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": self.llm_model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": False,
+            "think": False,
+        }
+        
+        if response_format:
+            payload["response_format"] = response_format
+        
+        # logger.debug(f"Calling OpenRouter structured API with payload: {json.dumps(payload)}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, headers=headers) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        # logger.debug(f"OpenRouter structured response: {json.dumps(result)}")
+                        content = result["choices"][0]["message"]["content"]
+                        # Try to parse as JSON
+                        try:
+                            return json.loads(content)
+                        except json.JSONDecodeError:
+                            return {"error": "Invalid JSON response", "content": content}
+                    else:
+                        logger.error(f"OpenRouter API error: {response.status}")
+                        return {"error": f"API error: {response.status}"}
+        except Exception as e:
+            logger.error(f"Error calling OpenRouter structured: {e}")
             return {"error": str(e)}
     
     async def _call_openai_stream(self, prompt: str, temperature: float, max_tokens: int):
@@ -637,6 +715,49 @@ class LLMClient:
                         yield f"Error: {response.status}"
         except Exception as e:
             logger.error(f"Error calling OpenAI streaming: {e}")
+            yield f"Error: {str(e)}"
+    
+    async def _call_openrouter_stream(self, prompt: str, temperature: float, max_tokens: int):
+        """Call OpenRouter API with streaming"""
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        
+        headers = {
+            "Authorization": f"Bearer {self.llm_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": self.llm_model or "openai/gpt-3.5-turbo",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, headers=headers) as response:
+                    if response.status == 200:
+                        async for line in response.content:
+                            line = line.decode('utf-8').strip()
+                            if line.startswith('data: '):
+                                data = line[6:]
+                                if data == '[DONE]':
+                                    break
+                                try:
+                                    chunk_data = json.loads(data)
+                                    if chunk_data.get('choices'):
+                                        delta = chunk_data['choices'][0].get('delta', {})
+                                        content = delta.get('content', '')
+                                        if content:
+                                            yield content
+                                except json.JSONDecodeError:
+                                    continue
+                    else:
+                        logger.error(f"OpenRouter streaming API error: {response.status}")
+                        yield f"Error: {response.status}"
+        except Exception as e:
+            logger.error(f"Error calling OpenRouter streaming: {e}")
             yield f"Error: {str(e)}"
     
     async def _call_ollama_stream(self, prompt: str, temperature: float, max_tokens: int):

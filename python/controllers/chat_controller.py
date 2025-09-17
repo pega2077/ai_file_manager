@@ -67,7 +67,7 @@ class DirectoryStructureRequest(BaseModel):
     max_directories: int = Field(default=20, description="最多目录数量", ge=1, le=50)
     max_depth: int = Field(default=2, description="最大目录层级", ge=1, le=5)
     temperature: float = Field(default=0.7, description="LLM 温度参数", ge=0, le=2.0)
-    max_tokens: int = Field(default=1000, description="最大生成token数", ge=100, le=4000)
+    max_tokens: int = Field(default=2000, description="最大生成token数", ge=100, le=4000)
 
 class DirectoryItem(BaseModel):
     path: str
@@ -477,8 +477,8 @@ async def recommend_directory_structure(request: DirectoryStructureRequest):
         generation_start = time.time()
         response_data = await llm_client.generate_structured_response(
             messages=messages,
-            temperature=0.2,
-            max_tokens=800,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
             response_format=response_format
         )
         generation_time = int((time.time() - generation_start) * 1000)
