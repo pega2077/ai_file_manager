@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Steps, Form, Input, Button, Card, List, Space, message, AutoComplete } from 'antd';
+import { Layout, Steps, Form, Input, Button, Card, Space, message, AutoComplete, Tree } from 'antd';
 import { apiService } from '../services/api';
 
 const { Content } = Layout;
@@ -12,6 +12,12 @@ interface DirectoryStructure {
   description: string;
 }
 
+interface TreeNode {
+  title: string;
+  key: string;
+  children: TreeNode[];
+}
+
 const Setup = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
@@ -19,6 +25,33 @@ const Setup = () => {
   const [directoryStructure, setDirectoryStructure] = useState<DirectoryStructure[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>('');
   const [loading, setLoading] = useState(false);
+
+  const buildTree = (directories: DirectoryStructure[]): { treeData: TreeNode[], expandedKeys: string[] } => {
+    const root: TreeNode[] = [];
+    const map = new Map<string, TreeNode>();
+    const expandedKeys: string[] = [];
+    directories.forEach(dir => {
+      const parts = dir.path.split('/');
+      let currentPath = '';
+      let parent: TreeNode[] = root;
+      parts.forEach((part, index) => {
+        currentPath += (currentPath ? '/' : '') + part;
+        if (!map.has(currentPath)) {
+          const isLeaf = index === parts.length - 1;
+          const node: TreeNode = {
+            title: isLeaf ? `${part} : ${dir.description}` : part,
+            key: currentPath,
+            children: []
+          };
+          map.set(currentPath, node);
+          parent.push(node);
+          expandedKeys.push(currentPath);
+        }
+        parent = map.get(currentPath)!.children;
+      });
+    });
+    return { treeData: root, expandedKeys };
+  };
 
   const steps = [
     {
@@ -121,7 +154,7 @@ const Setup = () => {
                     { value: '教师', label: '教师' },
                     { value: '学生', label: '学生' },
                     { value: '项目经理', label: '项目经理' },
-                    { value: '其他', label: '其他' },
+                    { value: '新媒体', label: '新媒体' },
                   ]}
                 />
               </Form.Item>
@@ -150,7 +183,7 @@ const Setup = () => {
 
             {directoryStructure.length > 0 && (
               <Card title="推荐目录结构" style={{ marginTop: 24 }}>
-                <Space style={{ marginTop: 16 }}>
+                <Space style={{ marginTop: 2, marginBottom: 16 }}>
                   <Button onClick={handleRegenerate} loading={loading}>
                     重新生成
                   </Button>
@@ -158,17 +191,16 @@ const Setup = () => {
                     继续
                   </Button>
                 </Space>
-                <List
-                  dataSource={directoryStructure}
-                  renderItem={(item) => (
-                    <List.Item>
-                      <List.Item.Meta
-                        title={item.path}
-                        description={item.description}
-                      />
-                    </List.Item>
-                  )}
-                />
+                
+                {(() => {
+                  const { treeData, expandedKeys } = buildTree(directoryStructure);
+                  return (
+                    <Tree
+                      treeData={treeData}
+                      defaultExpandedKeys={expandedKeys}
+                    />
+                  );
+                })()}
               </Card>
             )}
           </Card>
@@ -198,18 +230,15 @@ const Setup = () => {
                 创建目录结构并完成初始化
               </Button>  
               <Card title="将要创建的目录结构" size="small">
-                <List
-                  size="small"
-                  dataSource={directoryStructure}
-                  renderItem={(item) => (
-                    <List.Item>
-                      <List.Item.Meta
-                        title={item.path}
-                        description={item.description}
-                      />
-                    </List.Item>
-                  )}
-                />
+                {(() => {
+                  const { treeData, expandedKeys } = buildTree(directoryStructure);
+                  return (
+                    <Tree
+                      treeData={treeData}
+                      defaultExpandedKeys={expandedKeys}
+                    />
+                  );
+                })()}
               </Card>
             </Space>
           </Card>
