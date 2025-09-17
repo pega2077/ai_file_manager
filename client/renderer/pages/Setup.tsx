@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Steps, Form, Input, Button, Card, List, Space, message, Select } from 'antd';
+import { Layout, Steps, Form, Input, Button, Card, List, Space, message, AutoComplete } from 'antd';
 import { apiService } from '../services/api';
 
 const { Content } = Layout;
@@ -113,14 +113,17 @@ const Setup = () => {
                 label="职业"
                 rules={[{ required: true, message: '请输入职业' }]}
               >
-                <Select placeholder="选择或输入职业">
-                  <Select.Option value="软件工程师">软件工程师</Select.Option>
-                  <Select.Option value="设计师">设计师</Select.Option>
-                  <Select.Option value="教师">教师</Select.Option>
-                  <Select.Option value="学生">学生</Select.Option>
-                  <Select.Option value="项目经理">项目经理</Select.Option>
-                  <Select.Option value="其他">其他</Select.Option>
-                </Select>
+                <AutoComplete
+                  placeholder="选择或输入职业"
+                  options={[
+                    { value: '软件工程师', label: '软件工程师' },
+                    { value: '设计师', label: '设计师' },
+                    { value: '教师', label: '教师' },
+                    { value: '学生', label: '学生' },
+                    { value: '项目经理', label: '项目经理' },
+                    { value: '其他', label: '其他' },
+                  ]}
+                />
               </Form.Item>
 
               <Form.Item
@@ -147,6 +150,14 @@ const Setup = () => {
 
             {directoryStructure.length > 0 && (
               <Card title="推荐目录结构" style={{ marginTop: 24 }}>
+                <Space style={{ marginTop: 16 }}>
+                  <Button onClick={handleRegenerate} loading={loading}>
+                    重新生成
+                  </Button>
+                  <Button type="primary" onClick={handleContinue}>
+                    继续
+                  </Button>
+                </Space>
                 <List
                   dataSource={directoryStructure}
                   renderItem={(item) => (
@@ -158,14 +169,6 @@ const Setup = () => {
                     </List.Item>
                   )}
                 />
-                <Space style={{ marginTop: 16 }}>
-                  <Button onClick={handleRegenerate} loading={loading}>
-                    重新生成
-                  </Button>
-                  <Button type="primary" onClick={handleContinue}>
-                    继续
-                  </Button>
-                </Space>
               </Card>
             )}
           </Card>
