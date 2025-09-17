@@ -201,6 +201,10 @@ const Bot: React.FC = () => {
       return;
     }
 
+    // 隐藏弹框并开启loading动画
+    setImportModalVisible(false);
+    setProcessing(true);
+
     try {
       // 拼接完整的目标目录路径
       const separator = getPathSeparator();
@@ -211,7 +215,6 @@ const Bot: React.FC = () => {
       const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
       if (saveResponse.success) {
         message.success(`文件已保存到: ${selectedDirectory}`);
-        setImportModalVisible(false);
         // 导入到RAG库
         const fileName = getFileName(importFilePath);
         const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
@@ -222,6 +225,8 @@ const Bot: React.FC = () => {
     } catch (error) {
       message.error('文件保存失败');
       console.error(error);
+    } finally {
+      setProcessing(false);
     }
   };
 
