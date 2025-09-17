@@ -257,7 +257,7 @@ const Settings = () => {
               <Button danger onClick={handleClearAllData}>
                 清空所有数据
               </Button>
-              <Button onClick={() => navigate('/home')}>
+              <Button onClick={() => navigate('/files')}>
                 返回主页
               </Button>
             </div>
