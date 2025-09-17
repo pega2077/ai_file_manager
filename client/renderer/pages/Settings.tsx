@@ -110,6 +110,11 @@ const Settings = () => {
         try {
           const response = await apiService.clearAllData();
           if (response.success) {
+            // 清空 electronStore 中的初始化状态和工作目录
+            if (window.electronStore) {
+              await window.electronStore.set('isInitialized', false);
+              await window.electronStore.set('workDirectory', '');
+            }
             message.success('所有数据已清空');
           } else {
             message.error('清空数据失败：' + response.message);
