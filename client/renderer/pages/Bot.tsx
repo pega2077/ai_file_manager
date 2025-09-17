@@ -42,7 +42,6 @@ interface Settings {
 const Bot: React.FC = () => {
   const isDragging = useRef(false);
   const startPos = useRef({ x: 0, y: 0 });
-  const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
   const [workDirectory, setWorkDirectory] = useState<string>('workdir');
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [processing, setProcessing] = useState<boolean>(false);
@@ -240,16 +239,11 @@ const Bot: React.FC = () => {
 
       if (filePaths.length > 0) {
         console.log('Dropped files:', filePaths);
-        const message = files.length === 1
+        const toastMessage = files.length === 1
           ? `FilePath: ${filePaths[0]}`
           : `${files.length} files dropped`;
 
-        setToast({ visible: true, message });
-
-        // Hide toast after 3 seconds
-        setTimeout(() => {
-          setToast({ visible: false, message: '' });
-        }, 3000);
+        message.info(toastMessage);
 
         // Set processing state
         setProcessing(true);
@@ -264,10 +258,7 @@ const Bot: React.FC = () => {
       }
     } catch (error) {
       console.error('Error processing dropped files:', error);
-      setToast({ visible: true, message: 'Error processing files' });
-      setTimeout(() => {
-        setToast({ visible: false, message: '' });
-      }, 3000);
+      message.error('Error processing files');
       setProcessing(false);
     }
   };
@@ -292,24 +283,6 @@ const Bot: React.FC = () => {
       width: '100vw',
       position: 'relative'
     }}>
-       
-      {toast.visible && (
-        <div style={{
-          position: 'absolute',
-          top: '20px',
-          backgroundColor: 'rgba(128, 128, 128, 0.8)',
-          color: 'white',
-          padding: '10px 20px',
-          borderRadius: '5px',
-          border: '1px solid #ccc',
-          fontSize: '14px',
-          zIndex: 1000,
-          maxWidth: '300px',
-          textAlign: 'center'
-        }}>
-          {toast.message}
-        </div>
-      )}
       <img
         id="bot-image"
         src={processing ? botLoadingImage : botStaticImage}
