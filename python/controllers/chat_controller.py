@@ -65,7 +65,8 @@ class DirectoryStructureRequest(BaseModel):
     purpose: str = Field(..., description="文件夹用途")
     min_directories: int = Field(default=6, description="最少目录数量", ge=1, le=50)
     max_directories: int = Field(default=20, description="最多目录数量", ge=1, le=50)
-    temperature: float = Field(default=0.7, description="LLM 温度参数", ge=0.0, le=2.0)
+    max_depth: int = Field(default=2, description="最大目录层级", ge=1, le=5)
+    temperature: float = Field(default=0.7, description="LLM 温度参数", ge=0, le=2.0)
     max_tokens: int = Field(default=1000, description="最大生成token数", ge=100, le=4000)
 
 class DirectoryItem(BaseModel):
@@ -434,13 +435,15 @@ async def recommend_directory_structure(request: DirectoryStructureRequest):
   "profession": "{request.profession}",
   "folder_purpose": "{request.purpose}",
   "min_directories": {request.min_directories},
-  "max_directories": {request.max_directories}
+  "max_directories": {request.max_directories},
+  "max_depth": {request.max_depth}
 }}
 
 要求：
 - 返回 JSON，主键名为 directories。
 - directories 为数组，数组项包含：path（相对路径，例如 "招聘/简历/待筛选"）、description（用途说明）。
 - 要覆盖常见场景（例如备份、归档、临时、公共/私有等），并给出 {request.min_directories}~{request.max_directories} 条路径项（视职业复杂度）。
+- 目录结构的最大层级不超过 {request.max_depth} 层。
 - 输出必须严格匹配下面的 JSON Schema。"""
             }
         ]
