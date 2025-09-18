@@ -220,7 +220,7 @@ function setupBotWindowHandlers() {
 function createWindow() {
   const isInitialized = store.get("isInitialized", false) as boolean;
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+    icon: path.join(__dirname, "../app-icon.png"),
     width: 1920,
     height: 1080,
     show: !isInitialized,
