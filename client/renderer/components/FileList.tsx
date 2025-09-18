@@ -40,7 +40,9 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
     search: '',
     category: '',
     type: '',
-    tags: [] as string[]
+    tags: [] as string[],
+    sort_by: '',
+    sort_order: 'desc'
   });
 
   // 预览状态
@@ -171,6 +173,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       key: 'name',
       ellipsis: false,
       width: 200,
+      sorter: true,
       render: (name: string) => (
         <div>
           <FileTextOutlined style={{ marginRight: 8 }} />
@@ -213,6 +216,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       dataIndex: 'size',
       key: 'size',
       width: 100,
+      sorter: true,
       render: (size: number) => formatFileSize(size),
     },
     {
@@ -232,6 +236,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       dataIndex: 'added_at',
       key: 'added_at',
       width: 150,
+      sorter: true,
       render: (date: string) => new Date(date).toLocaleString(),
     },
     {
@@ -304,6 +309,26 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
     fetchFiles(page);
   };
 
+  // 处理表格变化（排序、分页等）
+  const handleTableChange = (...args: any[]) => {
+    const sorter = args[2];
+    if (sorter.field && sorter.order) {
+      const sortOrder = sorter.order === 'ascend' ? 'asc' : 'desc';
+      setFilters(prev => ({
+        ...prev,
+        sort_by: sorter.field,
+        sort_order: sortOrder
+      }));
+    } else {
+      // 取消排序
+      setFilters(prev => ({
+        ...prev,
+        sort_by: '',
+        sort_order: 'desc'
+      }));
+    }
+  };
+
   // 搜索
   const handleSearch = () => {
     fetchFiles(1);
@@ -326,8 +351,8 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
     };
 
     loadWorkDirectory();
-    fetchFiles();
-  }, [fetchFiles]);
+    // 不在这里调用 fetchFiles，因为 filters 的 useEffect 会处理
+  }, []);
 
   // 监听刷新触发器
   useEffect(() => {
@@ -335,6 +360,11 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       fetchFiles();
     }
   }, [refreshTrigger, fetchFiles]);
+
+  // 监听筛选条件变化，自动重新获取数据
+  useEffect(() => {
+    fetchFiles(1);
+  }, [filters, fetchFiles]);
 
   return (
     <div style={{ padding: 16 }}>
@@ -392,6 +422,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
         loading={loading}
         pagination={false}
         size="small"
+        onChange={handleTableChange}
         onRow={(record) => ({
           onClick: () => onFileSelect?.(record),
         })}

@@ -50,7 +50,7 @@ class FileManager:
     def __init__(self):
         self.converter = FileConverterMid()
         self.workdir = Path(settings.workdir_path) if not isinstance(settings.workdir_path, Path) else settings.workdir_path
-        self.temp_dir = self.workdir / "temp"
+        self.temp_dir = Path(settings.temp_path) if not isinstance(settings.temp_path, Path) else settings.temp_path
         self._ensure_directories()
 
     def _ensure_directories(self):
@@ -62,7 +62,7 @@ class FileManager:
     def update_workdir(self, new_workdir: Path) -> None:
         """Update workdir and ensure temp directory exists"""
         self.workdir = Path(new_workdir)
-        self.temp_dir = self.workdir / "temp"
+        # temp_dir 保持使用全局配置，不随 workdir 改变
         self._ensure_directories()
         logger.info(f"FileManager workdir updated to {self.workdir}")
 

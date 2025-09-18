@@ -11,3 +11,4 @@ bin
 models
 client/dist-electron/
 client/release/
+temp

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     workdir_path: Optional[Path] = None
     database_path: Optional[Path] = None
     logs_path: Optional[Path] = None
+    temp_path: Optional[Path] = None
     
     # 文档处理配置
     chunk_size: int = Field(default=1000, env="CHUNK_SIZE")
@@ -76,12 +77,15 @@ class Settings(BaseSettings):
         if self.logs_path is None:
             self.logs_path = self.project_root / "logs"
         
+        if self.temp_path is None:
+            self.temp_path = self.project_root / "temp"
+        
         if not self.pandoc_path:  # 如果 pandoc_path 为空，设置默认路径
             self.pandoc_path = str(self.project_root / "bin" / "pandoc.exe")
     
     def create_directories(self):
         """创建必要的目录"""
-        directories = [self.workdir_path, self.database_path, self.logs_path]
+        directories = [self.workdir_path, self.database_path, self.logs_path, self.temp_path]
         
         for directory in directories:
             try:
@@ -122,7 +126,8 @@ class Settings(BaseSettings):
             "pandoc_path": self.pandoc_path,
             "supported_file_types": self.supported_file_types,
             "workdir_path": str(self.workdir_path),
-            "database_path": str(self.database_path)
+            "database_path": str(self.database_path),
+            "temp_path": str(self.temp_path)
         }
     
     def update_config(self, updates: Dict[str, Any]) -> Dict[str, Any]:
@@ -132,9 +137,9 @@ class Settings(BaseSettings):
         # 定义需要重启的配置项
         restart_required_fields = {
             "embedding_model", "llm_type", "llm_endpoint", 
-            "database_path", "workdir_path", "pandoc_path"
+            "database_path", "workdir_path", "temp_path", "pandoc_path"
         }
-        path_fields = {"database_path", "workdir_path", "logs_path"}
+        path_fields = {"database_path", "workdir_path", "logs_path", "temp_path"}
         for key, value in updates.items():
             if hasattr(self, key):
                 value_to_set = value

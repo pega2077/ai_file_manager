@@ -251,6 +251,8 @@ class ApiService {
     type?: string;
     search?: string;
     tags?: string[];
+    sort_by?: string;
+    sort_order?: string;
   }) {
     return this.request('/files/list', {
       method: 'POST',

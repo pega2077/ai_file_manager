@@ -168,7 +168,10 @@ class DatabaseManager:
                    page: int = 1, 
                    limit: int = 20, 
                    category: str = None, 
-                   search: str = None) -> Tuple[List[Dict[str, Any]], int]:
+                   type: str = None,
+                   search: str = None,
+                   sort_by: str = None,
+                   sort_order: str = "desc") -> Tuple[List[Dict[str, Any]], int]:
         """List files with pagination and filtering"""
         try:
             with self.get_connection() as conn:
@@ -179,14 +182,33 @@ class DatabaseManager:
                 params = []
                 
                 if category:
-                    conditions.append("category = ?")
-                    params.append(category)
+                    conditions.append("category LIKE ?")
+                    params.append(f"%{category}%")
+                
+                if type:
+                    # Support both extension (e.g., "png") and MIME type (e.g., "image/png")
+                    if "/" in type:
+                        # MIME type
+                        conditions.append("type = ?")
+                        params.append(type)
+                    else:
+                        # Extension - match both MIME type ending with extension and exact extension
+                        conditions.append("(type LIKE ? OR type = ?)")
+                        params.extend([f"%/{type}", type])
                 
                 if search:
                     conditions.append("(name LIKE ? OR summary LIKE ?)")
                     params.extend([f"%{search}%", f"%{search}%"])
                 
                 where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+                
+                # Build order by clause
+                order_by = "added_at DESC"  # default
+                if sort_by:
+                    valid_sort_fields = {"name", "size", "added_at"}
+                    if sort_by in valid_sort_fields:
+                        order = "ASC" if sort_order.lower() == "asc" else "DESC"
+                        order_by = f"{sort_by} {order}"
                 
                 # Get total count
                 count_query = f"SELECT COUNT(*) FROM files{where_clause}"
@@ -197,7 +219,7 @@ class DatabaseManager:
                 offset = (page - 1) * limit
                 query = f"""
                     SELECT * FROM files{where_clause} 
-                    ORDER BY added_at DESC 
+                    ORDER BY {order_by} 
                     LIMIT ? OFFSET ?
                 """
                 params.extend([limit, offset])

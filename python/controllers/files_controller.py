@@ -549,10 +549,12 @@ async def import_file(request: FileImportRequestBody):
 class FileListRequest(BaseModel):
     page: int = Field(1, ge=1, description="Page number")
     limit: int = Field(20, ge=1, le=100, description="Items per page")
-    category: Optional[str] = Field(None, description="Filter by category")
+    category: Optional[str] = Field(None, description="Filter by category (fuzzy search)")
     type: Optional[str] = Field(None, description="Filter by file type")
     search: Optional[str] = Field(None, description="Search in filename")
     tags: Optional[List[str]] = Field(default_factory=list, description="Filter by tags")
+    sort_by: Optional[str] = Field(None, description="Sort by field: name, size, added_at")
+    sort_order: Optional[str] = Field("desc", description="Sort order: asc or desc")
 
 @files_router.post("/list", 
     summary="Get file list with filtering",
@@ -572,14 +574,20 @@ async def list_files(request: FileListRequest):
         page = request.page
         limit = request.limit
         category_filter = request.category
+        type_filter = request.type
         search_query = request.search
+        sort_by = request.sort_by
+        sort_order = request.sort_order
         
         # Get files from database with filtering and pagination
         files_data, total_count = db_manager.list_files(
             page=page,
             limit=limit,
             category=category_filter,
-            search=search_query
+            type=type_filter,
+            search=search_query,
+            sort_by=sort_by,
+            sort_order=sort_order
         )
         
         # Convert database format to API response format
