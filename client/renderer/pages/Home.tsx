@@ -5,10 +5,12 @@ import { apiService } from '../services/api';
 import Sidebar from '../components/Sidebar';
 import FilePreview from '../components/FilePreview';
 import { DirectoryItem, DirectoryStructureResponse, Settings, TreeNode, FileItem, DirectoryResponse, ImportFileResponse } from '../shared/types';
+import { useTranslation } from '../shared/i18n/I18nProvider';
 
 const { Content } = Layout;
 
 const Home = () => {
+  const { t } = useTranslation();
   const [currentDirectory, setCurrentDirectory] = useState<string>('');
   const [workDirectory, setWorkDirectory] = useState<string>('');
   const [fileList, setFileList] = useState<FileItem[]>([]);
@@ -26,7 +28,7 @@ const Home = () => {
 
   const columns = [
     {
-      title: '名称',
+      title: t('home.table.columns.name'),
       dataIndex: 'name',
       key: 'name',
       render: (text: string, record: FileItem) => (
@@ -37,13 +39,13 @@ const Home = () => {
       ),
     },
     {
-      title: '类型',
+      title: t('home.table.columns.type'),
       dataIndex: 'type',
       key: 'type',
-      render: (type: string) => type === 'folder' ? '文件夹' : '文件',
+      render: (type: string) => type === 'folder' ? t('home.table.type.folder') : t('home.table.type.file'),
     },
     {
-      title: '大小',
+      title: t('home.table.columns.size'),
       dataIndex: 'size',
       key: 'size',
       render: (size: number | null) => {
@@ -63,19 +65,19 @@ const Home = () => {
       },
     },
     {
-      title: '创建时间',
+      title: t('home.table.columns.createdAt'),
       dataIndex: 'created_at',
       key: 'created_at',
       render: (date: string | null) => date ? new Date(date).toLocaleString() : '-',
     },
     {
-      title: '修改时间',
+      title: t('home.table.columns.modifiedAt'),
       dataIndex: 'modified_at',
       key: 'modified_at',
       render: (date: string | null) => date ? new Date(date).toLocaleString() : '-',
     },
     {
-      title: '操作',
+      title: t('home.table.columns.actions'),
       key: 'actions',
       render: (_text: string, record: FileItem) => (
         <div style={{ display: 'flex', gap: '4px' }}>
@@ -89,7 +91,7 @@ const Home = () => {
                   e.stopPropagation();
                   handlePreview(record);
                 }}
-                title="预览"
+                title={t('home.actions.preview')}
               />
               <Button
                 type="text"
@@ -99,7 +101,7 @@ const Home = () => {
                   e.stopPropagation();
                   handleImportToRag(record);
                 }}
-                title="导入知识库"
+                title={t('home.actions.importToRag')}
               />
             </>
           )}
@@ -111,7 +113,7 @@ const Home = () => {
               e.stopPropagation();
               handleOpenFolder(record);
             }}
-            title="打开文件夹"
+            title={t('home.actions.openFolder')}
           />
           <Button
             type="text"
@@ -121,7 +123,7 @@ const Home = () => {
               e.stopPropagation();
               handleOpenFile(record);
             }}
-            title="直接打开"
+            title={t('home.actions.openFile')}
           />
         </div>
       ),
@@ -136,10 +138,10 @@ const Home = () => {
         setFileList(response.data.items);
         setCurrentDirectory(directoryPath);
       } else {
-        message.error(response.message || '加载目录失败');
+        message.error(response.message || t('home.messages.loadDirectoryFailed'));
       }
     } catch (error) {
-      message.error('加载目录失败');
+      message.error(t('home.messages.loadDirectoryFailed'));
       console.error(error);
     } finally {
       setLoading(false);
@@ -197,17 +199,17 @@ const Home = () => {
     const fullPath = `${currentDirectory}${separator}${record.name}`;
     
     try {
-      const loadingKey = message.loading('正在导入知识库...', 0);
+      const loadingKey = message.loading(t('home.messages.importingToRag'), 0);
       const ragResponse = await apiService.importToRag(fullPath);
       loadingKey();
       
       if (ragResponse.success) {
-        message.success('文件已成功导入知识库');
+        message.success(t('home.messages.importedToRagSuccess'));
       } else {
-        message.warning('导入知识库失败');
+        message.warning(t('home.messages.importToRagFailed'));
       }
     } catch (error) {
-      message.error('导入知识库失败');
+      message.error(t('home.messages.importToRagFailed'));
       console.error(error);
     }
   };
@@ -218,10 +220,10 @@ const Home = () => {
     try {
       const success = await window.electronAPI.openFolder(fullPath);
       if (!success) {
-        message.error('无法打开文件夹');
+        message.error(t('home.messages.cannotOpenFolder'));
       }
     } catch (error) {
-      message.error('打开文件夹失败');
+      message.error(t('home.messages.openFolderFailed'));
       console.error(error);
     }
   };
@@ -232,10 +234,10 @@ const Home = () => {
     try {
       const success = await window.electronAPI.openFile(fullPath);
       if (!success) {
-        message.error('无法打开文件');
+        message.error(t('home.messages.cannotOpenFile'));
       }
     } catch (error) {
-      message.error('打开文件失败');
+      message.error(t('home.messages.openFileFailed'));
       console.error(error);
     }
   };
@@ -251,7 +253,7 @@ const Home = () => {
       // 步骤1: 获取工作目录的目录结构
       const directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
       if (!directoryStructureResponse.success) {
-        message.error('获取目录结构失败');
+        message.error(t('home.messages.getDirectoryStructureFailed'));
         return;
       }
 
@@ -259,12 +261,12 @@ const Home = () => {
       const directories = extractDirectoriesFromStructure(directoryStructureResponse.data as DirectoryStructureResponse);
 
       // 步骤2: 调用推荐保存目录接口
-      const loadingKey = message.loading('正在分析文件并推荐保存目录...', 0);
+      const loadingKey = message.loading(t('home.messages.analyzingFile'), 0);
       const recommendResponse = await apiService.recommendDirectory(filePath, directories);
       loadingKey();
       
       if (!recommendResponse.success) {
-        message.error('获取推荐目录失败');
+        message.error(t('home.messages.getRecommendationFailed'));
         return;
       }
 
@@ -284,7 +286,7 @@ const Home = () => {
         
         const saveResponse = await apiService.saveFile(filePath, fullTargetDirectory, false);
         if (saveResponse.success) {
-          message.success(`文件已自动保存到: ${recommendedDirectory}`);
+          message.success(t('home.messages.fileAutoSavedTo', { path: recommendedDirectory }));
           // 刷新当前目录列表
           loadDirectory(currentDirectory);
           // 导入到RAG库
@@ -292,14 +294,14 @@ const Home = () => {
           const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
           await handleRagImport(savedFilePath);
         } else {
-          message.error(saveResponse.message || '文件保存失败');
+          message.error(saveResponse.message || t('home.messages.fileSaveFailed'));
         }
       } else {
         // 步骤5: 弹出确认对话框
         await showImportConfirmationDialog(filePath, recommendedDirectory, alternatives, directoryStructureResponse.data as DirectoryStructureResponse);
       }
     } catch (error) {
-      message.error('文件导入失败');
+      message.error(t('home.messages.fileImportFailed'));
       console.error(error);
     }
   };
@@ -320,17 +322,17 @@ const Home = () => {
     try {
       const settings = await window.electronStore.get('settings') as Settings;
       if (settings?.autoSaveRAG) {
-        const loadingKey = message.loading('正在导入RAG库...', 0);
+        const loadingKey = message.loading(t('home.messages.importingRag'), 0);
         const ragResponse = await apiService.importToRag(savedFilePath);
         loadingKey();
         if (ragResponse.success) {
-          message.success('文件已成功导入RAG库');
+          message.success(t('home.messages.importedRagSuccess'));
         } else {
-          message.warning('文件保存成功，但导入RAG库失败');
+          message.warning(t('home.messages.saveSuccessRagFailed'));
         }
       }
     } catch (error) {
-      message.warning('文件保存成功，但导入RAG库失败');
+      message.warning(t('home.messages.saveSuccessRagFailed'));
       console.error(error);
     }
   };
@@ -372,7 +374,7 @@ const Home = () => {
 
     // 添加推荐目录
     options.push({
-      title: `${recommendedDirectory} (推荐)`,
+      title: `${recommendedDirectory} ${t('files.import.suffixRecommended')}`,
       value: recommendedDirectory,
       key: recommendedDirectory,
       children: [],
@@ -382,7 +384,7 @@ const Home = () => {
     alternatives.forEach(alt => {
       if (alt !== recommendedDirectory) { // 避免重复
         options.push({
-          title: `${alt} (备选)`,
+          title: `${alt} ${t('files.import.suffixAlternative')}`,
           value: alt,
           key: alt,
           children: [],
@@ -435,7 +437,7 @@ const Home = () => {
   // 处理导入确认
   const handleImportConfirm = async () => {
     if (!selectedDirectory) {
-      message.error('请选择保存目录');
+      message.error(t('home.import.selectSaveDirectory'));
       return;
     }
 
@@ -448,7 +450,7 @@ const Home = () => {
       
       const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
       if (saveResponse.success) {
-        message.success(`文件已保存到: ${selectedDirectory}`);
+        message.success(t('home.import.fileSavedTo', { path: selectedDirectory }));
         loadDirectory(currentDirectory);
         setImportModalVisible(false);
         // 导入到RAG库
@@ -456,10 +458,10 @@ const Home = () => {
         const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
         await handleRagImport(savedFilePath);
       } else {
-        message.error(saveResponse.message || '文件保存失败');
+        message.error(saveResponse.message || t('home.import.fileSaveFailed'));
       }
     } catch (error) {
-      message.error('文件保存失败');
+      message.error(t('home.import.fileSaveFailed'));
       console.error(error);
     }
   };
@@ -480,7 +482,7 @@ const Home = () => {
   // 处理手动选择确认
   const handleManualSelectConfirm = async () => {
     if (!selectedDirectory) {
-      message.error('请选择保存目录');
+      message.error(t('home.import.selectSaveDirectory'));
       return;
     }
 
@@ -493,7 +495,7 @@ const Home = () => {
 
       const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
       if (saveResponse.success) {
-        message.success(`文件已保存到: ${selectedDirectory}`);
+        message.success(t('home.import.fileSavedTo', { path: selectedDirectory }));
         loadDirectory(currentDirectory);
         setManualSelectModalVisible(false);
         // 导入到RAG库
@@ -501,10 +503,10 @@ const Home = () => {
         const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
         await handleRagImport(savedFilePath);
       } else {
-        message.error(saveResponse.message || '文件保存失败');
+        message.error(saveResponse.message || t('home.import.fileSaveFailed'));
       }
     } catch (error) {
-      message.error('文件保存失败');
+      message.error(t('home.import.fileSaveFailed'));
       console.error(error);
     }
   };
@@ -553,10 +555,10 @@ const Home = () => {
         try {
           const success = await window.electronAPI.openFile(fullPath);
           if (!success) {
-            message.error('无法打开文件');
+            message.error(t('home.messages.cannotOpenFile'));
           }
         } catch (error) {
-          message.error('打开文件失败');
+          message.error(t('home.messages.openFileFailed'));
           console.error(error);
         }
       }
@@ -580,18 +582,18 @@ const Home = () => {
                 icon={<ArrowUpOutlined />}
                 onClick={handleGoUp}
                 disabled={currentDirectory === workDirectory}
-                title="返回上级目录"
+                title={t('home.buttonTitles.goUp')}
               >
-                返回上级
+                {t('home.buttons.goUp')}
               </Button>
               <Button
                 type="primary"
                 onClick={handleImportFile}
-                title="导入文件到工作区"
+                title={t('home.buttonTitles.importFile')}
               >
-                导入文件
+                {t('home.buttons.importFile')}
               </Button>
-              <h2 style={{ margin: 0 }}>当前目录: {currentDirectory}</h2>
+              <h2 style={{ margin: 0 }}>{t('home.currentDirectory', { path: currentDirectory })}</h2>
             </div>
             <Spin spinning={loading}>
               <Table
@@ -619,32 +621,32 @@ const Home = () => {
         )}
 
         <Modal
-          title="选择保存目录"
+          title={t('home.import.modalTitle')}
           open={importModalVisible}
           onOk={handleImportConfirm}
           onCancel={handleImportCancel}
-          okText="确认保存"
-          cancelText="取消"
+          okText={t('home.import.confirmSave')}
+          cancelText={t('common.cancel')}
           footer={[
             <Button key="cancel" onClick={handleImportCancel}>
-              取消
+              {t('common.cancel')}
             </Button>,
             <Button key="manual" onClick={handleManualSelectDirectory}>
-              手动选择目录
+              {t('home.import.manualSelectButton')}
             </Button>,
             <Button key="confirm" type="primary" onClick={handleImportConfirm}>
-              确认保存
+              {t('home.import.confirmSave')}
             </Button>,
           ]}
         >
           <div style={{ marginBottom: 16 }}>
-            <p>系统推荐保存到: <strong>{selectedDirectory}</strong></p>
-            <p>请选择要保存文件的目标目录：</p>
+            <p>{t('home.import.recommendText', { path: selectedDirectory })}</p>
+            <p>{t('home.import.selectTargetPrompt')}</p>
             <Select
               style={{ width: '100%' }}
               value={selectedDirectory}
               onChange={(value: string) => setSelectedDirectory(value)}
-              placeholder="请选择目录"
+              placeholder={t('home.import.selectPlaceholder')}
             >
               {directoryOptions.map(option => (
                 <Select.Option key={option.key} value={option.value}>
@@ -656,22 +658,22 @@ const Home = () => {
         </Modal>
 
         <Modal
-          title="手动选择保存目录"
+          title={t('home.import.manualModalTitle')}
           open={manualSelectModalVisible}
           onOk={handleManualSelectConfirm}
           onCancel={handleManualSelectCancel}
-          okText="确认选择"
-          cancelText="取消"
+          okText={t('home.import.confirmSelect')}
+          cancelText={t('common.cancel')}
           width={600}
         >
           <div style={{ marginBottom: 16 }}>
-            <p>请选择要保存文件的目标目录：</p>
+            <p>{t('home.import.selectTargetPrompt')}</p>
             <TreeSelect
               style={{ width: '100%' }}
               value={selectedDirectory}
               styles={{ popup: { root: { maxHeight: 400, overflow: 'auto' } } }}
               treeData={directoryTreeData}
-              placeholder="请选择目录"
+              placeholder={t('home.import.selectPlaceholder')}
               treeDefaultExpandAll
               treeLine
               showSearch

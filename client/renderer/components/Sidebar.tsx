@@ -1,6 +1,7 @@
 import { Layout, Menu } from 'antd';
 import { FolderOutlined, SettingOutlined, SearchOutlined, FileTextOutlined, SwapOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from '../shared/i18n/I18nProvider';
 
 const { Sider } = Layout;
 
@@ -10,6 +11,7 @@ interface SidebarProps {
 
 const Sidebar = ({ selectedMenu }: SidebarProps) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const handleMenuClick = ({ key }: { key: string }) => {
     switch (key) {
@@ -37,27 +39,27 @@ const Sidebar = ({ selectedMenu }: SidebarProps) => {
     {
       key: 'file-list',
       icon: <FileTextOutlined />,
-      label: '文件列表',
+      label: t('sidebar.fileList'),
     },
     {
       key: 'search',
       icon: <SearchOutlined />,
-      label: '搜索',
+      label: t('sidebar.search'),
     },
     {
       key: 'files',
       icon: <FolderOutlined />,
-      label: '文件管理',
+      label: t('sidebar.fileManagement'),
     },
     {
       key: 'convert',
       icon: <SwapOutlined />,
-      label: '文件转换',
+      label: t('sidebar.fileConvert'),
     },
     {
       key: 'settings',
       icon: <SettingOutlined />,
-      label: '设置',
+      label: t('sidebar.settings'),
     },
   ];
 

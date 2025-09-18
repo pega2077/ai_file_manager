@@ -3,6 +3,7 @@ import { Layout, Input, Button, List, Spin, message, Tag, Pagination, Card, Tabs
 import { SearchOutlined, QuestionCircleOutlined, EyeOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { apiService } from '../services/api';
 import Sidebar from '../components/Sidebar';
+import { useTranslation } from '../shared/i18n/I18nProvider';
 
 const { Content } = Layout;
 const { Search } = Input;
@@ -75,6 +76,7 @@ interface ChunkContent {
 }
 
 const SearchPage = () => {
+  const { t } = useTranslation();
   const selectedMenu = 'search';
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -98,7 +100,7 @@ const SearchPage = () => {
 
   const handleSearch = async (value: string) => {
     if (!value.trim()) {
-      message.warning('请输入搜索关键词');
+      message.warning(t('search.messages.emptyQuery'));
       return;
     }
 
@@ -111,11 +113,11 @@ const SearchPage = () => {
         setTotalResults(data.pagination.total_count);
         setCurrentPage(data.pagination.current_page);
       } else {
-        message.error(response.message || '搜索失败');
+        message.error(response.message || t('search.messages.searchFailed'));
       }
     } catch (error) {
       console.error('Search error:', error);
-      message.error('搜索请求失败');
+      message.error(t('search.messages.searchRequestFailed'));
     } finally {
       setLoading(false);
     }
@@ -130,7 +132,7 @@ const SearchPage = () => {
 
   const handleAskQuestion = async (value: string) => {
     if (!value.trim()) {
-      message.warning('请输入问题');
+      message.warning(t('search.messages.emptyQuestion'));
       return;
     }
 
@@ -141,11 +143,11 @@ const SearchPage = () => {
         const data = response.data as QuestionResponse;
         setQuestionResult(data);
       } else {
-        message.error(response.message || '提问失败');
+        message.error(response.message || t('search.messages.askFailed'));
       }
     } catch (error) {
       console.error('Question error:', error);
-      message.error('提问请求失败');
+      message.error(t('search.messages.askRequestFailed'));
     } finally {
       setAsking(false);
     }
@@ -160,12 +162,12 @@ const SearchPage = () => {
         const data = response.data as ChunkContent;
         setPreviewChunk(data);
       } else {
-        message.error(response.message || '获取分段内容失败');
+        message.error(response.message || t('search.messages.getChunkFailed'));
         setPreviewVisible(false);
       }
     } catch (error) {
       console.error('Preview chunk error:', error);
-      message.error('获取分段内容失败');
+      message.error(t('search.messages.getChunkFailed'));
       setPreviewVisible(false);
     } finally {
       setPreviewLoading(false);
@@ -179,13 +181,13 @@ const SearchPage = () => {
       try {
         const success = await window.electronAPI.copyToClipboard(textToCopy);
         if (success) {
-          message.success(`已复制"${textToCopy}"到剪贴板`);
+          message.success(t('search.messages.copySuccess', { text: textToCopy }));
         } else {
-          message.warning('复制到剪贴板失败');
+          message.warning(t('search.messages.copyFailed'));
         }
       } catch (error) {
         console.error('Copy to clipboard error:', error);
-        message.warning('复制到剪贴板失败');
+        message.warning(t('search.messages.copyFailed'));
       }
     }
 
@@ -193,11 +195,11 @@ const SearchPage = () => {
     if (window.electronAPI?.openFile) {
       window.electronAPI.openFile(filePath).then(success => {
         if (!success) {
-          message.error('打开文件失败');
+          message.error(t('search.messages.openFileFailed'));
         }
       });
     } else {
-      message.error('不支持的文件打开功能');
+      message.error(t('search.messages.openFileNotSupported'));
     }
   };
 
@@ -236,15 +238,15 @@ const SearchPage = () => {
                   label: (
                     <span>
                       <SearchOutlined />
-                      文件名搜索
+                      {t('search.tabs.filenameSearch')}
                     </span>
                   ),
                   children: (
                     <Search
-                      placeholder="输入文件名关键词进行搜索"
+                      placeholder={t('search.placeholders.filenameSearch')}
                       enterButton={
                         <Button type="primary" icon={<SearchOutlined />}>
-                          搜索
+                          {t('search.buttons.search')}
                         </Button>
                       }
                       size="large"
@@ -260,15 +262,15 @@ const SearchPage = () => {
                   label: (
                     <span>
                       <QuestionCircleOutlined />
-                      智能问答
+                      {t('search.tabs.qa')}
                     </span>
                   ),
                   children: (
                     <Search
-                      placeholder="输入问题进行智能问答"
+                      placeholder={t('search.placeholders.qa')}
                       enterButton={
                         <Button type="primary" icon={<QuestionCircleOutlined />}>
-                          提问
+                          {t('search.buttons.ask')}
                         </Button>
                       }
                       size="large"
@@ -288,13 +290,13 @@ const SearchPage = () => {
               {loading ? (
                 <div style={{ textAlign: 'center', padding: '50px' }}>
                   <Spin size="large" />
-                  <div style={{ marginTop: '16px' }}>正在搜索中...</div>
+                  <div style={{ marginTop: '16px' }}>{t('search.loading.searching')}</div>
                 </div>
               ) : (
                 <>
                   {searchResults.length > 0 && (
                     <div style={{ marginBottom: '16px' }}>
-                      <span>找到 {totalResults} 个结果</span>
+                      <span>{t('search.results.found', { count: totalResults })}</span>
                     </div>
                   )}
 
@@ -362,16 +364,16 @@ const SearchPage = () => {
               {asking ? (
                 <div style={{ textAlign: 'center', padding: '50px' }}>
                   <Spin size="large" />
-                  <div style={{ marginTop: '16px' }}>正在思考中...</div>
+                  <div style={{ marginTop: '16px' }}>{t('search.loading.thinking')}</div>
                 </div>
               ) : questionResult && (
                 <Card
                   title={
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <QuestionCircleOutlined />
-                      <span>智能问答结果</span>
+                      <span>{t('search.qa.resultTitle')}</span>
                       <Tag color={questionResult.confidence > 0.8 ? 'green' : questionResult.confidence > 0.6 ? 'orange' : 'red'}>
-                        置信度: {(questionResult.confidence * 100).toFixed(1)}%
+                        {t('search.qa.confidence')} {(questionResult.confidence * 100).toFixed(1)}%
                       </Tag>
                     </div>
                   }
@@ -390,7 +392,7 @@ const SearchPage = () => {
 
                   {questionResult.sources && questionResult.sources.length > 0 && (
                     <div>
-                      <div style={{ fontWeight: 'bold', marginBottom: '12px' }}>参考来源:</div>
+                      <div style={{ fontWeight: 'bold', marginBottom: '12px' }}>{t('search.qa.sources')}</div>
                       <List
                         dataSource={questionResult.sources}
                         renderItem={(source) => (
@@ -416,10 +418,10 @@ const SearchPage = () => {
                               description={
                                 <div>
                                   <div style={{ marginBottom: '8px', color: '#666', fontSize: '12px' }}>
-                                    路径: {source.file_path}
+                                    {t('search.qa.path')} {source.file_path}
                                   </div>
                                   <div style={{ marginBottom: '8px', color: '#999', fontSize: '12px' }}>
-                                    分段 {source.chunk_index + 1}
+                                    {t('search.qa.chunk', { index: source.chunk_index + 1 })}
                                   </div>
                                   {source.chunk_content && (
                                     <div style={{ marginBottom: '12px' }}>
@@ -436,14 +438,14 @@ const SearchPage = () => {
                                       icon={<EyeOutlined />}
                                       onClick={() => handlePreviewChunk(source.chunk_id)}
                                     >
-                                      预览内容
+                                      {t('search.qa.preview')}
                                     </Button>
                                     <Button
                                       size="small"
                                       icon={<FolderOpenOutlined />}
                                       onClick={() => handleOpenFile(source.file_path, source.chunk_content)}
                                     >
-                                      打开文件
+                                      {t('search.qa.openFile')}
                                     </Button>
                                   </div>
                                 </div>
@@ -467,15 +469,15 @@ const SearchPage = () => {
           previewChunk ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <EyeOutlined />
-              <span>{previewChunk.file_name} - 分段 {previewChunk.chunk_index + 1}</span>
+              <span>{previewChunk.file_name} - {t('search.qa.chunk', { index: previewChunk.chunk_index + 1 })}</span>
             </div>
-          ) : '分段内容预览'
+          ) : t('search.modal.previewTitle')
         }
         open={previewVisible}
         onCancel={handleClosePreview}
         footer={[
           <Button key="close" onClick={handleClosePreview}>
-            关闭
+            {t('search.modal.close')}
           </Button>,
           previewChunk && (
             <Button
@@ -483,7 +485,7 @@ const SearchPage = () => {
               icon={<FolderOpenOutlined />}
               onClick={() => handleOpenFile(previewChunk.file_path, previewChunk.content)}
             >
-              打开文件
+              {t('search.modal.openFile')}
             </Button>
           ),
         ]}
@@ -493,15 +495,15 @@ const SearchPage = () => {
         {previewLoading ? (
           <div style={{ textAlign: 'center', padding: '50px' }}>
             <Spin size="large" />
-            <div style={{ marginTop: '16px' }}>正在加载分段内容...</div>
+            <div style={{ marginTop: '16px' }}>{t('search.modal.loading')}</div>
           </div>
         ) : previewChunk ? (
           <div>
             <div style={{ marginBottom: '16px', padding: '12px', background: '#f5f5f5', borderRadius: '4px' }}>
               <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#666' }}>
-                <span>内容类型: {previewChunk.content_type}</span>
-                <span>字符数: {previewChunk.char_count}</span>
-                <span>Token数: {previewChunk.token_count}</span>
+                <span>{t('search.preview.contentType')} {previewChunk.content_type}</span>
+                <span>{t('search.preview.charCount')} {previewChunk.char_count}</span>
+                <span>{t('search.preview.tokenCount')} {previewChunk.token_count}</span>
               </div>
             </div>
             <div

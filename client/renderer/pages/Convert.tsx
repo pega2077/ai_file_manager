@@ -212,45 +212,45 @@ const FileConversion: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <Title level={2} style={{ marginBottom: 0 }}>
-                  文件格式转换
+                  {t('convert.pageTitle')}
                 </Title>
-                <Paragraph style={{ marginBottom: 0 }}>选择本地文件并一键转换为所需格式</Paragraph>
+                <Paragraph style={{ marginBottom: 0 }}>{t('convert.description')}</Paragraph>
               </div>
               <Button icon={<ReloadOutlined />} onClick={fetchFormats} loading={loadingFormats}>
-                刷新格式列表
+                {t('convert.actions.refreshFormats')}
               </Button>
             </div>
 
             {!formats && !loadingFormats ? (
-              <Alert message="尚未获取到转换格式，请刷新后重试" type="warning" showIcon />
+              <Alert message={t('convert.alerts.noFormats')} type="warning" showIcon />
             ) : null}
 
             {formats && !formats.pandoc_available ? (
               <Alert
                 type="info"
                 showIcon
-                message="未检测到 Pandoc，仅支持转换为 Markdown。"
-                description="请在系统中安装 Pandoc 后重新打开应用，以启用更多转换格式。"
+                message={t('convert.alerts.pandocNotAvailable')}
+                description={t('convert.alerts.pandocDescription')}
               />
             ) : null}
 
-            <Card title="转换设置" loading={loadingFormats}>
+            <Card title={t('convert.sections.settings')} loading={loadingFormats}>
               <Space direction="vertical" style={{ width: '100%' }} size="middle">
                 <div>
-                  <Text strong>源文件</Text>
+                  <Text strong>{t('convert.labels.sourceFile')}</Text>
                   <Space style={{ width: '100%', marginTop: 8 }}>
-                    <Input value={sourceFile} placeholder="请选择要转换的文件" readOnly />
+                    <Input value={sourceFile} placeholder={t('convert.placeholders.selectFile')} readOnly />
                     <Button type="primary" onClick={handleSelectFile}>
-                      选择文件
+                      {t('convert.actions.selectFile')}
                     </Button>
                   </Space>
                 </div>
 
                 <div>
-                  <Text strong>目标格式</Text>
+                  <Text strong>{t('convert.labels.targetFormat')}</Text>
                   <Select
                     style={{ width: '100%', marginTop: 8 }}
-                    placeholder="请选择目标格式"
+                    placeholder={t('convert.placeholders.selectFormat')}
                     value={targetFormat}
                     onChange={(value) => setTargetFormat(value)}
                     options={conversionOptions}
@@ -259,60 +259,60 @@ const FileConversion: React.FC = () => {
                 </div>
 
                 <div>
-                  <Text strong>输出目录</Text>
+                  <Text strong>{t('convert.labels.outputDirectory')}</Text>
                   <Space style={{ width: '100%', marginTop: 8 }}>
                     <Input
                       value={outputDirectory}
-                      placeholder="默认使用系统转换目录"
+                      placeholder={t('convert.placeholders.defaultDirectory')}
                       onChange={(event) => setOutputDirectory(event.target.value)}
                     />
                     <Button icon={<FolderOpenOutlined />} onClick={handleSelectOutputDirectory}>
-                      选择目录
+                      {t('convert.actions.selectDirectory')}
                     </Button>
                   </Space>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Space>
-                    <Text strong>覆盖已存在的文件</Text>
+                    <Text strong>{t('convert.labels.overwrite')}</Text>
                     <Switch checked={overwrite} onChange={setOverwrite} />
                   </Space>
                   <Button type="primary" loading={converting} onClick={handleConvert}>
-                    开始转换
+                    {t('convert.actions.startConversion')}
                   </Button>
                 </div>
               </Space>
             </Card>
 
             {conversionResult ? (
-              <Card title="转换结果" type="inner">
+              <Card title={t('convert.sections.result')} type="inner">
                 <Space direction="vertical" style={{ width: '100%' }} size="small">
                   <Paragraph style={{ marginBottom: 0 }}>
-                    <Text strong>输出文件：</Text>
+                    <Text strong>{t('convert.labels.outputFileLabel')}</Text>
                     <Text copyable>{conversionResult.output_file_path}</Text>
                   </Paragraph>
                   <Paragraph style={{ marginBottom: 0 }}>
-                    <Text strong>源文件：</Text>
+                    <Text strong>{t('convert.labels.sourceFileLabel')}</Text>
                     <Text copyable>{conversionResult.source_file_path}</Text>
                   </Paragraph>
                   <Paragraph style={{ marginBottom: 0 }}>
-                    <Text strong>目标格式：</Text>
+                    <Text strong>{t('convert.labels.targetFormatLabel')}</Text>
                     <Text>{conversionResult.output_format.toUpperCase()}</Text>
                   </Paragraph>
                   <Paragraph style={{ marginBottom: 0 }}>
-                    <Text strong>文件大小：</Text>
+                    <Text strong>{t('convert.labels.fileSize')}</Text>
                     <Text>{formatFileSize(conversionResult.size)}</Text>
                   </Paragraph>
                   <Paragraph style={{ marginBottom: 0 }}>
-                    <Text strong>转换信息：</Text>
+                    <Text strong>{t('convert.labels.conversionInfo')}</Text>
                     <Text>{conversionResult.message}</Text>
                   </Paragraph>
                   <Space size="middle" style={{ marginTop: 12 }}>
                     <Button icon={<FileDoneOutlined />} onClick={handleOpenConvertedFile}>
-                      打开文件
+                      {t('convert.actions.openFile')}
                     </Button>
                     <Button icon={<FolderOpenOutlined />} onClick={handleRevealFolder}>
-                      打开所在目录
+                      {t('convert.actions.openDirectory')}
                     </Button>
                   </Space>
                 </Space>

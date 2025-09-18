@@ -352,7 +352,7 @@ const Bot: React.FC = () => {
           const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
           await handleRagImport(savedFilePath);
         } else {
-          message.error(saveResponse.message || '文件保存失败');
+          message.error(saveResponse.message || t('bot.messages.fileSaveFailed'));
         }
       } else {
         // 步骤5: 弹出确认对话框

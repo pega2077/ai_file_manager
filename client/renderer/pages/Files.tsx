@@ -73,7 +73,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       }
     } catch (error) {
       console.error('获取文件列表失败:', error);
-      message.error('获取文件列表失败');
+      message.error(t('files.messages.fetchFilesFailed'));
     } finally {
       setLoading(false);
     }
@@ -95,14 +95,14 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       if (window.electronAPI && window.electronAPI.openFolder) {
         const success = await window.electronAPI.openFolder(dirPath);
         if (!success) {
-          message.error('打开目录失败');
+          message.error(t('files.messages.openDirectoryFailed'));
         }
       } else {
-        message.error('不支持打开目录功能');
+        message.error(t('files.messages.openDirectoryNotSupported'));
       }
     } catch (error) {
       console.error('打开目录失败:', error);
-      message.error('打开目录失败');
+      message.error(t('files.messages.openDirectoryFailed'));
     }
   };
 
@@ -112,34 +112,34 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       if (window.electronAPI && window.electronAPI.openFile) {
         const success = await window.electronAPI.openFile(file.path);
         if (!success) {
-          message.error('打开文件失败');
+          message.error(t('files.messages.openFileFailed'));
         }
       } else {
-        message.error('不支持打开文件功能');
+        message.error(t('files.messages.openFileNotSupported'));
       }
     } catch (error) {
       console.error('打开文件失败:', error);
-      message.error('打开文件失败');
+      message.error(t('files.messages.openFileFailed'));
     }
   };
 
   // 导入到知识库
   const handleImportToRag = async (file: ImportedFileItem) => {
     try {
-      const loadingKey = message.loading(`正在导入文件 "${file.name}" 到知识库...`, 0);
+      const loadingKey = message.loading(t('files.messages.importingToRag', { name: file.name }), 0);
       
       const response = await apiService.importToRag(file.path);
       loadingKey();
       
       if (response.success) {
-        message.success(`文件 "${file.name}" 已成功导入知识库`);
+        message.success(t('files.messages.importedToRagSuccess', { name: file.name }));
         // 刷新文件列表以更新状态
         fetchFiles(pagination.current_page);
       } else {
-        message.error(response.message || `导入文件 "${file.name}" 失败`);
+        message.error(response.message || t('files.messages.importToRagFailed', { name: file.name }));
       }
     } catch (error) {
-      message.error(`导入文件 "${file.name}" 失败`);
+      message.error(t('files.messages.importToRagFailed', { name: file.name }));
       console.error('导入知识库失败:', error);
     }
   };
@@ -172,7 +172,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
   // 表格列配置
   const columns = [
     {
-      title: '文件名',
+      title: t('files.table.columns.name'),
       dataIndex: 'name',
       key: 'name',
       ellipsis: false,
@@ -186,7 +186,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       ),
     },
     {
-      title: '文件路径',
+      title: t('files.table.columns.path'),
       dataIndex: 'path',
       key: 'path',
       ellipsis: true,
@@ -198,7 +198,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       ),
     },
     {
-      title: '类型',
+      title: t('files.table.columns.type'),
       dataIndex: 'type',
       key: 'type',
       width: 100,
@@ -207,16 +207,16 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       ),
     },
     {
-      title: '分类',
+      title: t('files.table.columns.category'),
       dataIndex: 'category',
       key: 'category',
       width: 120,
       render: (category: string) => (
-        <Tag color="green">{category || '未分类'}</Tag>
+        <Tag color="green">{category || t('files.table.category.uncategorized')}</Tag>
       ),
     },
     {
-      title: '大小',
+      title: t('files.table.columns.size'),
       dataIndex: 'size',
       key: 'size',
       width: 100,
@@ -224,7 +224,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       render: (size: number) => formatFileSize(size),
     },
     {
-      title: '标签',
+      title: t('files.table.columns.tags'),
       dataIndex: 'tags',
       key: 'tags',
       render: (tags: string[]) => (
@@ -236,7 +236,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       ),
     },
     {
-      title: '添加时间',
+      title: t('files.table.columns.addedAt'),
       dataIndex: 'added_at',
       key: 'added_at',
       width: 150,
@@ -244,7 +244,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       render: (date: string) => new Date(date).toLocaleString(),
     },
     {
-      title: '知识库状态',
+      title: t('files.table.columns.ragStatus'),
       dataIndex: 'processed',
       key: 'processed',
       width: 120,
@@ -253,19 +253,19 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
           {processed ? (
             <>
               <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
-              <span style={{ color: '#52c41a' }}>已导入</span>
+              <span style={{ color: '#52c41a' }}>{t('files.table.ragStatus.imported')}</span>
             </>
           ) : (
             <>
               <CloseCircleOutlined style={{ color: '#ff4d4f', marginRight: 8 }} />
-              <span style={{ color: '#ff4d4f' }}>未导入</span>
+              <span style={{ color: '#ff4d4f' }}>{t('files.table.ragStatus.notImported')}</span>
             </>
           )}
         </div>
       ),
     },
     {
-      title: '操作',
+      title: t('files.table.columns.actions'),
       key: 'actions',
       width: 200,
       render: (_: unknown, record: ImportedFileItem) => (
@@ -274,25 +274,25 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
             type="text"
             icon={<EyeOutlined />}
             onClick={() => handlePreview(record)}
-            title="预览"
+            title={t('files.actions.preview')}
           />
           <Button
             type="text"
             icon={<FolderOpenOutlined />}
             onClick={() => handleOpenDirectory(record)}
-            title="打开目录"
+            title={t('files.actions.openDirectory')}
           />
           <Button
             type="text"
             icon={<FileTextOutlined />}
             onClick={() => handleOpenFile(record)}
-            title="打开文件"
+            title={t('files.actions.openFile')}
           />
           <Button
             type="text"
             icon={<DatabaseOutlined />}
             onClick={() => handleImportToRag(record)}
-            title="导入知识库"
+            title={t('files.actions.importToRag')}
             disabled={record.processed}
           />
         </Space>
@@ -373,7 +373,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       {/* 筛选条件 */}
       <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <Input
-          placeholder="搜索文件名"
+          placeholder={t('files.placeholders.searchFileName')}
           prefix={<SearchOutlined />}
           value={filters.search}
           onChange={(e) => handleFilterChange('search', e.target.value)}
@@ -381,38 +381,38 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
           style={{ width: 200 }}
         />
         <Select
-          placeholder="选择分类"
+          placeholder={t('files.placeholders.selectCategory')}
           value={filters.category}
           onChange={(value) => handleFilterChange('category', value)}
           style={{ width: 150 }}
           allowClear
         >
-          <Option value="document">文档</Option>
-          <Option value="image">图片</Option>
-          <Option value="video">视频</Option>
-          <Option value="audio">音频</Option>
-          <Option value="archive">压缩包</Option>
-          <Option value="other">其他</Option>
+          <Option value="document">{t('files.options.categories.document')}</Option>
+          <Option value="image">{t('files.options.categories.image')}</Option>
+          <Option value="video">{t('files.options.categories.video')}</Option>
+          <Option value="audio">{t('files.options.categories.audio')}</Option>
+          <Option value="archive">{t('files.options.categories.archive')}</Option>
+          <Option value="other">{t('files.options.categories.other')}</Option>
         </Select>
         <Select
-          placeholder="选择类型"
+          placeholder={t('files.placeholders.selectType')}
           value={filters.type}
           onChange={(value) => handleFilterChange('type', value)}
           style={{ width: 150 }}
           allowClear
         >
-          <Option value="pdf">PDF</Option>
-          <Option value="docx">Word</Option>
-          <Option value="xlsx">Excel</Option>
-          <Option value="pptx">PowerPoint</Option>
-          <Option value="txt">文本</Option>
-          <Option value="jpg">JPG</Option>
-          <Option value="png">PNG</Option>
-          <Option value="mp4">MP4</Option>
-          <Option value="zip">ZIP</Option>
+          <Option value="pdf">{t('files.options.types.pdf')}</Option>
+          <Option value="docx">{t('files.options.types.docx')}</Option>
+          <Option value="xlsx">{t('files.options.types.xlsx')}</Option>
+          <Option value="pptx">{t('files.options.types.pptx')}</Option>
+          <Option value="txt">{t('files.options.types.txt')}</Option>
+          <Option value="jpg">{t('files.options.types.jpg')}</Option>
+          <Option value="png">{t('files.options.types.png')}</Option>
+          <Option value="mp4">{t('files.options.types.mp4')}</Option>
+          <Option value="zip">{t('files.options.types.zip')}</Option>
         </Select>
         <Button type="primary" onClick={handleSearch}>
-          搜索
+          {t('files.buttons.search')}
         </Button>
       </div>
 
@@ -441,7 +441,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
             showSizeChanger={false}
             showQuickJumper
             showTotal={(total, range) =>
-              `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
+              t('files.pagination.showTotal', { start: range[0], end: range[1], total })
             }
           />
         </div>
@@ -518,7 +518,7 @@ const FilesPage: React.FC = () => {
       // 步骤1: 获取工作目录的目录结构
       const directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
       if (!directoryStructureResponse.success) {
-        message.error('获取目录结构失败');
+        message.error(t('files.messages.getDirectoryStructureFailed'));
         return;
       }
 
@@ -526,12 +526,12 @@ const FilesPage: React.FC = () => {
       const directories = extractDirectoriesFromStructure(directoryStructureResponse.data as DirectoryStructureResponse);
 
       // 步骤2: 调用推荐保存目录接口
-      const loadingKey = message.loading('正在分析文件并推荐保存目录...', 0);
+      const loadingKey = message.loading(t('files.messages.analyzingFile'), 0);
       const recommendResponse = await apiService.recommendDirectory(filePath, directories);
       loadingKey();
       
       if (!recommendResponse.success) {
-        message.error('获取推荐目录失败');
+        message.error(t('files.messages.getRecommendationFailed'));
         return;
       }
 
@@ -551,7 +551,7 @@ const FilesPage: React.FC = () => {
         
         const saveResponse = await apiService.saveFile(filePath, fullTargetDirectory, false);
         if (saveResponse.success) {
-          message.success(`文件已自动保存到: ${recommendedDirectory}`);
+          message.success(t('files.messages.fileAutoSavedTo', { path: recommendedDirectory }));
           // 刷新文件列表
           setRefreshTrigger(prev => prev + 1);
           // 导入到RAG库
@@ -559,14 +559,14 @@ const FilesPage: React.FC = () => {
           const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
           await handleRagImport(savedFilePath, isTextFile(filePath));
         } else {
-          message.error(saveResponse.message || '文件保存失败');
+          message.error(saveResponse.message || t('files.messages.fileSaveFailed'));
         }
       } else {
         // 步骤5: 弹出确认对话框
         await showImportConfirmationDialog(filePath, recommendedDirectory, alternatives, directoryStructureResponse.data as DirectoryStructureResponse);
       }
     } catch (error) {
-      message.error('文件导入失败');
+      message.error(t('files.messages.fileImportFailed'));
       console.error(error);
     }
   };
@@ -587,17 +587,17 @@ const FilesPage: React.FC = () => {
     try {
       const settings = await window.electronStore.get('settings') as Settings;
       if (settings?.autoSaveRAG) {
-        const loadingKey = message.loading('正在导入RAG库...', 0);
+        const loadingKey = message.loading(t('files.messages.importingRag'), 0);
         const ragResponse = await apiService.importToRag(savedFilePath, noSaveDb);
         loadingKey();
         if (ragResponse.success) {
-          message.success('文件已成功导入RAG库');
+          message.success(t('files.messages.importedRagSuccess'));
         } else {
-          message.warning('文件保存成功，但导入RAG库失败');
+          message.warning(t('files.messages.saveSuccessRagFailed'));
         }
       }
     } catch (error) {
-      message.warning('文件保存成功，但导入RAG库失败');
+      message.warning(t('files.messages.saveSuccessRagFailed'));
       console.error(error);
     }
   };
@@ -639,7 +639,7 @@ const FilesPage: React.FC = () => {
 
     // 添加推荐目录
     options.push({
-      title: `${recommendedDirectory} (推荐)`,
+      title: `${recommendedDirectory} ${t('files.import.suffixRecommended')}`,
       value: recommendedDirectory,
       key: recommendedDirectory,
       children: [],
@@ -649,7 +649,7 @@ const FilesPage: React.FC = () => {
     alternatives.forEach(alt => {
       if (alt !== recommendedDirectory) { // 避免重复
         options.push({
-          title: `${alt} (备选)`,
+          title: `${alt} ${t('files.import.suffixAlternative')}`,
           value: alt,
           key: alt,
           children: [],
@@ -702,7 +702,7 @@ const FilesPage: React.FC = () => {
   // 处理导入确认
   const handleImportConfirm = async () => {
     if (!selectedDirectory) {
-      message.error('请选择保存目录');
+      message.error(t('files.import.selectSaveDirectory'));
       return;
     }
 
@@ -715,7 +715,7 @@ const FilesPage: React.FC = () => {
       
       const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
       if (saveResponse.success) {
-        message.success(`文件已保存到: ${selectedDirectory}`);
+        message.success(t('files.import.fileSavedTo', { path: selectedDirectory }));
         setImportModalVisible(false);
         // 刷新文件列表
         setRefreshTrigger(prev => prev + 1);
@@ -724,10 +724,10 @@ const FilesPage: React.FC = () => {
         const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
         await handleRagImport(savedFilePath, isTextFile(importFilePath));
       } else {
-        message.error(saveResponse.message || '文件保存失败');
+        message.error(saveResponse.message || t('files.messages.fileSaveFailed'));
       }
     } catch (error) {
-      message.error('文件保存失败');
+      message.error(t('files.messages.fileSaveFailed'));
       console.error(error);
     }
   };
@@ -748,7 +748,7 @@ const FilesPage: React.FC = () => {
   // 处理手动选择确认
   const handleManualSelectConfirm = async () => {
     if (!selectedDirectory) {
-      message.error('请选择保存目录');
+      message.error(t('files.import.selectSaveDirectory'));
       return;
     }
 
@@ -761,7 +761,7 @@ const FilesPage: React.FC = () => {
 
       const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
       if (saveResponse.success) {
-        message.success(`文件已保存到: ${selectedDirectory}`);
+        message.success(t('files.import.fileSavedTo', { path: selectedDirectory }));
         setManualSelectModalVisible(false);
         // 刷新文件列表
         setRefreshTrigger(prev => prev + 1);
@@ -770,10 +770,10 @@ const FilesPage: React.FC = () => {
         const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
         await handleRagImport(savedFilePath, isTextFile(importFilePath));
       } else {
-        message.error(saveResponse.message || '文件保存失败');
+        message.error(saveResponse.message || t('files.messages.fileSaveFailed'));
       }
     } catch (error) {
-      message.error('文件保存失败');
+      message.error(t('files.messages.fileSaveFailed'));
       console.error(error);
     }
   };
@@ -801,8 +801,8 @@ const FilesPage: React.FC = () => {
         >
           <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h1>文件管理</h1>
-              <p>查看和管理已导入到系统的文件</p>
+              <h1>{t('files.pageTitle')}</h1>
+              <p>{t('files.pageDescription')}</p>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <Button
@@ -810,7 +810,7 @@ const FilesPage: React.FC = () => {
                 onClick={handleRefresh}
                 size="large"
               >
-                刷新
+                {t('files.buttons.refresh')}
               </Button>
               <Button
                 type="primary"
@@ -818,7 +818,7 @@ const FilesPage: React.FC = () => {
                 onClick={handleImportFile}
                 size="large"
               >
-                导入文件
+                {t('files.buttons.importFile')}
               </Button>
             </div>
           </div>
@@ -828,32 +828,32 @@ const FilesPage: React.FC = () => {
       </Layout>
 
       <Modal
-        title="选择保存目录"
+        title={t('files.import.modalTitle')}
         open={importModalVisible}
         onOk={handleImportConfirm}
         onCancel={handleImportCancel}
-        okText="确认保存"
-        cancelText="取消"
+        okText={t('files.import.confirmSave')}
+        cancelText={t('common.cancel')}
         footer={[
           <Button key="cancel" onClick={handleImportCancel}>
-            取消
+            {t('common.cancel')}
           </Button>,
           <Button key="manual" onClick={handleManualSelectDirectory}>
-            手动选择目录
+            {t('files.import.manualSelectButton')}
           </Button>,
           <Button key="confirm" type="primary" onClick={handleImportConfirm}>
-            确认保存
+            {t('files.import.confirmSave')}
           </Button>,
         ]}
       >
         <div style={{ marginBottom: 16 }}>
-          <p>系统推荐保存到: <strong>{selectedDirectory}</strong></p>
-          <p>请选择要保存文件的目标目录：</p>
+          <p>{t('files.import.recommendText', { path: selectedDirectory })}</p>
+          <p>{t('files.import.selectTargetPrompt')}</p>
           <Select
             style={{ width: '100%' }}
             value={selectedDirectory}
             onChange={(value: string) => setSelectedDirectory(value)}
-            placeholder="请选择目录"
+            placeholder={t('files.import.selectPlaceholder')}
           >
             {directoryOptions.map(option => (
               <Select.Option key={option.key} value={option.value}>
@@ -865,22 +865,22 @@ const FilesPage: React.FC = () => {
       </Modal>
 
       <Modal
-        title="手动选择保存目录"
+        title={t('files.import.manualModalTitle')}
         open={manualSelectModalVisible}
         onOk={handleManualSelectConfirm}
         onCancel={handleManualSelectCancel}
-        okText="确认选择"
-        cancelText="取消"
+        okText={t('files.import.confirmSelect')}
+        cancelText={t('common.cancel')}
         width={600}
       >
         <div style={{ marginBottom: 16 }}>
-          <p>请选择要保存文件的目标目录：</p>
+          <p>{t('files.import.selectTargetPrompt')}</p>
           <TreeSelect
             style={{ width: '100%' }}
             value={selectedDirectory}
             styles={{ popup: { root: { maxHeight: 400, overflow: 'auto' } } }}
             treeData={directoryTreeData}
-            placeholder="请选择目录"
+            placeholder={t('files.import.selectPlaceholder')}
             treeDefaultExpandAll
             treeLine
             showSearch

@@ -2,12 +2,14 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout, Typography, Space, Button, message } from 'antd';
 import reactLogo from '../assets/react.svg';
+import { useTranslation } from '../shared/i18n/I18nProvider';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 
 const Landing = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const version = '0.0.1'; // Version from package.json
 
   useEffect(() => {
@@ -41,23 +43,23 @@ const Landing = () => {
           <div>
             <img src={reactLogo} alt="Logo" style={{ width: '100px', height: '100px' }} />
           </div>
-          <Title level={1}>AI File Manager</Title>
+          <Title level={1}>{t('landing.title')}</Title>
           <Text type="secondary" style={{ fontSize: '16px' }}>
-            Version {version}
+            {t('landing.version', { version })}
           </Text>
           <Text style={{ fontSize: '18px', maxWidth: '600px', margin: '0 auto', display: 'block' }}>
-            An intelligent file management system powered by AI. Organize, search, and manage your files with advanced features.
+            {t('landing.description')}
           </Text>
           <Button
             type="default"
             onClick={async () => {
               if (window.electronStore) {
                 await window.electronStore.set('isInitialized', false);
-                message.success('初始化状态已重置');
+                message.success(t('landing.resetMessage'));
               }
             }}
           >
-            Reset Initialization (Test)
+            {t('landing.resetButton')}
           </Button>
         </Space>
       </Content>

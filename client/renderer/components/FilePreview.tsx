@@ -1,6 +1,7 @@
 import { Modal, Button, Spin, message, Space } from 'antd';
 import { FolderOpenOutlined, GlobalOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
+import { useTranslation } from '../shared/i18n/I18nProvider';
 import { apiService } from '../services/api';
 
 interface FilePreviewProps {
@@ -20,6 +21,7 @@ interface PreviewData {
 }
 
 const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
 
@@ -31,11 +33,11 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
         if (response.success) {
           setPreviewData(response.data as PreviewData);
         } else {
-          message.error(response.message || '加载预览失败');
+          message.error(response.message || t('filePreview.messages.loadFailed'));
           onClose();
         }
       } catch (error) {
-        message.error('加载预览失败');
+        message.error(t('filePreview.messages.loadFailed'));
         console.error(error);
         onClose();
       } finally {
@@ -46,7 +48,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
     if (visible && filePath) {
       loadPreview();
     }
-  }, [visible, filePath, onClose]);
+  }, [visible, filePath, onClose, t]);
 
   const handleOpenInFolder = async () => {
     try {
@@ -54,7 +56,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
       const folderPath = filePath.substring(0, filePath.lastIndexOf(getPathSeparator()));
       await window.electronAPI.openFile(folderPath);
     } catch (error) {
-      message.error('打开文件夹失败');
+      message.error(t('filePreview.messages.openFolderFailed'));
       console.error(error);
     }
   };
@@ -63,7 +65,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
     try {
       await window.electronAPI.openFile(filePath);
     } catch (error) {
-      message.error('打开文件失败');
+      message.error(t('filePreview.messages.openFileFailed'));
       console.error(error);
     }
   };
@@ -106,32 +108,32 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
           {previewData.content}
           {previewData.truncated && (
             <div style={{ marginTop: '16px', color: '#999', fontStyle: 'italic' }}>
-              ... 文件内容过长，已截断显示（前10KB）...
+              {t('filePreview.messages.truncatedMessage')}
             </div>
           )}
         </div>
       );
     }
 
-    return <div>不支持的文件类型</div>;
+    return <div>{t('filePreview.messages.unsupportedFileType')}</div>;
   };
 
   return (
     <Modal
-      title={`预览 - ${fileName}`}
+      title={t('filePreview.modalTitle', { fileName })}
       open={visible}
       onCancel={onClose}
       width={800}
       footer={
         <Space>
           <Button icon={<FolderOpenOutlined />} onClick={handleOpenInFolder}>
-            在文件夹中打开
+            {t('filePreview.buttons.openInFolder')}
           </Button>
           <Button icon={<GlobalOutlined />} onClick={handleOpenWithDefault}>
-            用默认程序打开
+            {t('filePreview.buttons.openWithDefault')}
           </Button>
           <Button onClick={onClose}>
-            关闭
+            {t('filePreview.buttons.close')}
           </Button>
         </Space>
       }
