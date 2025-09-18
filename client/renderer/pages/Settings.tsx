@@ -35,7 +35,6 @@ const DEFAULT_SETTINGS: SettingsState = {
 const Settings = () => {
   const navigate = useNavigate();
   const { t, locale, setLocale, availableLocales, localeLabels } = useTranslation();
-  console.log(t('settings.actions.saveApiBaseUrl'));
   const [settings, setSettings] = useState<SettingsState>(() => ({
     ...DEFAULT_SETTINGS,
     language: locale,
@@ -61,6 +60,7 @@ const Settings = () => {
           const workDirectory = (await window.electronStore.get('workDirectory')) as string | undefined;
 
           if (savedSettings) {
+            console.log('Loaded settings from store:', savedSettings);
             const normalizedLanguage = normalizeLocale(savedSettings.language ?? defaultLocale);
             nextState = {
               ...nextState,
@@ -107,11 +107,21 @@ const Settings = () => {
     }));
   };
 
-  const handleLocaleChange = (value: SupportedLocale) => {
+  const handleLocaleChange = async (value: SupportedLocale) => {
+    console.log('Selected locale:', value);
     if (value !== locale) {
+      // First update the language value in electron store
+      const newSettings = { ...settings, language: value };
+      if (window.electronStore) {
+        try {
+          await window.electronStore.set('settings', newSettings);
+        } catch (error) {
+          console.error('Failed to save language to store:', error);
+        }
+      }
       setLocale(value);
+      setSettings(newSettings);
     }
-    handleSettingChange('language', value);
   };
 
   const handleSaveSettings = async () => {

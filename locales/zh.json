@@ -150,5 +150,57 @@
       "clearException": "清除数据时发生意外错误。",
       "unknownError": "未知错误"
     }
+  },
+  "bot": {
+    "messages": {
+      "importingToRag": "正在导入RAG库...",
+      "importedToRagSuccess": "文件已成功导入RAG库",
+      "saveSuccessRagFailed": "文件保存成功，但导入RAG库失败",
+      "selectSaveDirectory": "请选择保存目录",
+      "fileSavedTo": "文件已保存到: {path}",
+      "fileSaveFailed": "文件保存失败",
+      "getDirectoryStructureFailed": "获取目录结构失败",
+      "analyzingFile": "正在分析文件并推荐保存目录...",
+      "getRecommendationFailed": "获取推荐目录失败",
+      "fileAutoSavedTo": "文件已自动保存到: {path}",
+      "fileImportFailed": "文件导入失败",
+      "errorProcessingFiles": "处理文件时出错"
+    }
+  },
+  "convert": {
+    "messages": {
+      "fetchFormatsFailed": "获取转换格式失败",
+      "desktopNotAvailable": "桌面环境不可用",
+      "selectFileFailed": "选择文件失败",
+      "selectDirectoryFailed": "选择目录失败",
+      "selectFileFirst": "请先选择要转换的文件",
+      "selectTargetFormat": "请选择目标格式",
+      "pandocNotAvailable": "当前环境未检测到 Pandoc，仅支持转换为 Markdown",
+      "conversionSuccess": "文件转换成功",
+      "conversionFailed": "文件转换失败",
+      "cannotOpenFile": "无法打开文件",
+      "cannotOpenDirectory": "无法打开所在目录"
+    }
+  },
+  "files": {
+    "messages": {
+      "fetchFilesFailed": "获取文件列表失败",
+      "openDirectoryFailed": "打开目录失败",
+      "openDirectoryNotSupported": "不支持打开目录功能",
+      "openFileFailed": "打开文件失败",
+      "openFileNotSupported": "不支持打开文件功能",
+      "importingToRag": "正在导入文件 \"{name}\" 到知识库...",
+      "importedToRagSuccess": "文件 \"{name}\" 已成功导入知识库",
+      "importToRagFailed": "导入文件 \"{name}\" 失败",
+      "getDirectoryStructureFailed": "获取目录结构失败",
+      "analyzingFile": "正在分析文件并推荐保存目录...",
+      "getRecommendationFailed": "获取推荐目录失败",
+      "fileAutoSavedTo": "文件已自动保存到: {path}",
+      "fileSaveFailed": "文件保存失败",
+      "fileImportFailed": "文件导入失败",
+      "importingRag": "正在导入RAG库...",
+      "importedRagSuccess": "文件已成功导入RAG库",
+      "saveSuccessRagFailed": "文件保存成功，但导入RAG库失败"
+    }
   }
 }

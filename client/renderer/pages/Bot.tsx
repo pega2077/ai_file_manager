@@ -4,8 +4,10 @@ import botStaticImage from '../assets/mona-loading-default-static.png';
 import { message, Modal, Select, TreeSelect, Button, Menu } from 'antd';
 import { apiService } from '../services/api';
 import { DirectoryItem, DirectoryStructureResponse, RecommendDirectoryResponse, Settings, TreeNode } from '../shared/types';
+import { useTranslation } from '../shared/i18n/I18nProvider';
 
 const Bot: React.FC = () => {
+  const { t } = useTranslation();
   const isDragging = useRef(false);
   const startPos = useRef({ x: 0, y: 0 });
   const [workDirectory, setWorkDirectory] = useState<string>('workdir');
@@ -107,17 +109,17 @@ const Bot: React.FC = () => {
     try {
       const settings = await window.electronStore.get('settings') as Settings;
       if (settings?.autoSaveRAG) {
-        const loadingKey = message.loading('正在导入RAG库...', 0);
+        const loadingKey = message.loading(t('bot.messages.importingToRag'), 0);
         const ragResponse = await apiService.importToRag(savedFilePath);
         loadingKey();
         if (ragResponse.success) {
-          message.success('文件已成功导入RAG库');
+          message.success(t('bot.messages.importedToRagSuccess'));
         } else {
-          message.warning('文件保存成功，但导入RAG库失败');
+          message.warning(t('bot.messages.saveSuccessRagFailed'));
         }
       }
     } catch (error) {
-      message.warning('文件保存成功，但导入RAG库失败');
+      message.warning(t('bot.messages.saveSuccessRagFailed'));
       console.error(error);
     }
   };
@@ -222,7 +224,7 @@ const Bot: React.FC = () => {
   // 处理导入确认
   const handleImportConfirm = async () => {
     if (!selectedDirectory) {
-      message.error('请选择保存目录');
+      message.error(t('bot.messages.selectSaveDirectory'));
       return;
     }
 
@@ -239,16 +241,16 @@ const Bot: React.FC = () => {
       
       const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
       if (saveResponse.success) {
-        message.success(`文件已保存到: ${selectedDirectory}`);
+        message.success(t('bot.messages.fileSavedTo', { path: selectedDirectory }));
         // 导入到RAG库
         const fileName = getFileName(importFilePath);
         const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
         await handleRagImport(savedFilePath);
       } else {
-        message.error(saveResponse.message || '文件保存失败');
+        message.error(saveResponse.message || t('bot.messages.fileSaveFailed'));
       }
     } catch (error) {
-      message.error('文件保存失败');
+      message.error(t('bot.messages.fileSaveFailed'));
       console.error(error);
     } finally {
       setProcessing(false);
@@ -271,7 +273,7 @@ const Bot: React.FC = () => {
   // 处理手动选择确认
   const handleManualSelectConfirm = async () => {
     if (!selectedDirectory) {
-      message.error('请选择保存目录');
+      message.error(t('bot.messages.selectSaveDirectory'));
       return;
     }
 
@@ -284,17 +286,17 @@ const Bot: React.FC = () => {
 
       const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
       if (saveResponse.success) {
-        message.success(`文件已保存到: ${selectedDirectory}`);
+        message.success(t('bot.messages.fileSavedTo', { path: selectedDirectory }));
         setManualSelectModalVisible(false);
         // 导入到RAG库
         const fileName = getFileName(importFilePath);
         const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
         await handleRagImport(savedFilePath);
       } else {
-        message.error(saveResponse.message || '文件保存失败');
+        message.error(saveResponse.message || t('bot.messages.fileSaveFailed'));
       }
     } catch (error) {
-      message.error('文件保存失败');
+      message.error(t('bot.messages.fileSaveFailed'));
       console.error(error);
     }
   };
@@ -312,7 +314,7 @@ const Bot: React.FC = () => {
       // 步骤1: 获取工作目录的目录结构
       const directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
       if (!directoryStructureResponse.success) {
-        message.error('获取目录结构失败');
+        message.error(t('bot.messages.getDirectoryStructureFailed'));
         return;
       }
 
@@ -320,12 +322,12 @@ const Bot: React.FC = () => {
       const directories = extractDirectoriesFromStructure(directoryStructureResponse.data as DirectoryStructureResponse);
 
       // 步骤2: 调用推荐保存目录接口
-      const loadingKey = message.loading('正在分析文件并推荐保存目录...', 0);
+      const loadingKey = message.loading(t('bot.messages.analyzingFile'), 0);
       const recommendResponse = await apiService.recommendDirectory(filePath, directories);
       loadingKey();
       
       if (!recommendResponse.success) {
-        message.error('获取推荐目录失败');
+        message.error(t('bot.messages.getRecommendationFailed'));
         return;
       }
 
@@ -344,7 +346,7 @@ const Bot: React.FC = () => {
         
         const saveResponse = await apiService.saveFile(filePath, fullTargetDirectory, false);
         if (saveResponse.success) {
-          message.success(`文件已自动保存到: ${recommendedDirectory}`);
+          message.success(t('bot.messages.fileAutoSavedTo', { path: recommendedDirectory }));
           // 导入到RAG库
           const fileName = getFileName(filePath);
           const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
@@ -358,7 +360,7 @@ const Bot: React.FC = () => {
         await showImportConfirmationDialog(filePath, recommendedDirectory, alternatives, directoryStructureResponse.data as DirectoryStructureResponse);
       }
     } catch (error) {
-      message.error('文件导入失败');
+      message.error(t('bot.messages.fileImportFailed'));
       console.error(error);
     } finally {
       setProcessing(false);
@@ -409,7 +411,7 @@ const Bot: React.FC = () => {
       }
     } catch (error) {
       console.error('Error processing dropped files:', error);
-      message.error('Error processing files');
+      message.error(t('bot.messages.errorProcessingFiles'));
       setProcessing(false);
     }
   };

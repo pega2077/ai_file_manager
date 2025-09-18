@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar';
 import FilePreview from "../components/FilePreview";
 import { apiService } from '../services/api';
 import { DirectoryItem, DirectoryStructureResponse, RecommendDirectoryResponse, Settings, TreeNode, ImportedFileItem } from '../shared/types';
+import { useTranslation } from '../shared/i18n/I18nProvider';
 
 const { Content } = Layout;
 const { Option } = Select;
@@ -27,6 +28,7 @@ interface FileListProps {
 }
 
 const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => {
+  const { t } = useTranslation();
   const [files, setFiles] = useState<ImportedFileItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [workDirectory, setWorkDirectory] = useState<string>('workdir');
@@ -67,7 +69,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
         setFiles(data.files);
         setPagination(data.pagination);
       } else {
-        message.error(response.message || '获取文件列表失败');
+        message.error(response.message || t('files.messages.fetchFilesFailed'));
       }
     } catch (error) {
       console.error('获取文件列表失败:', error);
@@ -75,7 +77,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
     } finally {
       setLoading(false);
     }
-  }, [pagination.limit, filters]);
+  }, [pagination.limit, filters, t]);
 
   // 预览文件
   const handlePreview = (file: ImportedFileItem) => {
@@ -462,6 +464,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
 };
 
 const FilesPage: React.FC = () => {
+  const { t } = useTranslation();
   const selectedMenu = 'file-list';
   const [workDirectory, setWorkDirectory] = useState<string>('workdir');
   const [importModalVisible, setImportModalVisible] = useState(false);

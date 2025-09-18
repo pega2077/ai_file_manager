@@ -3,6 +3,7 @@ import { Layout, Card, Button, Select, Input, Switch, Space, Typography, Alert, 
 import { ReloadOutlined, FolderOpenOutlined, FileDoneOutlined } from '@ant-design/icons';
 import Sidebar from '../components/Sidebar';
 import { apiService } from '../services/api';
+import { useTranslation } from '../shared/i18n/I18nProvider';
 
 const { Content } = Layout;
 const { Title, Paragraph, Text } = Typography;
@@ -26,6 +27,7 @@ interface ConversionResult {
 const markdownFormats = new Set(['md', 'markdown']);
 
 const FileConversion: React.FC = () => {
+  const { t } = useTranslation();
   const selectedMenu = 'convert';
   const [formats, setFormats] = useState<ConversionFormats | null>(null);
   const [loadingFormats, setLoadingFormats] = useState(false);
@@ -49,15 +51,15 @@ const FileConversion: React.FC = () => {
           setOutputDirectory(response.data.default_output_directory);
         }
       } else {
-        message.error(response.message || '获取转换格式失败');
+        message.error(response.message || t('convert.messages.fetchFormatsFailed'));
       }
     } catch (error) {
       console.error(error);
-      message.error('获取转换格式失败');
+      message.error(t('convert.messages.fetchFormatsFailed'));
     } finally {
       setLoadingFormats(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void fetchFormats();
@@ -65,7 +67,7 @@ const FileConversion: React.FC = () => {
 
   const handleSelectFile = async () => {
     if (!window.electronAPI) {
-      message.error('桌面环境不可用');
+      message.error(t('convert.messages.desktopNotAvailable'));
       return;
     }
     try {
@@ -76,13 +78,13 @@ const FileConversion: React.FC = () => {
       }
     } catch (error) {
       console.error(error);
-      message.error('选择文件失败');
+      message.error(t('convert.messages.selectFileFailed'));
     }
   };
 
   const handleSelectOutputDirectory = async () => {
     if (!window.electronAPI) {
-      message.error('桌面环境不可用');
+      message.error(t('convert.messages.desktopNotAvailable'));
       return;
     }
     try {
@@ -92,7 +94,7 @@ const FileConversion: React.FC = () => {
       }
     } catch (error) {
       console.error(error);
-      message.error('选择目录失败');
+      message.error(t('convert.messages.selectDirectoryFailed'));
     }
   };
 
@@ -128,15 +130,15 @@ const FileConversion: React.FC = () => {
 
   const handleConvert = async () => {
     if (!sourceFile) {
-      message.warning('请先选择要转换的文件');
+      message.warning(t('convert.messages.selectFileFirst'));
       return;
     }
     if (!targetFormat) {
-      message.warning('请选择目标格式');
+      message.warning(t('convert.messages.selectTargetFormat'));
       return;
     }
     if (formats && !formats.pandoc_available && !markdownFormats.has(targetFormat.toLowerCase())) {
-      message.warning('当前环境未检测到 Pandoc，仅支持转换为 Markdown');
+      message.warning(t('convert.messages.pandocNotAvailable'));
       return;
     }
 
@@ -152,13 +154,13 @@ const FileConversion: React.FC = () => {
       const response = await apiService.convertFile(payload);
       if (response.success) {
         setConversionResult(response.data);
-        message.success(response.message || '文件转换成功');
+        message.success(response.message || t('convert.messages.conversionSuccess'));
       } else {
-        message.error(response.message || '文件转换失败');
+        message.error(response.message || t('convert.messages.conversionFailed'));
       }
     } catch (error) {
       console.error(error);
-      message.error('文件转换失败');
+      message.error(t('convert.messages.conversionFailed'));
     } finally {
       setConverting(false);
     }
@@ -171,11 +173,11 @@ const FileConversion: React.FC = () => {
     try {
       const opened = await window.electronAPI.openFile(conversionResult.output_file_path);
       if (!opened) {
-        message.error('无法打开文件');
+        message.error(t('convert.messages.cannotOpenFile'));
       }
     } catch (error) {
       console.error(error);
-      message.error('无法打开文件');
+      message.error(t('convert.messages.cannotOpenFile'));
     }
   };
 
@@ -186,11 +188,11 @@ const FileConversion: React.FC = () => {
     try {
       const opened = await window.electronAPI.openFolder(conversionResult.output_file_path);
       if (!opened) {
-        message.error('无法打开所在目录');
+        message.error(t('convert.messages.cannotOpenDirectory'));
       }
     } catch (error) {
       console.error(error);
-      message.error('无法打开所在目录');
+      message.error(t('convert.messages.cannotOpenDirectory'));
     }
   };
 

@@ -150,5 +150,57 @@
       "clearException": "An unexpected error occurred while clearing data.",
       "unknownError": "Unknown error"
     }
+  },
+  "bot": {
+    "messages": {
+      "importingToRag": "Importing to RAG library...",
+      "importedToRagSuccess": "File successfully imported to RAG library",
+      "saveSuccessRagFailed": "File saved successfully, but importing to RAG library failed",
+      "selectSaveDirectory": "Please select save directory",
+      "fileSavedTo": "File saved to: {path}",
+      "fileSaveFailed": "File save failed",
+      "getDirectoryStructureFailed": "Failed to get directory structure",
+      "analyzingFile": "Analyzing file and recommending save directory...",
+      "getRecommendationFailed": "Failed to get recommendation",
+      "fileAutoSavedTo": "File automatically saved to: {path}",
+      "fileImportFailed": "File import failed",
+      "errorProcessingFiles": "Error processing files"
+    }
+  },
+  "convert": {
+    "messages": {
+      "fetchFormatsFailed": "Failed to fetch conversion formats",
+      "desktopNotAvailable": "Desktop environment not available",
+      "selectFileFailed": "Failed to select file",
+      "selectDirectoryFailed": "Failed to select directory",
+      "selectFileFirst": "Please select a file to convert first",
+      "selectTargetFormat": "Please select target format",
+      "pandocNotAvailable": "Pandoc not detected in current environment, only Markdown conversion is supported",
+      "conversionSuccess": "File conversion successful",
+      "conversionFailed": "File conversion failed",
+      "cannotOpenFile": "Cannot open file",
+      "cannotOpenDirectory": "Cannot open directory"
+    }
+  },
+  "files": {
+    "messages": {
+      "fetchFilesFailed": "Failed to fetch file list",
+      "openDirectoryFailed": "Failed to open directory",
+      "openDirectoryNotSupported": "Directory opening not supported",
+      "openFileFailed": "Failed to open file",
+      "openFileNotSupported": "File opening not supported",
+      "importingToRag": "Importing file \"{name}\" to knowledge base...",
+      "importedToRagSuccess": "File \"{name}\" successfully imported to knowledge base",
+      "importToRagFailed": "Failed to import file \"{name}\"",
+      "getDirectoryStructureFailed": "Failed to get directory structure",
+      "analyzingFile": "Analyzing file and recommending save directory...",
+      "getRecommendationFailed": "Failed to get recommendation",
+      "fileAutoSavedTo": "File automatically saved to: {path}",
+      "fileSaveFailed": "File save failed",
+      "fileImportFailed": "File import failed",
+      "importingRag": "Importing to RAG library...",
+      "importedRagSuccess": "File successfully imported to RAG library",
+      "saveSuccessRagFailed": "File saved successfully, but importing to RAG library failed"
+    }
   }
 }
