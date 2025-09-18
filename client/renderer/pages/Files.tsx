@@ -19,6 +19,15 @@ const FilesPage: React.FC = () => {
   const [manualSelectModalVisible, setManualSelectModalVisible] = useState(false);
   const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // 文本文件扩展名列表
+  const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.markdown', '.rst', '.json', '.xml', '.yaml', '.yml']);
+
+  // 检查是否是文本文件
+  const isTextFile = (filePath: string): boolean => {
+    const extension = filePath.toLowerCase().substring(filePath.lastIndexOf('.'));
+    return TEXT_EXTENSIONS.has(extension);
+  };
   useEffect(() => {
     // 从store读取工作目录和设置
     const loadInitialData = async () => {
@@ -93,7 +102,7 @@ const FilesPage: React.FC = () => {
           // 导入到RAG库
           const fileName = getFileName(filePath);
           const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-          await handleRagImport(savedFilePath);
+          await handleRagImport(savedFilePath, isTextFile(filePath));
         } else {
           message.error(saveResponse.message || '文件保存失败');
         }
@@ -119,12 +128,12 @@ const FilesPage: React.FC = () => {
   };
 
   // 处理RAG导入
-  const handleRagImport = async (savedFilePath: string) => {
+  const handleRagImport = async (savedFilePath: string, noSaveDb: boolean = false) => {
     try {
       const settings = await window.electronStore.get('settings') as Settings;
       if (settings?.autoSaveRAG) {
         const loadingKey = message.loading('正在导入RAG库...', 0);
-        const ragResponse = await apiService.importToRag(savedFilePath);
+        const ragResponse = await apiService.importToRag(savedFilePath, noSaveDb);
         loadingKey();
         if (ragResponse.success) {
           message.success('文件已成功导入RAG库');
@@ -258,7 +267,7 @@ const FilesPage: React.FC = () => {
         // 导入到RAG库
         const fileName = getFileName(importFilePath);
         const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-        await handleRagImport(savedFilePath);
+        await handleRagImport(savedFilePath, isTextFile(importFilePath));
       } else {
         message.error(saveResponse.message || '文件保存失败');
       }
@@ -304,7 +313,7 @@ const FilesPage: React.FC = () => {
         // 导入到RAG库
         const fileName = getFileName(importFilePath);
         const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-        await handleRagImport(savedFilePath);
+        await handleRagImport(savedFilePath, isTextFile(importFilePath));
       } else {
         message.error(saveResponse.message || '文件保存失败');
       }

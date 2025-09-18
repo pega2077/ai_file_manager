@@ -817,7 +817,7 @@ If no suitable directory is found, you can suggest creating a new one by specify
                 'alternatives': []
             })()
 
-    async def import_to_rag(self, file_path: str) -> dict:
+    async def import_to_rag(self, file_path: str, no_save_db: bool = False) -> dict:
         """Import file to RAG library by processing embeddings and storing in database"""
         try:
             # Convert to Path object
@@ -927,29 +927,32 @@ If no suitable directory is found, you can suggest creating a new one by specify
                 )
 
             # Save basic file info to database (without full file record, just for RAG)
-            try:
-                from database import DatabaseManager
-                db_manager = DatabaseManager()
+            if not no_save_db:
+                try:
+                    from database import DatabaseManager
+                    db_manager = DatabaseManager()
 
-                rag_file_info = {
-                    'file_id': file_id,
-                    'path': str(final_file_path.relative_to(settings.workdir_path)) if final_file_path != source_path else str(source_path),
-                    'name': filename,
-                    'type': "text/markdown",
-                    'category': "RAG_Import",
-                    'summary': f"RAG imported file from {file_path}",
-                    'tags': ["rag_import"],
-                    'size': final_file_size,
-                    'added_at': datetime.now().isoformat(),
-                    'processed': True
-                }
+                    rag_file_info = {
+                        'file_id': file_id,
+                        'path': str(final_file_path.relative_to(settings.workdir_path)) if final_file_path != source_path else str(source_path),
+                        'name': filename,
+                        'type': "text/markdown",
+                        'category': "RAG_Import",
+                        'summary': f"RAG imported file from {file_path}",
+                        'tags': ["rag_import"],
+                        'size': final_file_size,
+                        'added_at': datetime.now().isoformat(),
+                        'processed': True
+                    }
 
-                db_id = db_manager.insert_file(rag_file_info)
-                logger.info(f"RAG file record saved to database with ID: {db_id}")
+                    db_id = db_manager.insert_file(rag_file_info)
+                    logger.info(f"RAG file record saved to database with ID: {db_id}")
 
-            except Exception as db_error:
-                logger.error(f"Failed to save RAG file record to database: {db_error}")
-                # Continue execution - embeddings are already stored
+                except Exception as db_error:
+                    logger.error(f"Failed to save RAG file record to database: {db_error}")
+                    # Continue execution - embeddings are already stored
+            else:
+                logger.info(f"Skipping database save for RAG import (no_save_db=True): {file_id}")
 
             # Clean up temporary file if created
             if temp_md_path and temp_md_path.exists():

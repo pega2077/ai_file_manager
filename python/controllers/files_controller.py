@@ -88,6 +88,7 @@ class RecommendDirectoryRequest(BaseModel):
 
 class ImportToRagRequest(BaseModel):
     file_path: str = Field(..., description="Path of the file to import to RAG library")
+    no_save_db: bool = Field(False, description="If true, do not save file record to database, only process embeddings")
 
 class ChunkInfo(BaseModel):
     id: str
@@ -1290,7 +1291,7 @@ async def recommend_directory(request: RecommendDirectoryRequest):
 async def import_to_rag(request: ImportToRagRequest):
     """Import file to RAG library for semantic search"""
     try:
-        result = await file_manager.import_to_rag(file_path=request.file_path)
+        result = await file_manager.import_to_rag(file_path=request.file_path, no_save_db=request.no_save_db)
         return result
         
     except Exception as e:

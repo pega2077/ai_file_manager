@@ -186,11 +186,12 @@ class ApiService {
   }
 
   // 导入到RAG库
-  async importToRag(filePath: string) {
+  async importToRag(filePath: string, noSaveDb: boolean = false) {
     return this.request('/files/import-to-rag', {
       method: 'POST',
       body: JSON.stringify({
         file_path: filePath,
+        no_save_db: noSaveDb,
       }),
     });
   }
