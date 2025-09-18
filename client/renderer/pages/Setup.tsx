@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Steps, Form, Input, Button, Card, Space, message, AutoComplete, Tree, Collapse } from 'antd';
+import { Layout, Steps, Form, Input, Button, Card, Space, message, AutoComplete, Tree, Collapse, Select } from 'antd';
 import { apiService } from '../services/api';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 
@@ -30,7 +30,7 @@ const professionOptionKeys = [
 
 const Setup = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, setLocale, locale, availableLocales, localeLabels } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
   const [form] = Form.useForm();
   const [directoryStructure, setDirectoryStructure] = useState<DirectoryStructure[]>([]);
@@ -315,6 +315,17 @@ const Setup = () => {
     <Layout style={{ minHeight: '100vh' }}>
       <Content style={{ padding: '24px', background: '#fff' }}>
         <div style={{ maxWidth: 800, margin: '0 auto' }}>
+          <Select
+            value={locale}
+            onChange={setLocale}
+            style={{ width: 120, marginBottom: 16 }}
+          >
+            {availableLocales.map((lang) => (
+              <Select.Option key={lang} value={lang}>
+                {localeLabels[lang]}
+              </Select.Option>
+            ))}
+          </Select>
           <Steps current={currentStep} style={{ marginBottom: 24 }}>
             {steps.map((step, index) => (
               <Step key={index} title={step.title} description={step.description} />
