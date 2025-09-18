@@ -37,8 +37,6 @@ const normalizeLocaleValue = (value: string | null | undefined): string => {
   return SUPPORTED_LOCALES.has(base) ? base : "en";
 };
 
-
-
 const syncWorkDirectoryConfig = async (): Promise<void> => {
   const workDirectory = store.get("workDirectory") as string | undefined;
 
@@ -218,6 +216,7 @@ function setupIpcHandlers() {
 
     importService = new ImportService(store, win, apiBaseUrl);
     void syncWorkDirectoryConfig();
+    void syncLanguageConfig();
     return true;
   });
 
@@ -242,6 +241,36 @@ function setupIpcHandlers() {
     }
 
     return true;
+  });
+
+  ipcMain.handle("sync-language-config", async () => {
+    const preferredLocale = store.get("preferredLocale") as string | undefined;
+
+    if (!preferredLocale) {
+      return;
+    }
+
+    const apiBaseUrl = (
+      store.get("apiBaseUrl", "http://localhost:8000") as string
+    ).replace(/\/$/, "");
+
+    const endpoint = `${apiBaseUrl}/api/system/config/update`;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale: preferredLocale }),
+      });
+
+      if (!response.ok) {
+        console.error(
+          `Failed to sync language config: ${response.status} ${response.statusText}`
+        );
+      }
+    } catch (error) {
+      console.error("Failed to sync language config", error);
+    }
   });
 }
 
@@ -290,6 +319,7 @@ function createWindow() {
   const apiBaseUrl = store.get("apiBaseUrl", "http://localhost:8000") as string;
   importService = new ImportService(store, win, apiBaseUrl);
   void syncWorkDirectoryConfig();
+  void syncLanguageConfig();
 }
 
 function createBotWindow() {
@@ -555,4 +585,40 @@ app.whenReady().then(() => {
   createBotWindow();
   createTray();
 });
+
+store.onDidChange("preferredLocale", (newValue) => {
+  if (typeof newValue === "string" && newValue.trim() !== "") {
+    void syncLanguageConfig();
+  }
+});
+
+const syncLanguageConfig = async (): Promise<void> => {
+  const preferredLocale = store.get("preferredLocale") as string | undefined;
+
+  if (!preferredLocale) {
+    return;
+  }
+
+  const apiBaseUrl = (
+    store.get("apiBaseUrl", "http://localhost:8000") as string
+  ).replace(/\/$/, "");
+
+  const endpoint = `${apiBaseUrl}/api/system/config/update`;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locale: preferredLocale }),
+    });
+
+    if (!response.ok) {
+      console.error(
+        `Failed to sync language config: ${response.status} ${response.statusText}`
+      );
+    }
+  } catch (error) {
+    console.error("Failed to sync language config", error);
+  }
+};
 
