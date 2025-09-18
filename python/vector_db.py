@@ -150,7 +150,8 @@ class VectorDatabase:
         self, 
         query_embedding: List[float], 
         limit: int = 10,
-        similarity_threshold: float = 0.7
+        similarity_threshold: float = 0.7,
+        file_ids: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """搜索相似的embeddings"""
         try:
@@ -195,6 +196,10 @@ class VectorDatabase:
                         break
                 
                 if embedding_id and metadata:
+                    # 如果指定了file_ids，进行过滤
+                    if file_ids and metadata.get("file_id") not in file_ids:
+                        continue
+                    
                     results.append({
                         "embedding_id": embedding_id,
                         "similarity_score": score,

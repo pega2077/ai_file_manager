@@ -39,6 +39,7 @@ class ChatAskRequest(BaseModel):
     max_tokens: int = Field(default=1000, description="最大生成token数", ge=100, le=4000)
     stream: bool = Field(default=False, description="是否流式响应")
     file_filters: Optional[Dict[str, Any]] = Field(default=None, description="文件筛选条件")
+    file_ids: Optional[List[str]] = Field(default=None, description="指定文件ID列表，用于缩小检索范围")
 
 class FileFilters(BaseModel):
     file_ids: Optional[List[str]] = Field(default=None, description="指定文件ID列表")
@@ -185,7 +186,8 @@ async def ask_question(request: ChatAskRequest):
         search_results = vector_db.search_similar(
             query_embedding=question_embedding,
             limit=request.context_limit,
-            similarity_threshold=request.similarity_threshold
+            similarity_threshold=request.similarity_threshold,
+            file_ids=request.file_ids
         )
         logger.debug(f"检索到 {len(search_results)} 条相关文档")
 

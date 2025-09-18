@@ -1115,21 +1115,33 @@
 
 **接口**: `POST /api/chat/ask`
 
+基于RAG的智能问答功能，支持从指定文件范围内进行语义检索和回答生成。
+
 **请求参数**:
 ```json
 {
   "question": "string",
   "context_limit": "number",     // 检索上下文数量，默认 5
+  "similarity_threshold": "number", // 相似度阈值，默认 0.7
   "temperature": "number",       // LLM 温度参数，默认 0.7
   "max_tokens": "number",        // 最大生成token数，默认 1000
   "stream": "boolean",          // 是否流式响应，默认 false
   "file_filters": {
-    "file_ids": ["string"],     // 可选，指定文件范围
+    "file_ids": ["string"],     // 可选，指定文件ID列表，用于缩小RAG检索范围
     "categories": ["string"],   // 可选，指定分类范围
     "tags": ["string"]         // 可选，指定标签范围
   }
 }
 ```
+
+**参数说明**:
+- `question`: 用户问题，必填
+- `context_limit`: 检索上下文数量，默认5，范围1-20
+- `similarity_threshold`: 相似度阈值，默认0.7，范围0.0-1.0
+- `temperature`: LLM温度参数，默认0.7，范围0.0-2.0
+- `max_tokens`: 最大生成token数，默认1000，范围100-4000
+- `stream`: 是否流式响应，默认false
+- `file_filters.file_ids`: 可选的文件ID列表，当指定时只从这些文件中检索相关内容，提高回答准确性
 
 **响应数据**:
 ```json
