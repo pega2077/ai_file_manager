@@ -69,7 +69,7 @@ export interface ImportFileResponse {
 }
 
 export interface ImportedFileItem {
-  id: string;
+  file_id: string;
   name: string;
   path: string;
   type: string;

@@ -141,7 +141,7 @@
 {
   "files": [
     {
-      "id": "string",
+      "file_id": "string",
       "name": "string",
       "path": "string",
       "type": "string",
@@ -169,7 +169,7 @@
 **响应数据**:
 ```json
 {
-  "id": "string",
+  "file_id": "string",
   "name": "string",
   "path": "string",
   "type": "string",

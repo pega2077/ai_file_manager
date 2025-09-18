@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Layout, Button, message, Modal, Select, TreeSelect, Table, Input, Tag, Space, Pagination } from 'antd';
-import { FileAddOutlined, ReloadOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined } from '@ant-design/icons';
+import type { TableProps } from 'antd';
+import { FileAddOutlined, ReloadOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import FilePreview from "../components/FilePreview";
 import { apiService } from '../services/api';
@@ -29,6 +31,7 @@ interface FileListProps {
 
 const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [files, setFiles] = useState<ImportedFileItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [workDirectory, setWorkDirectory] = useState<string>('workdir');
@@ -142,6 +145,18 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       message.error(t('files.messages.importToRagFailed', { name: file.name }));
       console.error('导入知识库失败:', error);
     }
+  };
+
+  // 提问文件
+  const handleAskQuestion = (file: ImportedFileItem) => {
+    // 构建URL参数，传递type=qa和fileIds
+    const params = new URLSearchParams({
+      type: 'qa',
+      fileIds: file.file_id
+    });
+    console.log(file.file_id + " " + params.toString());
+    // 使用React Router导航跳转到Search页面
+    navigate(`/search?${params.toString()}`);
   };
 
   // 获取相对于工作目录的路径
@@ -295,6 +310,12 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
             title={t('files.actions.importToRag')}
             disabled={record.processed}
           />
+          <Button
+            type="text"
+            icon={<QuestionCircleOutlined />}
+            onClick={() => handleAskQuestion(record)}
+            title={t('files.actions.askQuestion')}
+          />
         </Space>
       ),
     },
@@ -315,16 +336,19 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
   };
 
   // 处理表格变化（排序、分页等）
-  const handleTableChange = (...args: any[]) => {
-    const sorter = args[2];
-    if (sorter.field && sorter.order) {
+  const handleTableChange: TableProps<ImportedFileItem>['onChange'] = (
+    pagination,
+    filters,
+    sorter
+  ) => {
+    if (sorter && typeof sorter === 'object' && 'field' in sorter && 'order' in sorter) {
       const sortOrder = sorter.order === 'ascend' ? 'asc' : 'desc';
       setFilters(prev => ({
         ...prev,
-        sort_by: sorter.field,
+        sort_by: sorter.field as string,
         sort_order: sortOrder
       }));
-      fetchFiles(pagination.current_page);
+      fetchFiles(pagination.current || 1);
     } else {
       // 取消排序
       setFilters(prev => ({
@@ -332,7 +356,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
         sort_by: '',
         sort_order: 'desc'
       }));
-      fetchFiles(pagination.current_page);
+      fetchFiles(pagination.current || 1);
     }
   };
 

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout, Input, Button, List, Spin, message, Tag, Pagination, Card, Tabs, Modal } from 'antd';
 import { SearchOutlined, QuestionCircleOutlined, EyeOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { useSearchParams } from 'react-router-dom';
 import { apiService } from '../services/api';
 import Sidebar from '../components/Sidebar';
 import { useTranslation } from '../shared/i18n/I18nProvider';
@@ -77,6 +78,7 @@ interface ChunkContent {
 
 const SearchPage = () => {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
   const selectedMenu = 'search';
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -89,6 +91,7 @@ const SearchPage = () => {
   const [questionQuery, setQuestionQuery] = useState('');
   const [questionResult, setQuestionResult] = useState<QuestionResponse | null>(null);
   const [asking, setAsking] = useState(false);
+  const [referencedFiles, setReferencedFiles] = useState<SearchResult[]>([]);
 
   // 标签页状态
   const [activeTab, setActiveTab] = useState('search');
@@ -97,6 +100,59 @@ const SearchPage = () => {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewChunk, setPreviewChunk] = useState<ChunkContent | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  // 处理URL参数中的引用文件
+  useEffect(() => {
+    const type = searchParams.get('type');
+    const fileIdsParam = searchParams.get('fileIds');
+
+    if (type === 'qa' && fileIdsParam) {
+      const fileIds = fileIdsParam.split(',').filter(id => id && id.trim());
+      
+      // 通过接口获取文件信息
+      const loadReferencedFiles = async () => {
+        try {
+          const files: SearchResult[] = [];
+          for (const fileId of fileIds) {
+            if (!fileId || !fileId.trim()) {
+              console.warn('Skipping empty fileId:', fileId);
+              continue;
+            }
+            const response = await apiService.getFileDetail(fileId.trim());
+            if (response.success && response.data) {
+              const fileData = response.data as {
+                id: string;
+                name: string;
+                path: string;
+                type: string;
+                category: string;
+                size: number;
+                added_at: string;
+                tags?: string[];
+              };
+              files.push({
+                file_id: fileData.id,
+                file_name: fileData.name,
+                file_path: fileData.path,
+                file_type: fileData.type,
+                category: fileData.category,
+                size: fileData.size,
+                added_at: fileData.added_at,
+                tags: fileData.tags || []
+              });
+            }
+          }
+          setReferencedFiles(files);
+          setActiveTab('question'); // 切换到问答标签页
+        } catch (error) {
+          console.error('Failed to load referenced files:', error);
+          message.error(t('search.messages.loadReferencedFilesFailed'));
+        }
+      };
+
+      loadReferencedFiles();
+    }
+  }, [searchParams, t]);
 
   const handleSearch = async (value: string) => {
     if (!value.trim()) {
@@ -138,7 +194,16 @@ const SearchPage = () => {
 
     setAsking(true);
     try {
-      const response = await apiService.askQuestion(value);
+      const options: {
+        file_ids?: string[];
+      } = {};
+      
+      // 如果有引用文件，添加到请求中
+      if (referencedFiles.length > 0) {
+        options.file_ids = referencedFiles.map(file => file.file_id);
+      }
+
+      const response = await apiService.askQuestion(value, options);
       if (response.success) {
         const data = response.data as QuestionResponse;
         setQuestionResult(data);
@@ -266,19 +331,42 @@ const SearchPage = () => {
                     </span>
                   ),
                   children: (
-                    <Search
-                      placeholder={t('search.placeholders.qa')}
-                      enterButton={
-                        <Button type="primary" icon={<QuestionCircleOutlined />}>
-                          {t('search.buttons.ask')}
-                        </Button>
-                      }
-                      size="large"
-                      value={questionQuery}
-                      onChange={(e) => setQuestionQuery(e.target.value)}
-                      onSearch={handleAskQuestion}
-                      loading={asking}
-                    />
+                    <div>
+                      {/* 显示引用文件 */}
+                      {referencedFiles.length > 0 && (
+                        <Card
+                          size="small"
+                          style={{ marginBottom: '16px', background: '#f6ffed', border: '1px solid #b7eb8f' }}
+                          title={
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>📄 {t('search.qa.referencedFiles')}</span>
+                              <Tag color="green">{referencedFiles.length}</Tag>
+                            </div>
+                          }
+                        >
+                          {referencedFiles.map(file => (
+                            <div key={file.file_id} style={{ marginBottom: '8px' }}>
+                              <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{file.file_name}</div>
+                              <div style={{ color: '#666', fontSize: '12px' }}>{file.file_path}</div>
+                            </div>
+                          ))}
+                        </Card>
+                      )}
+
+                      <Search
+                        placeholder={t('search.placeholders.qa')}
+                        enterButton={
+                          <Button type="primary" icon={<QuestionCircleOutlined />}>
+                            {t('search.buttons.ask')}
+                          </Button>
+                        }
+                        size="large"
+                        value={questionQuery}
+                        onChange={(e) => setQuestionQuery(e.target.value)}
+                        onSearch={handleAskQuestion}
+                        loading={asking}
+                      />
+                    </div>
                   ),
                 },
               ]}

@@ -48,12 +48,35 @@ interface FileConversionFormats {
   markitdown_available: boolean;
 }
 
-interface FileConversionResult {
-  source_file_path: string;
-  output_file_path: string;
-  output_format: string;
+interface FileDetail {
+  id: string;
+  name: string;
+  path: string;
+  type: string;
+  category: string;
+  summary: string;
+  tags: string[];
   size: number;
-  message: string;
+  chunks_count: number;
+  added_at: string;
+  updated_at: string;
+  metadata: {
+    author?: string;
+    created_date?: string;
+    modified_date?: string;
+  };
+}
+
+interface AskQuestionPayload {
+  question: string;
+  context_limit: number;
+  similarity_threshold: number;
+  temperature: number;
+  max_tokens: number;
+  stream: boolean;
+  file_filters?: {
+    file_ids: string[];
+  };
 }
 
 class ApiService {
@@ -296,6 +319,43 @@ class ApiService {
     return this.request('/files/list', {
       method: 'POST',
       body: JSON.stringify(params || {}),
+    });
+  }
+
+  // 获取文件详情
+  async getFileDetail(fileId: string): Promise<ApiResponse<FileDetail>> {
+    return this.request<FileDetail>(`/files/${fileId}`, {
+      method: 'GET',
+    });
+  }
+
+  // 智能问答
+  async askQuestion(question: string, options?: {
+    context_limit?: number;
+    similarity_threshold?: number;
+    temperature?: number;
+    max_tokens?: number;
+    stream?: boolean;
+    file_ids?: string[];
+  }) {
+    const payload: AskQuestionPayload = {
+      question,
+      context_limit: options?.context_limit || 5,
+      similarity_threshold: options?.similarity_threshold || 0.7,
+      temperature: options?.temperature || 0.7,
+      max_tokens: options?.max_tokens || 1000,
+      stream: options?.stream || false,
+    };
+
+    if (options?.file_ids && options.file_ids.length > 0) {
+      payload.file_filters = {
+        file_ids: options.file_ids
+      };
+    }
+
+    return this.request('/chat/ask', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     });
   }
 }
