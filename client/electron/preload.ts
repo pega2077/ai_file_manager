@@ -5,7 +5,7 @@ import { webUtils } from 'electron'
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on(...args: Parameters<typeof ipcRenderer.on>) {
     const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
+    return ipcRenderer.on(channel, (event, ...listenerArgs) => listener(event, ...listenerArgs))
   },
   off(...args: Parameters<typeof ipcRenderer.off>) {
     const [channel, ...omit] = args
@@ -19,9 +19,6 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     const [channel, ...omit] = args
     return ipcRenderer.invoke(channel, ...omit)
   },
-
-  // You can expose other APTs you need here.
-  // ...
 })
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -36,6 +33,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showMainWindow: () => ipcRenderer.invoke('show-main-window'),
   hideBotWindow: () => ipcRenderer.invoke('hide-bot-window'),
   moveBotWindow: (deltaX: number, deltaY: number) => ipcRenderer.send('move-bot-window', deltaX, deltaY),
+  getPreferredLocale: () => ipcRenderer.invoke('locale:get-preferred'),
+  setPreferredLocale: (locale: string) => ipcRenderer.invoke('locale:set-preferred', locale),
+  getSystemLocale: () => ipcRenderer.invoke('locale:get-system'),
 })
 
 contextBridge.exposeInMainWorld('electronStore', {

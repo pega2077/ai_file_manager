@@ -63,3 +63,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Tag
 Tagged with #ForTheLoveOfCode
+## Internationalization
+
+The app now reads shared translations from the new `locales/` directory. React screens load the dictionaries through the `I18nProvider`, and the Python FastAPI backend can access the same JSON files via `python/i18n.py`. Add new languages by creating another JSON file in `locales/`, keeping the key structure in sync, and restart the desktop application.
+

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout, Steps, Form, Input, Button, Card, Space, message, AutoComplete, Tree, Collapse } from 'antd';
 import { apiService } from '../services/api';
+import { useTranslation } from '../shared/i18n/I18nProvider';
 
 const { Content } = Layout;
 const { Step } = Steps;
@@ -18,22 +19,57 @@ interface TreeNode {
   children: TreeNode[];
 }
 
+const professionOptionKeys = [
+  'softwareEngineer',
+  'lawyer',
+  'teacher',
+  'student',
+  'projectManager',
+  'contentCreator',
+] as const;
+
 const Setup = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
   const [form] = Form.useForm();
   const [directoryStructure, setDirectoryStructure] = useState<DirectoryStructure[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  const buildTree = (directories: DirectoryStructure[]): { treeData: TreeNode[], expandedKeys: string[] } => {
+  const professionOptions = useMemo(
+    () =>
+      professionOptionKeys.map((optionKey) => {
+        const label = t(`setup.options.profession.${optionKey}`);
+        return { value: label, label };
+      }),
+    [t],
+  );
+
+  const steps = useMemo(
+    () => [
+      {
+        title: t('setup.stepOneTitle'),
+        description: t('setup.stepOneDescription'),
+      },
+      {
+        title: t('setup.stepTwoTitle'),
+        description: t('setup.stepTwoDescription'),
+      },
+    ],
+    [t],
+  );
+
+  const buildTree = (directories: DirectoryStructure[]): { treeData: TreeNode[]; expandedKeys: string[] } => {
     const root: TreeNode[] = [];
     const map = new Map<string, TreeNode>();
     const expandedKeys: string[] = [];
-    directories.forEach(dir => {
+
+    directories.forEach((dir) => {
       const parts = dir.path.split('/');
       let currentPath = '';
       let parent: TreeNode[] = root;
+
       parts.forEach((part, index) => {
         currentPath += (currentPath ? '/' : '') + part;
         if (!map.has(currentPath)) {
@@ -41,7 +77,7 @@ const Setup = () => {
           const node: TreeNode = {
             title: isLeaf ? `${part} : ${dir.description}` : part,
             key: currentPath,
-            children: []
+            children: [],
           };
           map.set(currentPath, node);
           parent.push(node);
@@ -50,19 +86,9 @@ const Setup = () => {
         parent = map.get(currentPath)!.children;
       });
     });
+
     return { treeData: root, expandedKeys };
   };
-
-  const steps = [
-    {
-      title: '配置信息',
-      description: '填写职业和用途',
-    },
-    {
-      title: '创建目录',
-      description: '选择文件夹并创建目录结构',
-    },
-  ];
 
   const handleGetDirectoryStructure = async () => {
     try {
@@ -74,17 +100,17 @@ const Setup = () => {
         max_depth: values.max_depth || 2,
         min_directories: values.min_directories || 6,
         max_directories: values.max_directories || 20,
-        temperature: values.temperature || 0.7
+        temperature: values.temperature || 0.7,
       });
 
       if (response.success) {
         setDirectoryStructure((response.data as { directories: DirectoryStructure[] }).directories);
-        message.success('目录结构推荐生成成功');
+        message.success(t('setup.messages.fetchSuccess'));
       } else {
-        message.error(response.message || '获取目录结构失败');
+        message.error(t('setup.messages.fetchError'));
       }
     } catch (error) {
-      message.error('获取目录结构失败');
+      message.error(t('setup.messages.fetchError'));
     } finally {
       setLoading(false);
     }
@@ -105,19 +131,19 @@ const Setup = () => {
         setSelectedFolder(folder);
       }
     } catch (error) {
-      message.error('选择文件夹失败');
+      message.error(t('setup.messages.selectFolderError'));
     }
   };
 
   const handleCreateFolders = async () => {
     if (!selectedFolder) {
-      message.error('请先选择目标文件夹');
+      message.error(t('setup.messages.missingTarget'));
       return;
     }
 
     try {
       setLoading(true);
-      const structure = directoryStructure.map(dir => ({
+      const structure = directoryStructure.map((dir) => ({
         name: dir.path,
         type: 'folder',
       }));
@@ -125,18 +151,18 @@ const Setup = () => {
       const response = await apiService.createFolders(selectedFolder, structure);
 
       if (response.success) {
-        // 更新初始化状态和保存工作目录
         if (window.electronStore) {
           await window.electronStore.set('isInitialized', true);
           await window.electronStore.set('workDirectory', selectedFolder);
         }
-        message.success('目录结构创建成功，初始化完成');
+
+        message.success(t('setup.messages.createSuccess'));
         navigate('/home');
       } else {
-        message.error(response.message || '创建目录结构失败');
+        message.error(t('setup.messages.createError'));
       }
     } catch (error) {
-      message.error('创建目录结构失败');
+      message.error(t('setup.messages.createError'));
     } finally {
       setLoading(false);
     }
@@ -146,75 +172,71 @@ const Setup = () => {
     switch (currentStep) {
       case 0:
         return (
-          <Card title="步骤一：配置信息" style={{ maxWidth: 600, margin: '0 auto' }}>
+          <Card title={t('setup.cards.stepOne')} style={{ maxWidth: 600, margin: '0 auto' }}>
             <Form form={form} layout="vertical">
               <Form.Item
                 name="profession"
-                label="职业"
-                rules={[{ required: true, message: '请输入职业' }]}
+                label={t('setup.form.professionLabel')}
+                rules={[{ required: true, message: t('setup.validation.professionRequired') }]}
               >
                 <AutoComplete
-                  placeholder="选择或输入职业"
-                  options={[
-                    { value: '软件工程师', label: '软件工程师' },
-                    { value: '设计师', label: '设计师' },
-                    { value: '教师', label: '教师' },
-                    { value: '学生', label: '学生' },
-                    { value: '项目经理', label: '项目经理' },
-                    { value: '新媒体', label: '新媒体' },
-                  ]}
+                  placeholder={t('setup.placeholders.profession')}
+                  options={professionOptions}
+                  filterOption={(inputValue, option) =>
+                    option?.value.toLowerCase().includes(inputValue.toLowerCase()) ?? false
+                  }
                 />
               </Form.Item>
 
               <Form.Item
                 name="purpose"
-                label="用途"
-                rules={[{ required: true, message: '请输入用途' }]}
+                label={t('setup.form.purposeLabel')}
+                rules={[{ required: true, message: t('setup.validation.purposeRequired') }]}
               >
-                <TextArea
-                  placeholder="例如：项目管理、个人资料、学习资料等"
-                  rows={3}
-                />
+                <TextArea placeholder={t('setup.placeholders.purpose')} rows={3} />
               </Form.Item>
 
-              <Collapse ghost items={[
-                {
-                  key: 'advanced',
-                  label: '高级选项',
-                  children: (
-                    <>
-                      <Form.Item
-                        name="max_depth"
-                        label="目录层级"
-                        initialValue={2}
-                      >
-                        <Input type="number" min={1} max={5} />
-                      </Form.Item>
-                      <Form.Item
-                        name="min_directories"
-                        label="最少目录数量"
-                        initialValue={6}
-                      >
-                        <Input type="number" min={1} max={50} />
-                      </Form.Item>
-                      <Form.Item
-                        name="max_directories"
-                        label="最多目录数量"
-                        initialValue={20}
-                      >
-                        <Input type="number" min={1} max={50} />
-                      </Form.Item>
-                      <Form.Item
-                        name="temperature"
-                        label="温度"
-                        initialValue={0.7}
-                      >
-                        <Input type="number" step={0.1} min={0} max={2} />
-                      </Form.Item>
-                    </>
-                  )
-                }
-              ]} />
+              <Collapse
+                ghost
+                items={[
+                  {
+                    key: 'advanced',
+                    label: t('setup.optionalSettings'),
+                    children: (
+                      <>
+                        <Form.Item
+                          name="max_depth"
+                          label={t('setup.form.maxDepth')}
+                          initialValue={2}
+                        >
+                          <Input type="number" min={1} max={5} />
+                        </Form.Item>
+                        <Form.Item
+                          name="min_directories"
+                          label={t('setup.form.minDirectories')}
+                          initialValue={6}
+                        >
+                          <Input type="number" min={1} max={50} />
+                        </Form.Item>
+                        <Form.Item
+                          name="max_directories"
+                          label={t('setup.form.maxDirectories')}
+                          initialValue={20}
+                        >
+                          <Input type="number" min={1} max={50} />
+                        </Form.Item>
+                        <Form.Item
+                          name="temperature"
+                          label={t('setup.form.temperature')}
+                          initialValue={0.7}
+                        >
+                          <Input type="number" step={0.1} min={0} max={2} />
+                        </Form.Item>
+                      </>
+                    ),
+                  },
+                ]}
+              />
 
               <Space>
                 <Button
@@ -222,29 +244,26 @@ const Setup = () => {
                   onClick={handleGetDirectoryStructure}
                   loading={loading}
                 >
-                  获取推荐目录结构
+                  {t('setup.actions.fetchRecommendation')}
                 </Button>
               </Space>
             </Form>
 
             {directoryStructure.length > 0 && (
-              <Card title="推荐目录结构" style={{ marginTop: 24 }}>
+              <Card title={t('setup.cards.recommendations')} style={{ marginTop: 24 }}>
                 <Space style={{ marginTop: 2, marginBottom: 16 }}>
                   <Button onClick={handleRegenerate} loading={loading}>
-                    重新生成
+                    {t('setup.actions.regenerate')}
                   </Button>
                   <Button type="primary" onClick={handleContinue}>
-                    继续
+                    {t('setup.actions.continue')}
                   </Button>
                 </Space>
-                
+
                 {(() => {
                   const { treeData, expandedKeys } = buildTree(directoryStructure);
                   return (
-                    <Tree
-                      treeData={treeData}
-                      defaultExpandedKeys={expandedKeys}
-                    />
+                    <Tree treeData={treeData} defaultExpandedKeys={expandedKeys} />
                   );
                 })()}
               </Card>
@@ -254,15 +273,15 @@ const Setup = () => {
 
       case 1:
         return (
-          <Card title="步骤二：创建目录" style={{ maxWidth: 600, margin: '0 auto' }}>
+          <Card title={t('setup.cards.stepTwo')} style={{ maxWidth: 600, margin: '0 auto' }}>
             <Space direction="vertical" style={{ width: '100%' }}>
               <div>
                 <Button onClick={handleSelectFolder}>
-                  选择目标文件夹
+                  {t('setup.actions.selectTarget')}
                 </Button>
                 {selectedFolder && (
                   <div style={{ marginTop: 8 }}>
-                    <strong>已选择：</strong>{selectedFolder}
+                    {t('setup.actions.selectedPath', { path: selectedFolder })}
                   </div>
                 )}
               </div>
@@ -273,16 +292,13 @@ const Setup = () => {
                 disabled={!selectedFolder}
                 block
               >
-                创建目录结构并完成初始化
-              </Button>  
-              <Card title="将要创建的目录结构" size="small">
+                {t('setup.actions.createStructure')}
+              </Button>
+              <Card title={t('setup.cards.pending')} size="small">
                 {(() => {
                   const { treeData, expandedKeys } = buildTree(directoryStructure);
                   return (
-                    <Tree
-                      treeData={treeData}
-                      defaultExpandedKeys={expandedKeys}
-                    />
+                    <Tree treeData={treeData} defaultExpandedKeys={expandedKeys} />
                   );
                 })()}
               </Card>

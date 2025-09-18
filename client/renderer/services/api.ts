@@ -57,14 +57,52 @@ interface FileConversionResult {
 }
 
 class ApiService {
+  private locale = 'en';
+
+  setLocale(locale: string) {
+    this.locale = locale;
+  }
+
+  private mergeHeaders(headers?: HeadersInit): HeadersInit {
+    const baseHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept-Language': this.locale,
+    };
+
+    if (!headers) {
+      return baseHeaders;
+    }
+
+    if (headers instanceof Headers) {
+      const result = new Headers(headers);
+      result.set('Accept-Language', this.locale);
+      if (!result.has('Content-Type')) {
+        result.set('Content-Type', 'application/json');
+      }
+      return result;
+    }
+
+    if (Array.isArray(headers)) {
+      const result = new Headers(headers);
+      result.set('Accept-Language', this.locale);
+      if (!result.has('Content-Type')) {
+        result.set('Content-Type', 'application/json');
+      }
+      return result;
+    }
+
+    return {
+      ...baseHeaders,
+      ...(headers as Record<string, string>),
+    };
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const url = `${API_BASE_URL}${endpoint}`;
+    const mergedHeaders = this.mergeHeaders(options.headers);
     const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
       ...options,
+      headers: mergedHeaders,
     });
 
     if (!response.ok) {

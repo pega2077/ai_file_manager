@@ -1,45 +1,86 @@
-import { Layout, Card, Typography, Switch, Input, Button, message, Modal } from 'antd';
-import { useState, useEffect } from 'react';
+﻿
+import { Layout, Card, Typography, Switch, Input, Button, message, Modal, Select } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService, updateApiBaseUrl } from '../services/api';
+import { useTranslation } from '../shared/i18n/I18nProvider';
+import { defaultLocale, normalizeLocale, type SupportedLocale } from '../shared/i18n';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
+interface SettingsState {
+  theme: 'light' | 'dark';
+  language: SupportedLocale;
+  autoSave: boolean;
+  showHiddenFiles: boolean;
+  enablePreview: boolean;
+  autoSaveRAG: boolean;
+  autoClassifyWithoutConfirmation: boolean;
+  workDirectory: string;
+}
+
+const DEFAULT_SETTINGS: SettingsState = {
+  theme: 'light',
+  language: defaultLocale,
+  autoSave: true,
+  showHiddenFiles: false,
+  enablePreview: true,
+  autoSaveRAG: true,
+  autoClassifyWithoutConfirmation: false,
+  workDirectory: '',
+};
+
 const Settings = () => {
   const navigate = useNavigate();
-  const [settings, setSettings] = useState({
-    theme: 'light',
-    language: 'zh-CN',
-    autoSave: true,
-    showHiddenFiles: false,
-    enablePreview: true, // 新增预览开关
-    autoSaveRAG: true, // 新增自动保存RAG设置开关
-    autoClassifyWithoutConfirmation: false, // 新增自动分类开关
-    workDirectory: '',
-  });
+  const { t, locale, setLocale, availableLocales, localeLabels } = useTranslation();
+  console.log(t('settings.actions.saveApiBaseUrl'));
+  const [settings, setSettings] = useState<SettingsState>(() => ({
+    ...DEFAULT_SETTINGS,
+    language: locale,
+  }));
   const [apiBaseUrl, setApiBaseUrl] = useState('http://localhost:8000');
 
+  const languageOptions = useMemo(
+    () =>
+      availableLocales.map((localeKey) => ({
+        value: localeKey,
+        label: localeLabels[localeKey],
+      })),
+    [availableLocales, localeLabels],
+  );
+
   useEffect(() => {
-    // 从store加载设置
     const loadSettings = async () => {
+      let nextState: SettingsState = { ...DEFAULT_SETTINGS, language: locale };
+
       if (window.electronStore) {
         try {
-          const savedSettings = await window.electronStore.get('settings') as Partial<typeof settings>;
-          const workDirectory = await window.electronStore.get('workDirectory') as string;
+          const savedSettings = (await window.electronStore.get('settings')) as Partial<SettingsState> | undefined;
+          const workDirectory = (await window.electronStore.get('workDirectory')) as string | undefined;
 
-          setSettings(prev => ({
-            ...prev,
-            ...savedSettings,
-            workDirectory: workDirectory || '',
-          }));
+          if (savedSettings) {
+            const normalizedLanguage = normalizeLocale(savedSettings.language ?? defaultLocale);
+            nextState = {
+              ...nextState,
+              ...savedSettings,
+              language: normalizedLanguage,
+            };
+
+            if (normalizedLanguage !== locale) {
+              setLocale(normalizedLanguage);
+            }
+          }
+
+          if (typeof workDirectory === 'string') {
+            nextState.workDirectory = workDirectory;
+          }
         } catch (error) {
           console.error('Failed to load settings:', error);
         }
       }
 
-      // 加载 API 地址
       if (window.electronAPI) {
         try {
           const url = await window.electronAPI.getApiBaseUrl();
@@ -48,26 +89,39 @@ const Settings = () => {
           console.error('Failed to load API base URL:', error);
         }
       }
+
+      setSettings(nextState);
     };
 
-    loadSettings();
-  }, []);
+    void loadSettings();
+  }, [locale, setLocale]);
 
-  const handleSettingChange = (key: string, value: string | boolean) => {
-    setSettings(prev => ({
+  useEffect(() => {
+    setSettings((prev) => (prev.language === locale ? prev : { ...prev, language: locale }));
+  }, [locale]);
+
+  const handleSettingChange = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => {
+    setSettings((prev) => ({
       ...prev,
       [key]: value,
     }));
+  };
+
+  const handleLocaleChange = (value: SupportedLocale) => {
+    if (value !== locale) {
+      setLocale(value);
+    }
+    handleSettingChange('language', value);
   };
 
   const handleSaveSettings = async () => {
     try {
       if (window.electronStore) {
         await window.electronStore.set('settings', settings);
-        message.success('设置已保存');
+        message.success(t('settings.messages.saveSuccess'));
       }
     } catch (error) {
-      message.error('保存设置失败');
+      message.error(t('settings.messages.saveError'));
       console.error(error);
     }
   };
@@ -77,50 +131,51 @@ const Settings = () => {
       if (window.electronAPI) {
         await window.electronAPI.setApiBaseUrl(apiBaseUrl);
         updateApiBaseUrl(apiBaseUrl);
-        message.success('API 地址已保存');
+        message.success(t('settings.messages.apiSuccess'));
       }
     } catch (error) {
-      message.error('保存 API 地址失败');
+      message.error(t('settings.messages.apiError'));
       console.error(error);
     }
   };
 
   const handleResetSettings = () => {
-    setSettings({
-      theme: 'light',
-      language: 'zh-CN',
-      autoSave: true,
-      showHiddenFiles: false,
-      enablePreview: true,
-      autoSaveRAG: true,
-      autoClassifyWithoutConfirmation: false,
-      workDirectory: '',
-    });
-    message.success('设置已重置');
+    const nextState: SettingsState = {
+      ...DEFAULT_SETTINGS,
+      language: defaultLocale,
+      workDirectory: settings.workDirectory,
+    };
+    setSettings(nextState);
+    setLocale(defaultLocale);
+    message.success(t('settings.messages.resetSuccess'));
   };
 
   const handleClearAllData = () => {
     Modal.confirm({
-      title: '确认清空所有数据',
-      content: '此操作将永久删除所有文件记录、向量数据和对话历史。此操作不可撤销，确定要继续吗？',
-      okText: '确定清空',
-      cancelText: '取消',
+      title: t('settings.messages.clearConfirmTitle'),
+      content: t('settings.messages.clearConfirmContent'),
+      okText: t('settings.messages.clearConfirmOk'),
+      cancelText: t('settings.messages.clearConfirmCancel'),
       okType: 'danger',
       onOk: async () => {
         try {
           const response = await apiService.clearAllData();
           if (response.success) {
-            // 清空 electronStore 中的初始化状态和工作目录
             if (window.electronStore) {
               await window.electronStore.set('isInitialized', false);
               await window.electronStore.set('workDirectory', '');
             }
-            message.success('所有数据已清空');
+            setSettings((prev) => ({ ...prev, workDirectory: '' }));
+            message.success(t('settings.messages.clearSuccess'));
           } else {
-            message.error('清空数据失败：' + response.message);
+            message.error(
+              t('settings.messages.clearError', {
+                reason: response.message ?? t('settings.messages.unknownError'),
+              }),
+            );
           }
         } catch (error) {
-          message.error('清空数据时发生错误');
+          message.error(t('settings.messages.clearException'));
           console.error('Clear data error:', error);
         }
       },
@@ -131,15 +186,15 @@ const Settings = () => {
     <Layout style={{ minHeight: '100vh' }}>
       <Content style={{ padding: '24px', background: '#fff' }}>
         <div style={{ maxWidth: 800, margin: '0 auto' }}>
-          <Title level={2}>设置</Title>
+          <Title level={2}>{t('settings.pageTitle')}</Title>
 
-          <Card title="基本设置" style={{ marginBottom: 24 }}>
+          <Card title={t('settings.sections.general')} style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <Text strong>主题模式：</Text>
+                <Text strong>{t('settings.labels.theme')}</Text>
                 <Switch
-                  checkedChildren="深色"
-                  unCheckedChildren="浅色"
+                  checkedChildren={t('settings.themeOptions.dark')}
+                  unCheckedChildren={t('settings.themeOptions.light')}
                   checked={settings.theme === 'dark'}
                   onChange={(checked) => handleSettingChange('theme', checked ? 'dark' : 'light')}
                   style={{ marginLeft: 16 }}
@@ -147,19 +202,20 @@ const Settings = () => {
               </div>
 
               <div>
-                <Text strong>语言：</Text>
-                <Switch
-                  checkedChildren="English"
-                  unCheckedChildren="中文"
-                  checked={settings.language === 'en-US'}
-                  onChange={(checked) => handleSettingChange('language', checked ? 'en-US' : 'zh-CN')}
-                  style={{ marginLeft: 16 }}
+                <Text strong>{t('settings.labels.language')}</Text>
+                <Select
+                  style={{ marginLeft: 16, minWidth: 160 }}
+                  value={settings.language}
+                  options={languageOptions}
+                  onChange={(value) => handleLocaleChange(value as SupportedLocale)}
                 />
               </div>
 
               <div>
-                <Text strong>自动保存：</Text>
+                <Text strong>{t('settings.labels.autoSave')}</Text>
                 <Switch
+                  checkedChildren={t('settings.common.enabled')}
+                  unCheckedChildren={t('settings.common.disabled')}
                   checked={settings.autoSave}
                   onChange={(checked) => handleSettingChange('autoSave', checked)}
                   style={{ marginLeft: 16 }}
@@ -167,8 +223,10 @@ const Settings = () => {
               </div>
 
               <div>
-                <Text strong>显示隐藏文件：</Text>
+                <Text strong>{t('settings.labels.showHiddenFiles')}</Text>
                 <Switch
+                  checkedChildren={t('settings.common.enabled')}
+                  unCheckedChildren={t('settings.common.disabled')}
                   checked={settings.showHiddenFiles}
                   onChange={(checked) => handleSettingChange('showHiddenFiles', checked)}
                   style={{ marginLeft: 16 }}
@@ -176,89 +234,89 @@ const Settings = () => {
               </div>
 
               <div>
-                <Text strong>启用文件预览：</Text>
+                <Text strong>{t('settings.labels.enablePreview')}</Text>
                 <Switch
+                  checkedChildren={t('settings.common.enabled')}
+                  unCheckedChildren={t('settings.common.disabled')}
                   checked={settings.enablePreview}
                   onChange={(checked) => handleSettingChange('enablePreview', checked)}
                   style={{ marginLeft: 16 }}
                 />
                 <Text type="secondary" style={{ marginLeft: 8 }}>
-                  双击文件时显示预览而不是直接打开
+                  {t('settings.descriptions.enablePreview')}
                 </Text>
               </div>
 
               <div>
-                <Text strong>自动保存RAG设置：</Text>
+                <Text strong>{t('settings.labels.autoSaveRAG')}</Text>
                 <Switch
+                  checkedChildren={t('settings.common.enabled')}
+                  unCheckedChildren={t('settings.common.disabled')}
                   checked={settings.autoSaveRAG}
                   onChange={(checked) => handleSettingChange('autoSaveRAG', checked)}
                   style={{ marginLeft: 16 }}
                 />
                 <Text type="secondary" style={{ marginLeft: 8 }}>
-                  启用后，RAG相关设置将自动保存
+                  {t('settings.descriptions.autoSaveRAG')}
                 </Text>
               </div>
 
               <div>
-                <Text strong>自动分类（无需确认）：</Text>
+                <Text strong>{t('settings.labels.autoClassify')}</Text>
                 <Switch
+                  checkedChildren={t('settings.common.enabled')}
+                  unCheckedChildren={t('settings.common.disabled')}
                   checked={settings.autoClassifyWithoutConfirmation}
                   onChange={(checked) => handleSettingChange('autoClassifyWithoutConfirmation', checked)}
                   style={{ marginLeft: 16 }}
                 />
                 <Text type="secondary" style={{ marginLeft: 8 }}>
-                  启用后，文件将自动分类而不显示确认对话框
+                  {t('settings.descriptions.autoClassify')}
                 </Text>
               </div>
             </div>
           </Card>
 
-          <Card title="工作目录" style={{ marginBottom: 24 }}>
+          <Card title={t('settings.sections.workDirectory')} style={{ marginBottom: 24 }}>
             <div>
-              <Text strong>当前工作目录：</Text>
-              <TextArea
-                value={settings.workDirectory}
-                readOnly
-                rows={2}
-                style={{ marginTop: 8 }}
-              />
+              <Text strong>{t('settings.labels.workDirectory')}</Text>
+              <TextArea value={settings.workDirectory} readOnly rows={2} style={{ marginTop: 8 }} />
               <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-                工作目录在初始化时设置，如需修改请重新运行初始化流程。
+                {t('settings.descriptions.workDirectory')}
               </Text>
             </div>
           </Card>
 
-          <Card title="API 配置" style={{ marginBottom: 24 }}>
+          <Card title={t('settings.sections.api')}
+                style={{ marginBottom: 24 }}>
             <div>
-              <Text strong>API 基础地址：</Text>
+              <Text strong>{t('settings.labels.apiBaseUrl')}</Text>
               <Input
                 value={apiBaseUrl}
-                onChange={(e) => setApiBaseUrl(e.target.value)}
-                placeholder="http://localhost:8000"
+                onChange={(event) => setApiBaseUrl(event.target.value)}
+                placeholder={t('settings.placeholders.apiBaseUrl')}
                 style={{ marginTop: 8, marginBottom: 8 }}
               />
               <Text type="secondary" style={{ display: 'block' }}>
-                Python 后端服务的地址，用于文件导入和搜索功能。
+                {t('settings.descriptions.apiBaseUrl')}
               </Text>
               <Button type="primary" onClick={handleSaveApiBaseUrl} style={{ marginTop: 8 }}>
-                保存 API 地址
+                {t('settings.actions.saveApiBaseUrl')}
               </Button>
             </div>
           </Card>
 
-          <Card title="操作">
-            <div style={{ display: 'flex', gap: '16px' }}>
+          <Card title={t('settings.sections.actions')}>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
               <Button type="primary" onClick={handleSaveSettings}>
-                保存设置
+                {t('settings.actions.save')}
               </Button>
-              <Button onClick={handleResetSettings}>
-                重置为默认
-              </Button>
+              <Button onClick={handleResetSettings}>{t('settings.actions.reset')}</Button>
               <Button danger onClick={handleClearAllData}>
-                清空所有数据
+                {t('settings.actions.clear')}
               </Button>
               <Button onClick={() => navigate('/files')}>
-                返回主页
+                {t('settings.actions.back')}
               </Button>
             </div>
           </Card>
@@ -269,3 +327,4 @@ const Settings = () => {
 };
 
 export default Settings;
+

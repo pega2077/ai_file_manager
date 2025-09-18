@@ -8,12 +8,15 @@ declare global {
       openFolder: (filePath: string) => Promise<boolean>
       selectFile: () => Promise<string | null>
       copyToClipboard: (text: string) => Promise<boolean>
-      importFile: () => Promise<unknown>
+      importFile: () => Promise<{ success: boolean; message: string }>
       getApiBaseUrl: () => Promise<string>
       setApiBaseUrl: (url: string) => Promise<boolean>
       showMainWindow: () => Promise<boolean>
       hideBotWindow: () => Promise<boolean>
       moveBotWindow: (deltaX: number, deltaY: number) => void
+      getPreferredLocale: () => Promise<string>
+      setPreferredLocale: (locale: string) => Promise<string>
+      getSystemLocale: () => Promise<string>
     }
     electronStore: {
       get: (key: string) => Promise<unknown>

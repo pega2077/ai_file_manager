@@ -21,6 +21,24 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const store = new Store();
 
+const SUPPORTED_LOCALES = new Set<string>(["en", "zh"]);
+
+const normalizeLocaleValue = (value: string | null | undefined): string => {
+  if (!value) {
+    return "en";
+  }
+
+  const lowerCase = value.toLowerCase();
+  if (SUPPORTED_LOCALES.has(lowerCase)) {
+    return lowerCase;
+  }
+
+  const base = lowerCase.split("-")[0];
+  return SUPPORTED_LOCALES.has(base) ? base : "en";
+};
+
+
+
 const syncWorkDirectoryConfig = async (): Promise<void> => {
   const workDirectory = store.get("workDirectory") as string | undefined;
 
@@ -92,6 +110,25 @@ function setupIpcHandlers() {
 
   ipcMain.handle("store:has", (_event, key) => {
     return store.has(key);
+  });
+
+  ipcMain.handle("locale:get-preferred", () => {
+    const storedLocale = store.get("preferredLocale") as string | undefined;
+    if (storedLocale) {
+      return normalizeLocaleValue(storedLocale);
+    }
+
+    return normalizeLocaleValue(app.getLocale());
+  });
+
+  ipcMain.handle("locale:set-preferred", (_event, locale: string) => {
+    const normalized = normalizeLocaleValue(locale);
+    store.set("preferredLocale", normalized);
+    return normalized;
+  });
+
+  ipcMain.handle("locale:get-system", () => {
+    return normalizeLocaleValue(app.getLocale());
   });
 
   // IPC handler for folder selection
@@ -518,3 +555,4 @@ app.whenReady().then(() => {
   createBotWindow();
   createTray();
 });
+

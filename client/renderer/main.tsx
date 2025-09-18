@@ -3,11 +3,14 @@ import ReactDOM from 'react-dom/client'
 import { StyleProvider } from '@ant-design/cssinjs'
 import App from './App.tsx'
 import './index.css'
+import { I18nProvider } from './shared/i18n/I18nProvider'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <StyleProvider hashPriority="high">
-      <App />
+      <I18nProvider>
+        <App />
+      </I18nProvider>
     </StyleProvider>
   </React.StrictMode>,
 )

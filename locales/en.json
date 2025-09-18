@@ -1,0 +1,154 @@
+{
+  "common": {
+    "appTitle": "AI File Manager",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "select": "Select",
+    "loading": "Loading...",
+    "retry": "Try Again",
+    "success": "Success",
+    "error": "Error",
+    "optional": "Optional"
+  },
+  "setup": {
+    "stepOneTitle": "Profile Details",
+    "stepOneDescription": "Describe your profession and purpose.",
+    "stepTwoTitle": "Directory Selection",
+    "stepTwoDescription": "Choose a folder and confirm the recommended structure.",
+    "generalSettings": "General Settings",
+    "optionalSettings": "Advanced Options",
+    "form": {
+      "professionLabel": "Profession",
+      "purposeLabel": "Purpose",
+      "keywordsLabel": "Keywords",
+      "examplesLabel": "Examples",
+      "notesLabel": "Additional Notes",
+      "maxDepth": "Directory Depth",
+      "minDirectories": "Minimum Directories",
+      "maxDirectories": "Maximum Directories",
+      "temperature": "Temperature"
+    },
+    "actions": {
+      "fetchRecommendation": "Fetch Recommended Structure",
+      "regenerate": "Regenerate",
+      "continue": "Continue",
+      "selectTarget": "Select Target Folder",
+      "createStructure": "Create Structure And Complete Setup",
+      "pendingStructure": "Pending Directory Structure",
+      "selectedPath": "Selected: {path}"
+    },
+    "messages": {
+      "fetchSuccess": "Directory recommendation generated successfully",
+      "fetchError": "Failed to fetch the directory structure",
+      "selectFolderError": "Failed to select folder",
+      "missingTarget": "Please choose a destination folder",
+      "createSuccess": "Directory structure created successfully",
+      "createError": "Failed to generate directory structure"
+    },
+    "cards": {
+      "stepOne": "Step 1 - Describe Your Needs",
+      "recommendations": "Recommended Directory Structure",
+      "stepTwo": "Step 2 - Confirm Target Folder",
+      "pending": "Structure To Be Created"
+    },
+    "placeholders": {
+      "profession": "Select or enter your profession",
+      "purpose": "e.g. project documentation, research notes"
+    },
+    "validation": {
+      "professionRequired": "Please enter your profession",
+      "purposeRequired": "Please describe the purpose"
+    },
+    "options": {
+      "profession": {
+        "softwareEngineer": "Software Engineer",
+        "lawyer": "Lawyer",
+        "teacher": "Teacher",
+        "student": "Student",
+        "projectManager": "Project Manager",
+        "contentCreator": "Content Creator"
+      }
+    }
+  },
+  "backend": {
+    "files": {
+      "create": {
+        "success": "Folder structure created successfully",
+        "invalidTarget": "Target folder path is required",
+        "emptyStructure": "Folder structure cannot be empty",
+        "failure": "Failed to create folder structure"
+      }
+    },
+    "common": {
+      "llmUnavailable": "LLM service is unavailable, please try again later",
+      "llmResponseError": "LLM response error: {reason}"
+    },
+    "chat": {
+      "directoryFailure": "Failed to generate directory structure"
+    }
+  },
+  "settings": {
+    "pageTitle": "Settings",
+    "sections": {
+      "general": "General",
+      "workDirectory": "Workspace",
+      "api": "API Configuration",
+      "actions": "Actions"
+    },
+    "labels": {
+      "theme": "Theme",
+      "language": "Language",
+      "autoSave": "Auto-save",
+      "showHiddenFiles": "Show hidden files",
+      "enablePreview": "File preview",
+      "autoSaveRAG": "Auto-save to RAG",
+      "autoClassify": "Auto classify without confirmation",
+      "workDirectory": "Current workspace",
+      "apiBaseUrl": "API base URL"
+    },
+    "descriptions": {
+      "enablePreview": "Double-click files to preview them before opening the default app.",
+      "autoSaveRAG": "Automatically add imported files to the RAG knowledge base.",
+      "autoClassify": "Skip confirmation dialogs when saving files to recommended directories.",
+      "workDirectory": "The workspace folder is defined during setup. Re-run the setup wizard to change it.",
+      "apiBaseUrl": "Base URL of the Python backend, including protocol (e.g. http://localhost:8000)."
+    },
+    "placeholders": {
+      "apiBaseUrl": "http://localhost:8000"
+    },
+    "themeOptions": {
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "common": {
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "actions": {
+      "save": "Save settings",
+      "reset": "Reset to defaults",
+      "clear": "Clear all data",
+      "back": "Back to files",
+      "saveApiBaseUrl": "Save API URL"
+    },
+    "messages": {
+      "saveSuccess": "Settings saved",
+      "saveError": "Failed to save settings",
+      "apiSuccess": "API base URL saved",
+      "apiError": "Failed to update API base URL",
+      "resetSuccess": "Settings reset",
+      "clearConfirmTitle": "Clear all data?",
+      "clearConfirmContent": "This will delete imported files, database records, and chat history. This action cannot be undone.",
+      "clearConfirmOk": "Clear now",
+      "clearConfirmCancel": "Cancel",
+      "clearSuccess": "All data cleared",
+      "clearError": "Failed to clear data: {reason}",
+      "clearException": "An unexpected error occurred while clearing data.",
+      "unknownError": "Unknown error"
+    }
+  }
+}

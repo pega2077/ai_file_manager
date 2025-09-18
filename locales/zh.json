@@ -1,0 +1,154 @@
+{
+  "common": {
+    "appTitle": "AI 文件管家",
+    "confirm": "确认",
+    "cancel": "取消",
+    "save": "保存",
+    "close": "关闭",
+    "back": "返回",
+    "next": "下一步",
+    "select": "选择",
+    "loading": "加载中...",
+    "retry": "重试",
+    "success": "操作成功",
+    "error": "发生错误",
+    "optional": "选填"
+  },
+  "setup": {
+    "stepOneTitle": "基础信息",
+    "stepOneDescription": "描述你的职业与目标用途。",
+    "stepTwoTitle": "目录配置",
+    "stepTwoDescription": "选择目标文件夹并确认推荐结构。",
+    "generalSettings": "基础设置",
+    "optionalSettings": "高级选项",
+    "form": {
+      "professionLabel": "职业",
+      "purposeLabel": "用途",
+      "keywordsLabel": "关键词",
+      "examplesLabel": "示例",
+      "notesLabel": "补充说明",
+      "maxDepth": "目录层级",
+      "minDirectories": "最少目录数量",
+      "maxDirectories": "最多目录数量",
+      "temperature": "温度"
+    },
+    "actions": {
+      "fetchRecommendation": "获取推荐目录结构",
+      "regenerate": "重新生成",
+      "continue": "继续",
+      "selectTarget": "选择目标文件夹",
+      "createStructure": "创建目录结构并完成初始化",
+      "pendingStructure": "待创建目录结构",
+      "selectedPath": "已选择：{path}"
+    },
+    "messages": {
+      "fetchSuccess": "已生成目录结构推荐",
+      "fetchError": "获取目录结构失败",
+      "selectFolderError": "选择文件夹失败",
+      "missingTarget": "请先选择目标文件夹",
+      "createSuccess": "目录结构已生成并初始化完成",
+      "createError": "生成目录结构时出现错误"
+    },
+    "cards": {
+      "stepOne": "步骤 1 - 描述您的需求",
+      "recommendations": "推荐目录结构",
+      "stepTwo": "步骤 2 - 确认目标文件夹",
+      "pending": "待创建结构"
+    },
+    "placeholders": {
+      "profession": "选择或输入您的职业",
+      "purpose": "例如：项目文档、研究笔记"
+    },
+    "validation": {
+      "professionRequired": "请输入您的职业",
+      "purposeRequired": "请描述用途"
+    },
+    "options": {
+      "profession": {
+        "softwareEngineer": "软件工程师",
+        "lawyer": "律师",
+        "teacher": "教师",
+        "student": "学生",
+        "projectManager": "项目经理",
+        "contentCreator": "内容创作者"
+      }
+    }
+  },
+  "backend": {
+    "files": {
+      "create": {
+        "success": "文件夹结构创建成功",
+        "invalidTarget": "目标文件夹路径是必需的",
+        "emptyStructure": "文件夹结构不能为空",
+        "failure": "创建文件夹结构失败"
+      }
+    },
+    "common": {
+      "llmUnavailable": "LLM 服务不可用，请稍后重试",
+      "llmResponseError": "LLM 响应错误：{reason}"
+    },
+    "chat": {
+      "directoryFailure": "生成目录结构失败"
+    }
+  },
+  "settings": {
+    "pageTitle": "设置",
+    "sections": {
+      "general": "通用",
+      "workDirectory": "工作区",
+      "api": "API 配置",
+      "actions": "操作"
+    },
+    "labels": {
+      "theme": "主题",
+      "language": "语言",
+      "autoSave": "自动保存",
+      "showHiddenFiles": "显示隐藏文件",
+      "enablePreview": "文件预览",
+      "autoSaveRAG": "自动保存到 RAG",
+      "autoClassify": "自动分类无需确认",
+      "workDirectory": "当前工作区",
+      "apiBaseUrl": "API 基础 URL"
+    },
+    "descriptions": {
+      "enablePreview": "双击文件以在打开默认应用前预览。",
+      "autoSaveRAG": "自动将导入的文件添加到 RAG 知识库。",
+      "autoClassify": "保存文件到推荐目录时跳过确认对话框。",
+      "workDirectory": "工作区文件夹在设置期间定义。重新运行设置向导以更改。",
+      "apiBaseUrl": "Python 后端的基准 URL，包括协议（例如 http://localhost:8000）。"
+    },
+    "placeholders": {
+      "apiBaseUrl": "http://localhost:8000"
+    },
+    "themeOptions": {
+      "light": "浅色",
+      "dark": "深色"
+    },
+    "common": {
+      "enabled": "启用",
+      "disabled": "禁用"
+    },
+    "actions": {
+      "save": "保存设置",
+      "reset": "重置为默认",
+      "clear": "清除所有数据",
+      "back": "返回文件",
+      "saveApiBaseUrl": "保存 API URL"
+    },
+    "messages": {
+      "saveSuccess": "设置已保存",
+      "saveError": "保存设置失败",
+      "apiSuccess": "API 基础 URL 已保存",
+      "apiError": "更新 API 基础 URL 失败",
+      "resetSuccess": "设置已重置",
+      "clearConfirmTitle": "清除所有数据？",
+      "clearConfirmContent": "这将删除导入的文件、数据库记录和聊天历史。此操作无法撤销。",
+      "clearConfirmOk": "立即清除",
+      "clearConfirmCancel": "取消",
+      "clearSuccess": "所有数据已清除",
+      "clearError": "清除数据失败：{reason}",
+      "clearException": "清除数据时发生意外错误。",
+      "unknownError": "未知错误"
+    }
+  }
+}

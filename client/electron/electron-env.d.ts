@@ -33,6 +33,12 @@ interface Window {
     importFile: () => Promise<{ success: boolean; message: string }>
     getApiBaseUrl: () => Promise<string>
     setApiBaseUrl: (url: string) => Promise<boolean>
+    showMainWindow: () => Promise<boolean>
+    hideBotWindow: () => Promise<boolean>
+    moveBotWindow: (deltaX: number, deltaY: number) => void
+    getPreferredLocale: () => Promise<string>
+    setPreferredLocale: (locale: string) => Promise<string>
+    getSystemLocale: () => Promise<string>
   }
   electronStore: {
     get: (key: string) => Promise<unknown>
@@ -41,3 +47,4 @@ interface Window {
     has: (key: string) => Promise<boolean>
   }
 }
+

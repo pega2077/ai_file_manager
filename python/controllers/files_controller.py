@@ -13,12 +13,13 @@ import mimetypes
 import asyncio
 import json
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks, Header
 from pydantic import BaseModel, Field
 from loguru import logger
 
 # 导入公共工具
 from commons import create_response, create_error_response, create_success_response
+from i18n import detect_locale, t
 # 导入配置
 from config import settings
 # 导入文件转换器
@@ -853,49 +854,49 @@ async def update_file(request: FileUpdateRequest):
         500: {"description": "Server error during folder creation"}
     }
 )
-async def create_folder_structure(request: CreateFolderStructureRequest):
+async def create_folder_structure(request: CreateFolderStructureRequest, accept_language: str | None = Header(None)):
     """Create folder structure in target directory"""
+    locale = detect_locale(accept_language)
     try:
-        # Validate target folder path
         if not request.target_folder or not request.target_folder.strip():
             return create_error_response(
-                message="Target folder path is required",
+                message=t('backend.files.create.invalidTarget', locale=locale),
                 error_code="INVALID_REQUEST"
             )
-        
-        # Validate structure
+
         if not request.structure:
             return create_error_response(
-                message="Folder structure cannot be empty",
+                message=t('backend.files.create.emptyStructure', locale=locale),
                 error_code="INVALID_REQUEST"
             )
-        
-        # Create folder structure
-        success, message = file_manager.create_folder_structure(
-            request.target_folder, 
+
+        success, details_message = file_manager.create_folder_structure(
+            request.target_folder,
             [item.model_dump() for item in request.structure]
         )
-        
+
         if success:
             return create_success_response(
-                message=message,
+                message=t('backend.files.create.success', locale=locale),
                 data={
                     "target_folder": request.target_folder,
-                    "folders_created": len(request.structure)
+                    "folders_created": len(request.structure),
+                    "details": details_message
                 }
             )
-        else:
-            return create_error_response(
-                message=f"Failed to create folder structure: {message}",
-                error_code="INTERNAL_ERROR"
-            )
-            
-    except Exception as e:
-        logger.error(f"Error creating folder structure: {e}")
+
         return create_error_response(
-            message="Failed to create folder structure",
+            message=t('backend.files.create.failure', locale=locale),
             error_code="INTERNAL_ERROR",
-            error_details=str(e)
+            error_details=details_message
+        )
+
+    except Exception as error:
+        logger.error(f"Error creating folder structure: {error}")
+        return create_error_response(
+            message=t('backend.files.create.failure', locale=locale),
+            error_code="INTERNAL_ERROR",
+            error_details=str(error)
         )
 
 @files_router.post("/list-directory",
@@ -1552,3 +1553,4 @@ async def get_chunk_content(chunk_id: str):
             error_code="INTERNAL_ERROR",
             error_details=str(e)
         )
+
