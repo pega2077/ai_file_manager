@@ -108,7 +108,7 @@ const SearchPage = () => {
 
     if (type === 'qa' && fileIdsParam) {
       const fileIds = fileIdsParam.split(',').filter(id => id && id.trim());
-      
+      console.log('Referenced fileIds from URL:', fileIds);
       // 通过接口获取文件信息
       const loadReferencedFiles = async () => {
         try {
@@ -121,7 +121,8 @@ const SearchPage = () => {
             const response = await apiService.getFileDetail(fileId.trim());
             if (response.success && response.data) {
               const fileData = response.data as {
-                id: string;
+                id?: string;
+                file_id?: string;
                 name: string;
                 path: string;
                 type: string;
@@ -130,8 +131,15 @@ const SearchPage = () => {
                 added_at: string;
                 tags?: string[];
               };
+              
+              const actualFileId = fileData.file_id || fileData.id;
+              if (!actualFileId) {
+                console.warn('File data missing id or file_id:', fileData);
+                continue;
+              }
+              
               files.push({
-                file_id: fileData.id,
+                file_id: actualFileId,
                 file_name: fileData.name,
                 file_path: fileData.path,
                 file_type: fileData.type,
@@ -200,9 +208,16 @@ const SearchPage = () => {
       
       // 如果有引用文件，添加到请求中
       if (referencedFiles.length > 0) {
-        options.file_ids = referencedFiles.map(file => file.file_id);
+        const validFileIds = referencedFiles
+          .map(file => file.file_id)
+          .filter(id => id && typeof id === 'string' && id.trim());
+        
+        if (validFileIds.length > 0) {
+          options.file_ids = validFileIds;
+        }
       }
-
+      
+      console.log('Asking question with options:', options);
       const response = await apiService.askQuestion(value, options);
       if (response.success) {
         const data = response.data as QuestionResponse;

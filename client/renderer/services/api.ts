@@ -338,6 +338,7 @@ class ApiService {
     stream?: boolean;
     file_ids?: string[];
   }) {
+    console.log('askQuestion:', options);
     const payload: AskQuestionPayload = {
       question,
       context_limit: options?.context_limit || 5,
