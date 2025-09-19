@@ -7,6 +7,7 @@ import Sidebar from '../components/Sidebar';
 import FilePreview from "../components/FilePreview";
 import { apiService } from '../services/api';
 import { DirectoryItem, DirectoryStructureResponse, RecommendDirectoryResponse, Settings, TreeNode, ImportedFileItem } from '../shared/types';
+import { isTextFile } from '../shared/utils';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 
 const { Content } = Layout;
@@ -499,14 +500,6 @@ const FilesPage: React.FC = () => {
   const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // 文本文件扩展名列表
-  const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.markdown', '.rst', '.json', '.xml', '.yaml', '.yml']);
-
-  // 检查是否是文本文件
-  const isTextFile = (filePath: string): boolean => {
-    const extension = filePath.toLowerCase().substring(filePath.lastIndexOf('.'));
-    return TEXT_EXTENSIONS.has(extension);
-  };
   useEffect(() => {
     // 从store读取工作目录和设置
     const loadInitialData = async () => {

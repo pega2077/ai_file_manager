@@ -4,6 +4,7 @@ import botStaticImage from '../assets/mona-loading-default-static.png';
 import { message, Modal, Select, TreeSelect, Button, Menu } from 'antd';
 import { apiService } from '../services/api';
 import { DirectoryItem, DirectoryStructureResponse, RecommendDirectoryResponse, Settings, TreeNode } from '../shared/types';
+import { isTextFile } from '../shared/utils';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 
 const Bot: React.FC = () => {
@@ -105,12 +106,12 @@ const Bot: React.FC = () => {
   };
 
   // 处理RAG导入
-  const handleRagImport = async (savedFilePath: string) => {
+  const handleRagImport = async (savedFilePath: string, noSaveDb: boolean = false) => {
     try {
       const settings = await window.electronStore.get('settings') as Settings;
       if (settings?.autoSaveRAG) {
         const loadingKey = message.loading(t('bot.messages.importingToRag'), 0);
-        const ragResponse = await apiService.importToRag(savedFilePath);
+        const ragResponse = await apiService.importToRag(savedFilePath, noSaveDb);
         loadingKey();
         if (ragResponse.success) {
           message.success(t('bot.messages.importedToRagSuccess'));
@@ -245,7 +246,7 @@ const Bot: React.FC = () => {
         // 导入到RAG库
         const fileName = getFileName(importFilePath);
         const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-        await handleRagImport(savedFilePath);
+        await handleRagImport(savedFilePath, isTextFile(importFilePath));
       } else {
         message.error(saveResponse.message || t('bot.messages.fileSaveFailed'));
       }
@@ -291,7 +292,7 @@ const Bot: React.FC = () => {
         // 导入到RAG库
         const fileName = getFileName(importFilePath);
         const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-        await handleRagImport(savedFilePath);
+        await handleRagImport(savedFilePath, isTextFile(importFilePath));
       } else {
         message.error(saveResponse.message || t('bot.messages.fileSaveFailed'));
       }
@@ -350,7 +351,7 @@ const Bot: React.FC = () => {
           // 导入到RAG库
           const fileName = getFileName(filePath);
           const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-          await handleRagImport(savedFilePath);
+          await handleRagImport(savedFilePath, isTextFile(filePath));
         } else {
           message.error(saveResponse.message || t('bot.messages.fileSaveFailed'));
         }
