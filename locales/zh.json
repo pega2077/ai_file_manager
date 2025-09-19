@@ -254,6 +254,7 @@
     "options": {
       "categories": {
         "document": "文档",
+        "sheet": "表格",
         "image": "图片",
         "video": "视频",
         "audio": "音频",

@@ -16,6 +16,17 @@ from config import settings
 class DatabaseManager:
     """SQLite database manager"""
     
+    # Category to file extensions mapping for filtering
+    CATEGORY_EXTENSIONS = {
+        "document": ["txt", "doc", "docx", "pdf", "ppt", "pptx", "rtf", "odt", "ods", "odp"],
+        "sheet": ["xlsx", "xls", "csv", "ods"],
+        "image": ["jpg", "png", "gif", "jpeg", "bmp", "tiff", "tif", "webp", "svg"],
+        "video": ["mp4", "avi", "mkv", "mov", "wmv", "flv", "webm", "m4v"],
+        "audio": ["mp3", "wav", "flac", "aac", "ogg", "wma", "m4a"],
+        "archive": ["zip", "rar", "7z", "tar", "gz", "bz2", "xz"],
+        "other": []  # For other types, no specific extensions
+    }
+    
     def __init__(self, db_path: Path = None):
         self.db_path = db_path or (settings.database_path / "files.db")
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -182,8 +193,19 @@ class DatabaseManager:
                 params = []
                 
                 if category:
-                    conditions.append("category LIKE ?")
-                    params.append(f"%{category}%")
+                    # Use category to get extensions and search by filename extensions
+                    extensions = self.CATEGORY_EXTENSIONS.get(category.lower(), [])
+                    if extensions:
+                        ext_conditions = []
+                        for ext in extensions:
+                            ext_conditions.append("name LIKE ?")
+                            params.append(f"%.{ext}")
+                        if ext_conditions:
+                            conditions.append("(" + " OR ".join(ext_conditions) + ")")
+                    else:
+                        # For categories with no extensions (like "other"), fall back to category field search
+                        conditions.append("category LIKE ?")
+                        params.append(f"%{category}%")
                 
                 if type:
                     # Support both extension (e.g., "png") and MIME type (e.g., "image/png")

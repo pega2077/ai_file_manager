@@ -413,6 +413,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
           allowClear
         >
           <Option value="document">{t('files.options.categories.document')}</Option>
+          <Option value="sheet">{t('files.options.categories.sheet')}</Option>
           <Option value="image">{t('files.options.categories.image')}</Option>
           <Option value="video">{t('files.options.categories.video')}</Option>
           <Option value="audio">{t('files.options.categories.audio')}</Option>

@@ -257,6 +257,7 @@
     "options": {
       "categories": {
         "document": "Document",
+        "sheet": "Sheet",
         "image": "Image",
         "video": "Video",
         "audio": "Audio",
