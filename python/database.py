@@ -192,9 +192,9 @@ class DatabaseManager:
                         conditions.append("type = ?")
                         params.append(type)
                     else:
-                        # Extension - match both MIME type ending with extension and exact extension
-                        conditions.append("(type LIKE ? OR type = ?)")
-                        params.extend([f"%/{type}", type])
+                        # Extension - match MIME type ending with extension, exact extension, or filename ending with extension
+                        conditions.append("(type LIKE ? OR type = ? OR name LIKE ?)")
+                        params.extend([f"%/{type}", type, f"%.{type}"])
                 
                 if search:
                     conditions.append("(name LIKE ? OR summary LIKE ?)")
