@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Layout, Input, Button, List, Spin, message, Tag, Pagination, Card, Tabs, Modal } from 'antd';
+import { Layout, Input, Button, List, Spin, message, Tag, Pagination, Card, Tabs, Modal, Slider, InputNumber } from 'antd';
 import { SearchOutlined, QuestionCircleOutlined, EyeOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
 import { apiService } from '../services/api';
@@ -92,6 +92,10 @@ const SearchPage = () => {
   const [questionResult, setQuestionResult] = useState<QuestionResponse | null>(null);
   const [asking, setAsking] = useState(false);
   const [referencedFiles, setReferencedFiles] = useState<SearchResult[]>([]);
+  const [similarityThreshold, setSimilarityThreshold] = useState(0.4);
+  const [contextLimit, setContextLimit] = useState(5);
+  const [maxTokens, setMaxTokens] = useState(1000);
+  const [temperature, setTemperature] = useState(0.7);
 
   // 标签页状态
   const [activeTab, setActiveTab] = useState('search');
@@ -204,6 +208,10 @@ const SearchPage = () => {
     try {
       const options: {
         file_ids?: string[];
+        similarity_threshold?: number;
+        context_limit?: number;
+        max_tokens?: number;
+        temperature?: number;
       } = {};
       
       // 如果有引用文件，添加到请求中
@@ -216,6 +224,14 @@ const SearchPage = () => {
           options.file_ids = validFileIds;
         }
       }
+      
+      // 设置相似度阈值
+      options.similarity_threshold = similarityThreshold;
+      
+      // 设置其他参数
+      options.context_limit = contextLimit;
+      options.max_tokens = maxTokens;
+      options.temperature = temperature;
       
       console.log('Asking question with options:', options);
       const response = await apiService.askQuestion(value, options);
@@ -367,6 +383,68 @@ const SearchPage = () => {
                           ))}
                         </Card>
                       )}
+
+                      {/* 相关度设置 */}
+                      <Card size="small" style={{ marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <span style={{ fontWeight: 'bold', minWidth: '80px' }}>
+                            {t('search.qa.similarityThreshold')}:
+                          </span>
+                          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px', maxWidth: '200px' }}>
+                            <Slider
+                              min={0}
+                              max={1}
+                              step={0.1}
+                              value={similarityThreshold}
+                              onChange={setSimilarityThreshold}
+                              style={{ flex: 1 }}
+                              tooltip={{ formatter: (value) => `${(value! * 100).toFixed(0)}%` }}
+                            />
+                            <span style={{ minWidth: '40px', textAlign: 'right' }}>
+                              {(similarityThreshold * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontWeight: 'bold', minWidth: '60px' }}>
+                              {t('search.qa.contextLimit')}:
+                            </span>
+                            <InputNumber
+                              min={1}
+                              max={20}
+                              value={contextLimit}
+                              onChange={(value) => setContextLimit(value || 5)}
+                              style={{ width: '80px' }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontWeight: 'bold', minWidth: '60px' }}>
+                              {t('search.qa.maxTokens')}:
+                            </span>
+                            <InputNumber
+                              min={100}
+                              max={4000}
+                              step={100}
+                              value={maxTokens}
+                              onChange={(value) => setMaxTokens(value || 2000)}
+                              style={{ width: '100px' }}
+                            />
+                          </div>
+                          
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontWeight: 'bold', minWidth: '60px' }}>
+                              {t('search.qa.temperature')}:
+                            </span>
+                            <InputNumber
+                              min={0}
+                              max={2}
+                              step={0.1}
+                              value={temperature}
+                              onChange={(value) => setTemperature(value || 0.7)}
+                              style={{ width: '80px' }}
+                            />
+                          </div>
+                        </div>
+                      </Card>
 
                       <Search
                         placeholder={t('search.placeholders.qa')}

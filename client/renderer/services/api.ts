@@ -342,9 +342,9 @@ class ApiService {
     const payload: AskQuestionPayload = {
       question,
       context_limit: options?.context_limit || 5,
-      similarity_threshold: options?.similarity_threshold || 0.7,
+      similarity_threshold: options?.similarity_threshold || 0.5,
       temperature: options?.temperature || 0.7,
-      max_tokens: options?.max_tokens || 1000,
+      max_tokens: options?.max_tokens || 2000,
       stream: options?.stream || false,
     };
 

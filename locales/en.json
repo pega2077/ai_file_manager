@@ -427,7 +427,12 @@
       "path": "Path:",
       "chunk": "Chunk {index}",
       "preview": "Preview Content",
-      "openFile": "Open File"
+      "openFile": "Open File",
+      "similarityThreshold": "Similarity Threshold",
+      "contextLimit": "Context Limit",
+      "maxTokens": "Max Tokens",
+      "temperature": "Temperature",
+      "referencedFiles": "Referenced Files"
     },
     "preview": {
       "contentType": "Content Type:",

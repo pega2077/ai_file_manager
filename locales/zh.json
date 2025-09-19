@@ -424,7 +424,12 @@
       "path": "路径:",
       "chunk": "分段 {index}",
       "preview": "预览内容",
-      "openFile": "打开文件"
+      "openFile": "打开文件",
+      "similarityThreshold": "相关度阈值",
+      "contextLimit": "搜索条数",
+      "maxTokens": "最大Token数",
+      "temperature": "温度",
+      "referencedFiles": "引用文件"
     },
     "preview": {
       "contentType": "内容类型:",
