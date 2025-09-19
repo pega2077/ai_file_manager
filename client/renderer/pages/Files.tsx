@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import FilePreview from "../components/FilePreview";
 import { apiService } from '../services/api';
-import { DirectoryItem, DirectoryStructureResponse, RecommendDirectoryResponse, Settings, TreeNode, ImportedFileItem } from '../shared/types';
+import { DirectoryStructureResponse, RecommendDirectoryResponse, Settings, TreeNode, ImportedFileItem } from '../shared/types';
 import { isTextFile } from '../shared/utils';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 
@@ -339,7 +339,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
   // 处理表格变化（排序、分页等）
   const handleTableChange: TableProps<ImportedFileItem>['onChange'] = (
     pagination,
-    filters,
+    _filters,
     sorter
   ) => {
     if (sorter && typeof sorter === 'object' && 'field' in sorter && 'order' in sorter) {

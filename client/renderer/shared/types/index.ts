@@ -81,3 +81,11 @@ export interface ImportedFileItem {
   updated_at: string;
   processed: boolean;
 }
+
+export interface FileConversionResult {
+  source_file_path: string;
+  output_file_path: string;
+  output_format: string;
+  size: number;
+  message: string;
+}

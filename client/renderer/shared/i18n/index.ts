@@ -6,8 +6,9 @@ export type SupportedLocale = (typeof supportedLocales)[number]
 
 export const defaultLocale: SupportedLocale = 'en'
 
-export type TranslationDictionary = Record<string, TranslationValue>
-type TranslationValue = string | TranslationDictionary
+export interface TranslationDictionary {
+  [key: string]: string | TranslationDictionary;
+}
 
 const dictionaries: Record<SupportedLocale, TranslationDictionary> = {
   en: en as TranslationDictionary,
@@ -74,9 +75,9 @@ export function translateValue(
   return formatParams(direct, params)
 }
 
-function resolveKey(dictionary: TranslationDictionary, key: string): TranslationValue | undefined {
+function resolveKey(dictionary: TranslationDictionary, key: string): string | TranslationDictionary | undefined {
   const segments = key.split('.')
-  let current: TranslationValue | undefined = dictionary
+  let current: string | TranslationDictionary | undefined = dictionary
 
   for (const segment of segments) {
     if (!current || typeof current !== 'object') {

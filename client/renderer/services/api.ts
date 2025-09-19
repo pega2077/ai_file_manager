@@ -1,6 +1,8 @@
 // Dynamic API base URL - will be initialized from electron store
 let API_BASE_URL = 'http://localhost:8000/api';
 
+import { FileConversionResult } from '../shared/types';
+
 // Function to update API base URL
 export const updateApiBaseUrl = (url: string) => {
   API_BASE_URL = `${url}/api`;

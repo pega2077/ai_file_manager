@@ -18,7 +18,12 @@
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "@locales/*": ["../locales/*"]
+    }
   },
   "include": ["renderer", "electron"],
   "references": [{ "path": "./tsconfig.node.json" }]
