@@ -15,8 +15,9 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import Store from "electron-store";
 import { ImportService } from "./importService";
-import { checkServiceStatus, startPythonServer, stopPythonServer } from "./backendService";
+import { checkServiceStatus, startPythonServer, startPythonServerWithConfig, stopPythonServer } from "./backendService";
 import { logger } from "./logger";
+import { configManager, AppConfig } from "./configManager";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Initialize electron-store
@@ -216,6 +217,17 @@ function setupIpcHandlers() {
       logger.error("Failed to open log file:", error);
       return false;
     }
+  });
+
+  // IPC handler for getting app config
+  ipcMain.handle("get-app-config", () => {
+    return configManager.getConfig();
+  });
+
+  // IPC handler for updating app config
+  ipcMain.handle("update-app-config", (_event, updates: Partial<AppConfig>) => {
+    configManager.updateConfig(updates);
+    return configManager.getConfig();
   });
 
   // IPC handler for setting API base URL
@@ -623,29 +635,51 @@ app.on("activate", () => {
 
 app.whenReady().then(async () => {
   logger.info('Application starting...');
+
+  // 读取配置文件
+  const appConfig = configManager.loadConfig();
+  logger.info('Loaded configuration:', appConfig);
+
   setupIpcHandlers();
   setupBotWindowHandlers();
 
   // Check if in development mode
-  // const isDevelopment = !!VITE_DEV_SERVER_URL;
-  const isDevelopment = false;
+  const isDevelopment = !!VITE_DEV_SERVER_URL;
+
   if (isDevelopment) {
     logger.info('Running in development mode - skipping backend service check');
   } else {
-    logger.info('Running in production mode - checking backend service');
-    // Check if using local service and start server if needed
-    const useLocalService = store.get('settings.useLocalService', true) as boolean;
-    if (useLocalService) {
-      const apiBaseUrl = store.get('apiBaseUrl', 'http://localhost:8000') as string;
-      logger.info('Checking backend service status at:', apiBaseUrl);
-      const isRunning = await checkServiceStatus(apiBaseUrl);
-      logger.info('Service running:', isRunning);
-      if (!isRunning) {
-        logger.info('Starting Python server...');
-        startPythonServer();
+    logger.info('Running in production mode - checking backend service configuration');
+
+    // 使用配置文件中的设置
+    if (appConfig.useLocalService) {
+      logger.info('Local service is enabled in config');
+
+      // 检查服务文件是否存在
+      const { pathExists, exeExists } = configManager.checkLocalServiceFiles();
+
+      if (pathExists && exeExists) {
+        logger.info('Service files exist, checking if service is running');
+
+        // 构建 API 基础 URL
+        const apiBaseUrl = `http://${appConfig.localServiceHost}:${appConfig.localServicePort}`;
+        logger.info('Checking backend service status at:', apiBaseUrl);
+
+        const isRunning = await checkServiceStatus(apiBaseUrl);
+        logger.info('Service running:', isRunning);
+
+        if (!isRunning) {
+          logger.info('Starting Python server with config settings...');
+          // 这里需要修改 startPythonServer 来使用配置文件
+          startPythonServerWithConfig(appConfig);
+        } else {
+          logger.info('Python server is already running');
+        }
       } else {
-        logger.info('Python server is already running');
+        logger.error('Service files not found. Path exists:', pathExists, 'Exe exists:', exeExists);
       }
+    } else {
+      logger.info('Local service is disabled in config');
     }
   }
 

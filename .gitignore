@@ -12,3 +12,4 @@ models
 client/dist-electron/
 client/release/
 temp
+client/config.json
