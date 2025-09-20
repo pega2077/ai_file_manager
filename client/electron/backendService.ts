@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { spawn, ChildProcess } from "child_process";
+import { logger } from "./logger";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,7 +20,7 @@ export const checkServiceStatus = async (apiBaseUrl: string): Promise<boolean> =
     clearTimeout(timeoutId);
     return response.ok;
   } catch (error) {
-    console.log('Service not running:', error);
+    logger.warn('Service not running:', error);
     return false;
   }
 };
@@ -29,7 +30,7 @@ export const startPythonServer = (): void => {
   const pythonScript = path.join(projectRoot, 'python', 'server.py');
   const venvPython = path.join(projectRoot, 'python', 'venv', 'Scripts', 'python.exe');
 
-  console.log('Starting Python server directly:', pythonScript);
+  logger.info('Starting Python server directly:', pythonScript);
 
   // 使用虚拟环境的 Python 解释器直接启动
   pythonProcess = spawn(venvPython, [pythonScript], {
@@ -39,20 +40,20 @@ export const startPythonServer = (): void => {
   });
 
   pythonProcess.stdout?.on('data', (data) => {
-    console.log('Python server stdout:', data.toString());
+    logger.info('Python server stdout:', data.toString().trim());
   });
 
   pythonProcess.stderr?.on('data', (data) => {
-    console.error('Python server stderr:', data.toString());
+    logger.error('Python server stderr:', data.toString().trim());
   });
 
   pythonProcess.on('close', (code) => {
-    console.log('Python server process exited with code:', code);
+    logger.info('Python server process exited with code:', code);
     pythonProcess = null;
   });
 
   pythonProcess.on('error', (error) => {
-    console.error('Failed to start Python server:', error);
+    logger.error('Failed to start Python server:', error);
   });
 
   // Note: Removed unref() to keep process attached for output logging
@@ -61,10 +62,10 @@ export const startPythonServer = (): void => {
 
 export const stopPythonServer = (): void => {
   if (pythonProcess && !pythonProcess.killed) {
-    console.log('Stopping Python server...');
+    logger.info('Stopping Python server...');
     pythonProcess.kill('SIGTERM');
     pythonProcess = null;
   } else {
-    console.log('Python server is not running or already stopped.');
+    logger.info('Python server is not running or already stopped.');
   }
 };

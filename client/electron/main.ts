@@ -16,6 +16,7 @@ import path from "node:path";
 import Store from "electron-store";
 import { ImportService } from "./importService";
 import { checkServiceStatus, startPythonServer, stopPythonServer } from "./backendService";
+import { logger } from "./logger";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Initialize electron-store
@@ -200,9 +201,21 @@ function setupIpcHandlers() {
     return { success: false, message: "Import service not initialized" };
   });
 
-  // IPC handler for getting API base URL
-  ipcMain.handle("get-api-base-url", () => {
-    return store.get("apiBaseUrl", "http://localhost:8000");
+  // IPC handler for getting log file path
+  ipcMain.handle("get-log-file-path", () => {
+    return logger.getLogFilePath();
+  });
+
+  // IPC handler for opening log file
+  ipcMain.handle("open-log-file", async () => {
+    try {
+      const logFilePath = logger.getLogFilePath();
+      await shell.openPath(logFilePath);
+      return true;
+    } catch (error) {
+      logger.error("Failed to open log file:", error);
+      return false;
+    }
   });
 
   // IPC handler for setting API base URL
@@ -497,6 +510,13 @@ function createMenu() {
       label: "Help",
       submenu: [
         {
+          label: "View Logs",
+          click: () => {
+            const logFilePath = logger.getLogFilePath();
+            shell.openPath(logFilePath);
+          },
+        },
+        {
           label: "About",
           click: () => {
             // Show about dialog
@@ -547,6 +567,13 @@ function createTray() {
     },
     { type: "separator" },
     {
+      label: "View Logs",
+      click: () => {
+        const logFilePath = logger.getLogFilePath();
+        shell.openPath(logFilePath);
+      },
+    },
+    {
       label: "Stop Server",
       click: () => {
         stopPythonServer();
@@ -571,25 +598,31 @@ function createTray() {
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on("window-all-closed", () => {
+  logger.info('All windows closed');
   if (process.platform !== "darwin") {
+    logger.info('Application quitting (non-macOS platform)');
     app.quit();
     win = null;
   }
 });
 
 app.on("before-quit", () => {
+  logger.info('Application before-quit event triggered');
   stopPythonServer();
 });
 
 app.on("activate", () => {
+  logger.info('Application activated');
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
+    logger.info('No windows open, creating new window');
     createWindow();
   }
 });
 
 app.whenReady().then(async () => {
+  logger.info('Application starting...');
   setupIpcHandlers();
   setupBotWindowHandlers();
 
@@ -597,24 +630,30 @@ app.whenReady().then(async () => {
   const isDevelopment = !!VITE_DEV_SERVER_URL;
 
   if (isDevelopment) {
-    console.log('Running in development mode - skipping backend service check');
+    logger.info('Running in development mode - skipping backend service check');
   } else {
-    console.log('Running in production mode - checking backend service');
+    logger.info('Running in production mode - checking backend service');
     // Check if using local service and start server if needed
     const useLocalService = store.get('settings.useLocalService', true) as boolean;
     if (useLocalService) {
       const apiBaseUrl = store.get('apiBaseUrl', 'http://localhost:8000') as string;
+      logger.info('Checking backend service status at:', apiBaseUrl);
       const isRunning = await checkServiceStatus(apiBaseUrl);
-      console.log('Service running:', isRunning);
+      logger.info('Service running:', isRunning);
       if (!isRunning) {
+        logger.info('Starting Python server...');
         startPythonServer();
+      } else {
+        logger.info('Python server is already running');
       }
     }
   }
 
+  logger.info('Creating application windows and tray');
   createWindow();
   createBotWindow();
   createTray();
+  logger.info('Application startup complete');
 });
 
 store.onDidChange("preferredLocale", (newValue) => {
