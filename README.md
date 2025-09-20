@@ -1,4 +1,4 @@
-# AI Document Manager
+# AiFileManager
 
 A desktop document organization and intelligent search program based on RAG (Retrieval-Augmented Generation) technology.
 

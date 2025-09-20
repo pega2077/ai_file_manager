@@ -1,10 +1,9 @@
 // @see - https://www.electron.build/configuration/configuration
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "YourAppID",
+  "appId": "com.pega2077.aifilemanager",
   "asar": true,
-  "productName": "YourAppName",
-  "icon": "client/renderer/assets/app-icon.png",
+  "productName": "AiFileManager",
   "directories": {
     "output": "release/${version}"
   },
@@ -12,10 +11,17 @@
     "dist",
     "dist-electron"
   ],
+  "extraResources": [
+    {
+      "from": "app-icon.ico",
+      "to": "app-icon.ico"
+    }
+  ],
   "mac": {
     "target": [
       "dmg"
     ],
+    "icon": "app-icon.ico",
     "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
   },
   "win": {
@@ -27,6 +33,7 @@
         ]
       }
     ],
+    "icon": "app-icon.ico",
     "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
   },
   "nsis": {
@@ -39,6 +46,7 @@
     "target": [
       "AppImage"
     ],
+    "icon": "app-icon.ico",
     "artifactName": "${productName}-Linux-${version}.${ext}"
   }
 }

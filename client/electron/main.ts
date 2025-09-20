@@ -544,10 +544,11 @@ function createMenu() {
 
 // Create system tray
 function createTray() {
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'app-icon.ico')
+    : path.join(__dirname, '../app-icon.ico');
   tray = new Tray(
-    nativeImage.createFromPath(
-      path.join(__dirname, "../renderer/assets/mona-loading-default-static.png")
-    )
+    nativeImage.createFromPath(iconPath)
   );
 
   const contextMenu = Menu.buildFromTemplate([
