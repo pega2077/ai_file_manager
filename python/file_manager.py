@@ -55,9 +55,9 @@ class FileManager:
 
     def _ensure_directories(self):
         """Ensure necessary directories exist"""
-        self.workdir.mkdir(parents=True, exist_ok=True)
+        # self.workdir.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Ensured directories: workdir={self.workdir}, temp={self.temp_dir}")
+        logger.info(f"Ensured directories: temp={self.temp_dir}")
 
     def update_workdir(self, new_workdir: Path) -> None:
         """Update workdir and ensure temp directory exists"""

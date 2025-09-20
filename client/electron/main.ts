@@ -627,8 +627,8 @@ app.whenReady().then(async () => {
   setupBotWindowHandlers();
 
   // Check if in development mode
-  const isDevelopment = !!VITE_DEV_SERVER_URL;
-
+  // const isDevelopment = !!VITE_DEV_SERVER_URL;
+  const isDevelopment = false;
   if (isDevelopment) {
     logger.info('Running in development mode - skipping backend service check');
   } else {

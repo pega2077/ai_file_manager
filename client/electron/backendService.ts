@@ -44,7 +44,15 @@ export const startPythonServer = (): void => {
   });
 
   pythonProcess.stderr?.on('data', (data) => {
-    logger.error('Python server stderr:', data.toString().trim());
+    const output = data.toString().trim();
+    // 检查是否包含错误关键词
+    const isError = /\b(ERROR|error|Error|FATAL|fatal|Fatal|CRITICAL|critical|Critical|Exception|exception)\b/.test(output);
+
+    if (isError) {
+      logger.error('Python server stderr:', output);
+    } else {
+      logger.info('Python server stderr:', output);
+    }
   });
 
   pythonProcess.on('close', (code) => {
