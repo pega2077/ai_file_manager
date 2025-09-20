@@ -12,7 +12,7 @@ export interface AppConfig {
 }
 
 const DEFAULT_CONFIG: AppConfig = {
-  useLocalService: true,
+  useLocalService: false,
   localServicePath: "python/server.py",
   localServicePythonExe: "python/venv/Scripts/python.exe",
   localServicePort: 8000,
@@ -31,9 +31,8 @@ export class ConfigManager {
       // 开发模式：使用 client/config.json
       this.configPath = path.join(appRoot, 'config.json');
     } else {
-      // 生产模式：使用程序安装目录/../config.json
-      const projectRoot = path.join(appRoot, '..');
-      this.configPath = path.join(projectRoot, 'config.json');
+      // 生产模式：使用程序安装目录/config.json
+      this.configPath = path.join(appRoot, 'config.json');
     }
 
     logger.info('ConfigManager: Config path set to', this.configPath);
