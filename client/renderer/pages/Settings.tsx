@@ -19,6 +19,7 @@ interface SettingsState {
   autoSaveRAG: boolean;
   autoClassifyWithoutConfirmation: boolean;
   workDirectory: string;
+  useLocalService: boolean;
 }
 
 const DEFAULT_SETTINGS: SettingsState = {
@@ -30,6 +31,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   autoSaveRAG: true,
   autoClassifyWithoutConfirmation: false,
   workDirectory: '',
+  useLocalService: true,
 };
 
 const Settings = () => {
@@ -100,6 +102,12 @@ const Settings = () => {
     setSettings((prev) => (prev.language === locale ? prev : { ...prev, language: locale }));
   }, [locale]);
 
+  useEffect(() => {
+    if (settings.useLocalService) {
+      setApiBaseUrl('http://localhost:8000');
+    }
+  }, [settings.useLocalService]);
+
   const handleSettingChange = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => {
     setSettings((prev) => ({
       ...prev,
@@ -139,8 +147,9 @@ const Settings = () => {
   const handleSaveApiBaseUrl = async () => {
     try {
       if (window.electronAPI) {
-        await window.electronAPI.setApiBaseUrl(apiBaseUrl);
-        updateApiBaseUrl(apiBaseUrl);
+        const urlToSave = settings.useLocalService ? 'http://localhost:8000' : apiBaseUrl;
+        await window.electronAPI.setApiBaseUrl(urlToSave);
+        updateApiBaseUrl(urlToSave);
         message.success(t('settings.messages.apiSuccess'));
       }
     } catch (error) {
@@ -300,12 +309,27 @@ const Settings = () => {
           <Card title={t('settings.sections.api')}
                 style={{ marginBottom: 24 }}>
             <div>
+              <div style={{ marginBottom: 16 }}>
+                <Text strong>{t('settings.labels.useLocalService')}</Text>
+                <Switch
+                  checkedChildren={t('settings.common.enabled')}
+                  unCheckedChildren={t('settings.common.disabled')}
+                  checked={settings.useLocalService}
+                  onChange={(checked) => handleSettingChange('useLocalService', checked)}
+                  style={{ marginLeft: 16 }}
+                />
+                <Text type="secondary" style={{ marginLeft: 8 }}>
+                  {t('settings.descriptions.useLocalService')}
+                </Text>
+              </div>
+
               <Text strong>{t('settings.labels.apiBaseUrl')}</Text>
               <Input
                 value={apiBaseUrl}
                 onChange={(event) => setApiBaseUrl(event.target.value)}
                 placeholder={t('settings.placeholders.apiBaseUrl')}
                 style={{ marginTop: 8, marginBottom: 8 }}
+                disabled={settings.useLocalService}
               />
               <Text type="secondary" style={{ display: 'block' }}>
                 {t('settings.descriptions.apiBaseUrl')}

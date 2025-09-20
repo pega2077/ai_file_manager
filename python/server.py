@@ -2,6 +2,8 @@
 AI文件管理器 FastAPI 服务端
 """
 import os
+import signal
+import sys
 import time
 import uuid
 from datetime import datetime
@@ -141,7 +143,15 @@ def init_directories():
         logger.error(f"初始化目录失败: {e}")
         raise
 
+def shutdown_handler(signal, frame):
+    print("Shutting down gracefully...")
+    sys.exit(0)
+
 if __name__ == "__main__":
+    # 注册信号处理器
+    signal.signal(signal.SIGINT, shutdown_handler)  # 监听中断信号 (Ctrl+C)
+    signal.signal(signal.SIGTERM, shutdown_handler)  # 监听终止信号
+    
     # 配置日志
     logger.add(
         settings.logs_path / "server.log",
@@ -160,6 +170,6 @@ if __name__ == "__main__":
         "server:app",
         host=settings.host,
         port=settings.port,
-        reload=True,
+        reload=False,
         log_level="debug" if settings.debug else "info"
     )

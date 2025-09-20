@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import Store from "electron-store";
 import { ImportService } from "./importService";
+import { checkServiceStatus, startPythonServer, stopPythonServer } from "./backendService";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Initialize electron-store
@@ -544,7 +545,13 @@ function createTray() {
         }
       },
     },
-
+    { type: "separator" },
+    {
+      label: "Stop Server",
+      click: () => {
+        stopPythonServer();
+      },
+    },
     { type: "separator" },
     {
       label: "Close App",
@@ -570,6 +577,10 @@ app.on("window-all-closed", () => {
   }
 });
 
+app.on("before-quit", () => {
+  stopPythonServer();
+});
+
 app.on("activate", () => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
@@ -578,9 +589,21 @@ app.on("activate", () => {
   }
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   setupIpcHandlers();
   setupBotWindowHandlers();
+
+  // Check if using local service and start server if needed
+  const useLocalService = store.get('settings.useLocalService', true) as boolean;
+  if (useLocalService) {
+    const apiBaseUrl = store.get('apiBaseUrl', 'http://localhost:8000') as string;
+    const isRunning = await checkServiceStatus(apiBaseUrl);
+    console.log('Service running:', isRunning);
+    if (!isRunning) {
+      startPythonServer();
+    }
+  }
+
   createWindow();
   createBotWindow();
   createTray();
