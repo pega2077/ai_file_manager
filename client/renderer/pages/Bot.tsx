@@ -29,18 +29,20 @@ const Bot: React.FC = () => {
       if (window.electronStore) {
         try {
           const storedWorkDirectory = await window.electronStore.get('workDirectory') as string;
-          
+          message.info(storedWorkDirectory);
           if (storedWorkDirectory) {
             setWorkDirectory(storedWorkDirectory);
           } else {
-            setWorkDirectory('workdir');
+            message.error('工作目录未设置，使用默认值');
           }
         } catch (error) {
           console.error('Failed to load initial data:', error);
-          setWorkDirectory('workdir');
+          message.error('加载工作目录失败');
+          // setWorkDirectory('workdir');
         }
       } else {
-        setWorkDirectory('workdir');
+        message.error('加载工作目录失败.');
+        // setWorkDirectory('workdir');
       }
     };
 
@@ -239,7 +241,7 @@ const Bot: React.FC = () => {
       const fullTargetDirectory = selectedDirectory.startsWith(workDirectory) 
         ? selectedDirectory 
         : `${workDirectory}${separator}${selectedDirectory.replace(/\//g, separator)}`;
-      
+      message.info(fullTargetDirectory);
       const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
       if (saveResponse.success) {
         message.success(t('bot.messages.fileSavedTo', { path: selectedDirectory }));
