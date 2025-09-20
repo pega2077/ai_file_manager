@@ -593,14 +593,22 @@ app.whenReady().then(async () => {
   setupIpcHandlers();
   setupBotWindowHandlers();
 
-  // Check if using local service and start server if needed
-  const useLocalService = store.get('settings.useLocalService', true) as boolean;
-  if (useLocalService) {
-    const apiBaseUrl = store.get('apiBaseUrl', 'http://localhost:8000') as string;
-    const isRunning = await checkServiceStatus(apiBaseUrl);
-    console.log('Service running:', isRunning);
-    if (!isRunning) {
-      startPythonServer();
+  // Check if in development mode
+  const isDevelopment = !!VITE_DEV_SERVER_URL;
+
+  if (isDevelopment) {
+    console.log('Running in development mode - skipping backend service check');
+  } else {
+    console.log('Running in production mode - checking backend service');
+    // Check if using local service and start server if needed
+    const useLocalService = store.get('settings.useLocalService', true) as boolean;
+    if (useLocalService) {
+      const apiBaseUrl = store.get('apiBaseUrl', 'http://localhost:8000') as string;
+      const isRunning = await checkServiceStatus(apiBaseUrl);
+      console.log('Service running:', isRunning);
+      if (!isRunning) {
+        startPythonServer();
+      }
     }
   }
 
