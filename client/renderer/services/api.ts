@@ -81,6 +81,17 @@ interface AskQuestionPayload {
   };
 }
 
+interface SystemConfigUpdate {
+  llm_type?: 'local' | 'openai' | 'ollama' | 'claude' | 'custom';
+  llm_endpoint?: string;
+  llm_api_key?: string;
+  chunk_size?: number;
+  chunk_overlap?: number;
+  similarity_threshold?: number;
+  max_file_size_mb?: number;
+  workdir_path?: string;
+}
+
 class ApiService {
   private locale = 'en';
 
@@ -249,11 +260,11 @@ class ApiService {
   }
 
   // 导入到RAG库
-  async importToRag(filePath: string, noSaveDb: boolean = false) {
+  async importToRag(fileId: string, noSaveDb: boolean = false) {
     return this.request('/files/import-to-rag', {
       method: 'POST',
       body: JSON.stringify({
-        file_path: filePath,
+        file_id: fileId,
         no_save_db: noSaveDb,
       }),
     });
@@ -304,6 +315,14 @@ class ApiService {
   async clearAllData() {
     return this.request('/system/clear-data', {
       method: 'POST',
+    });
+  }
+
+  // 更新系统配置
+  async updateSystemConfig(config: SystemConfigUpdate) {
+    return this.request('/system/config/update', {
+      method: 'POST',
+      body: JSON.stringify(config),
     });
   }
 

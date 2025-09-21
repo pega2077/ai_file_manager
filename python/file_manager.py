@@ -817,7 +817,7 @@ If no suitable directory is found, you can suggest creating a new one by specify
                 'alternatives': []
             })()
 
-    async def import_to_rag(self, file_path: str, no_save_db: bool = False) -> dict:
+    async def import_to_rag(self, file_id: str, file_path: str, no_save_db: bool = False) -> dict:
         """Import file to RAG library by processing embeddings and storing in database"""
         try:
             # Convert to Path object
@@ -904,9 +904,6 @@ If no suitable directory is found, you can suggest creating a new one by specify
                     message="No content extracted from file",
                     error_code="NO_CONTENT"
                 )
-
-            # Generate file_id for RAG storage
-            file_id = str(uuid.uuid4())
 
             # Process embeddings and store in databases (similar to import_file)
             try:

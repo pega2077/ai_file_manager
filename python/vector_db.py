@@ -18,7 +18,13 @@ class VectorDatabase:
     
     def __init__(self, database_path: Path = None, dimension: int = None):
         self.database_path = database_path or (settings.database_path / "vectors")
-        self.dimension = dimension or settings.embedding_dimension
+        # 根据 embedding_type 选择正确的维度
+        if dimension is not None:
+            self.dimension = dimension
+        elif settings.embedding_type.lower() == "ollama":
+            self.dimension = settings.ollama_embedding_dimension
+        else:
+            self.dimension = settings.embedding_dimension
         self.index = None
         self.metadata = {}  # 存储embedding对应的元数据
         self.is_loaded = False

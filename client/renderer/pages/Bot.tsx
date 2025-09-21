@@ -3,7 +3,7 @@ import botLoadingImage from '../assets/mona-loading-default.gif';
 import botStaticImage from '../assets/mona-loading-default-static.png';
 import { message, Modal, Select, TreeSelect, Button, Menu } from 'antd';
 import { apiService } from '../services/api';
-import { DirectoryItem, DirectoryStructureResponse, RecommendDirectoryResponse, Settings, TreeNode } from '../shared/types';
+import { DirectoryStructureResponse, RecommendDirectoryResponse, Settings, TreeNode } from '../shared/types';
 import { isTextFile } from '../shared/utils';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 
@@ -12,7 +12,7 @@ const Bot: React.FC = () => {
   const isDragging = useRef(false);
   const startPos = useRef({ x: 0, y: 0 });
   const [workDirectory, setWorkDirectory] = useState<string>('workdir');
-  const [debugMessage, setDebugMessage] = useState<string>('');
+  // const [debugMessage, setDebugMessage] = useState<string>('');
   const [processing, setProcessing] = useState<boolean>(false);
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [selectedDirectory, setSelectedDirectory] = useState<string>('');
@@ -101,19 +101,15 @@ const Bot: React.FC = () => {
     return navigator.userAgent.includes('Windows') ? '\\' : '/';
   };
 
-  // 提取文件名从路径
-  const getFileName = (filePath: string) => {
-    const separator = getPathSeparator();
-    return filePath.split(separator).pop() || '';
-  };
+  // 已不再需要提取文件名，因 RAG 导入改为使用 file_id
 
-  // 处理RAG导入
-  const handleRagImport = async (savedFilePath: string, noSaveDb: boolean = false) => {
+  // 处理RAG导入：使用 file_id
+  const handleRagImport = async (fileId: string, noSaveDb: boolean = false) => {
     try {
       const settings = await window.electronStore.get('settings') as Settings;
       if (settings?.autoSaveRAG) {
         const loadingKey = message.loading(t('bot.messages.importingToRag'), 0);
-        const ragResponse = await apiService.importToRag(savedFilePath, noSaveDb);
+        const ragResponse = await apiService.importToRag(fileId, noSaveDb);
         loadingKey();
         if (ragResponse.success) {
           message.success(t('bot.messages.importedToRagSuccess'));
@@ -245,10 +241,13 @@ const Bot: React.FC = () => {
       const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
       if (saveResponse.success) {
         message.success(t('bot.messages.fileSavedTo', { path: selectedDirectory }));
-        // 导入到RAG库
-        const fileName = getFileName(importFilePath);
-        const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-        await handleRagImport(savedFilePath, isTextFile(importFilePath));
+        // 导入到RAG库：使用 saveFile 返回的 file_id
+        const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
+        if (fileId) {
+          await handleRagImport(fileId, isTextFile(importFilePath));
+        } else {
+          message.warning(t('bot.messages.saveSuccessRagFailed'));
+        }
       } else {
         message.error(saveResponse.message || t('bot.messages.fileSaveFailed'));
       }
@@ -291,10 +290,13 @@ const Bot: React.FC = () => {
       if (saveResponse.success) {
         message.success(t('bot.messages.fileSavedTo', { path: selectedDirectory }));
         setManualSelectModalVisible(false);
-        // 导入到RAG库
-        const fileName = getFileName(importFilePath);
-        const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-        await handleRagImport(savedFilePath, isTextFile(importFilePath));
+        // 导入到RAG库：使用 saveFile 返回的 file_id
+        const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
+        if (fileId) {
+          await handleRagImport(fileId, isTextFile(importFilePath));
+        } else {
+          message.warning(t('bot.messages.saveSuccessRagFailed'));
+        }
       } else {
         message.error(saveResponse.message || t('bot.messages.fileSaveFailed'));
       }
@@ -312,8 +314,7 @@ const Bot: React.FC = () => {
   // 处理文件导入
   const handleFileImport = async (filePath: string) => {
     try {
-      setProcessing(true);
-      setDebugMessage(`Importing file: ${filePath}`);
+  setProcessing(true);
       // 步骤1: 获取工作目录的目录结构
       const directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
       if (!directoryStructureResponse.success) {
@@ -339,7 +340,7 @@ const Bot: React.FC = () => {
       // 步骤3: 获取设置选项 autoClassifyWithoutConfirmation
       const settings = await window.electronStore.get('settings') as Settings;
       const autoClassifyWithoutConfirmation = settings?.autoClassifyWithoutConfirmation || false;
-      setDebugMessage(`Recommended directory: ${recommendedDirectory}, Auto classify without confirmation: ${autoClassifyWithoutConfirmation}`);
+  // Debug log removed; using toast/messages if needed
       if (autoClassifyWithoutConfirmation) {
         // 步骤4: 自动保存到推荐目录
         const separator = getPathSeparator();
@@ -350,10 +351,13 @@ const Bot: React.FC = () => {
         const saveResponse = await apiService.saveFile(filePath, fullTargetDirectory, false);
         if (saveResponse.success) {
           message.success(t('bot.messages.fileAutoSavedTo', { path: recommendedDirectory }));
-          // 导入到RAG库
-          const fileName = getFileName(filePath);
-          const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-          await handleRagImport(savedFilePath, isTextFile(filePath));
+          // 导入到RAG库：使用 saveFile 返回的 file_id
+          const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
+          if (fileId) {
+            await handleRagImport(fileId, isTextFile(filePath));
+          } else {
+            message.warning(t('bot.messages.saveSuccessRagFailed'));
+          }
         } else {
           message.error(saveResponse.message || t('bot.messages.fileSaveFailed'));
         }

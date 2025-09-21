@@ -216,15 +216,17 @@ async def ask_question(request: ChatAskRequest):
         for result in search_results:
             # 从向量数据库结果中获取 embedding_id
             embedding_id = result.get('embedding_id', '')
+            # logger.debug(f"Processing search result with embedding_id: {embedding_id}")
             if not embedding_id:
                 continue
                 
             # 根据 embedding_id 从 SQLite 获取完整的 chunk 信息
             chunk_data = db_manager.get_chunk_by_embedding_id(embedding_id)
-
+            # logger.debug(f"Retrieved chunk data: {chunk_data}")
             if chunk_data:
                 # 获取文件信息
                 file_data = db_manager.get_file_by_id(chunk_data['file_id'])
+                # logger.debug(f"Retrieved file data: {file_data}")
                 if file_data:
                     context_parts.append(f"文档片段 {chunk_data['chunk_index']}: {chunk_data['content']}")
 
@@ -246,7 +248,7 @@ async def ask_question(request: ChatAskRequest):
             context=context,
             question=request.question
         )
-        # logger.debug(f"构建的提示词: {prompt}")
+        logger.debug(f"构建的提示词: {prompt}")
         # 5. 调用LLM生成回答
         generation_start = time.time()
         

@@ -132,7 +132,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
     try {
       const loadingKey = message.loading(t('files.messages.importingToRag', { name: file.name }), 0);
       
-      const response = await apiService.importToRag(file.path);
+      const response = await apiService.importToRag(file.file_id);
       loadingKey();
       
       if (response.success) {
@@ -572,10 +572,11 @@ const FilesPage: React.FC = () => {
           message.success(t('files.messages.fileAutoSavedTo', { path: recommendedDirectory }));
           // 刷新文件列表
           setRefreshTrigger(prev => prev + 1);
-          // 导入到RAG库
-          const fileName = getFileName(filePath);
-          const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-          await handleRagImport(savedFilePath, isTextFile(filePath));
+          // 导入到RAG库（使用数据库返回的 file_id）
+          const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
+          if (fileId) {
+            await handleRagImport(fileId, isTextFile(filePath));
+          }
         } else {
           message.error(saveResponse.message || t('files.messages.fileSaveFailed'));
         }
@@ -594,19 +595,13 @@ const FilesPage: React.FC = () => {
     return navigator.userAgent.includes('Windows') ? '\\' : '/';
   };
 
-  // 提取文件名从路径
-  const getFileName = (filePath: string) => {
-    const separator = getPathSeparator();
-    return filePath.split(separator).pop() || '';
-  };
-
   // 处理RAG导入
-  const handleRagImport = async (savedFilePath: string, noSaveDb: boolean = false) => {
+  const handleRagImport = async (fileId: string, noSaveDb: boolean = false) => {
     try {
       const settings = await window.electronStore.get('settings') as Settings;
       if (settings?.autoSaveRAG) {
         const loadingKey = message.loading(t('files.messages.importingRag'), 0);
-        const ragResponse = await apiService.importToRag(savedFilePath, noSaveDb);
+        const ragResponse = await apiService.importToRag(fileId, noSaveDb);
         loadingKey();
         if (ragResponse.success) {
           message.success(t('files.messages.importedRagSuccess'));
@@ -737,10 +732,11 @@ const FilesPage: React.FC = () => {
         setImportModalVisible(false);
         // 刷新文件列表
         setRefreshTrigger(prev => prev + 1);
-        // 导入到RAG库
-        const fileName = getFileName(importFilePath);
-        const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-        await handleRagImport(savedFilePath, isTextFile(importFilePath));
+        // 导入到RAG库（使用数据库返回的 file_id）
+        const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
+        if (fileId) {
+          await handleRagImport(fileId, isTextFile(importFilePath));
+        }
       } else {
         message.error(saveResponse.message || t('files.messages.fileSaveFailed'));
       }
@@ -783,10 +779,11 @@ const FilesPage: React.FC = () => {
         setManualSelectModalVisible(false);
         // 刷新文件列表
         setRefreshTrigger(prev => prev + 1);
-        // 导入到RAG库
-        const fileName = getFileName(importFilePath);
-        const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-        await handleRagImport(savedFilePath, isTextFile(importFilePath));
+        // 导入到RAG库（使用数据库返回的 file_id）
+        const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
+        if (fileId) {
+          await handleRagImport(fileId, isTextFile(importFilePath));
+        }
       } else {
         message.error(saveResponse.message || t('files.messages.fileSaveFailed'));
       }

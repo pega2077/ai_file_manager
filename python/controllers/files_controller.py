@@ -88,7 +88,7 @@ class RecommendDirectoryRequest(BaseModel):
     available_directories: List[str] = Field(..., description="List of available directory paths in the project")
 
 class ImportToRagRequest(BaseModel):
-    file_path: str = Field(..., description="Path of the file to import to RAG library")
+    file_id: str = Field(..., description="ID of the file to import to RAG library")
     no_save_db: bool = Field(False, description="If true, do not save file record to database, only process embeddings")
 
 class ChunkInfo(BaseModel):
@@ -1223,30 +1223,30 @@ async def save_file(request: SaveFileRequest):
                 error_details=str(db_error)
             )
 
-        markdown_path = data.get("temp_markdown_path")
-        markdown_content = None
-        if markdown_path:
-            try:
-                with open(markdown_path, 'r', encoding='utf-8') as temp_file:
-                    markdown_content = temp_file.read()
-            except Exception as read_error:
-                logger.warning(f"Failed to read temp markdown file {markdown_path}: {read_error}")
+        # markdown_path = data.get("temp_markdown_path")
+        # markdown_content = None
+        # if markdown_path:
+        #     try:
+        #         with open(markdown_path, 'r', encoding='utf-8') as temp_file:
+        #             markdown_content = temp_file.read()
+        #     except Exception as read_error:
+        #         logger.warning(f"Failed to read temp markdown file {markdown_path}: {read_error}")
 
-        if markdown_content:
-            try:
-                await process_file_embeddings(
-                    file_id=file_id,
-                    content=markdown_content,
-                    file_path=str(saved_path),
-                    category=category
-                )
-                processed = True
-                try:
-                    db_manager.update_file(file_id, {"processed": True})
-                except Exception as update_error:
-                    logger.warning(f"Failed to mark file as processed: {update_error}")
-            except Exception as embed_error:
-                logger.error(f"Failed to process embeddings for {file_id}: {embed_error}")
+        # if markdown_content:
+        #     try:
+        #         await process_file_embeddings(
+        #             file_id=file_id,
+        #             content=markdown_content,
+        #             file_path=str(saved_path),
+        #             category=category
+        #         )
+        #         processed = True
+        #         try:
+        #             db_manager.update_file(file_id, {"processed": True})
+        #         except Exception as update_error:
+        #             logger.warning(f"Failed to mark file as processed: {update_error}")
+        #     except Exception as embed_error:
+        #         logger.error(f"Failed to process embeddings for {file_id}: {embed_error}")
 
         response_data = {
             **data,
@@ -1292,7 +1292,22 @@ async def recommend_directory(request: RecommendDirectoryRequest):
 async def import_to_rag(request: ImportToRagRequest):
     """Import file to RAG library for semantic search"""
     try:
-        result = await file_manager.import_to_rag(file_path=request.file_path, no_save_db=request.no_save_db)
+        # 获取数据库管理器实例
+        from database import DatabaseManager
+        db_manager = DatabaseManager()
+        
+        # 根据 file_id 获取文件信息
+        file_data = db_manager.get_file_by_id(request.file_id)
+        if not file_data:
+            return create_error_response(
+                message="File not found",
+                error_code="FILE_NOT_FOUND"
+            )
+        
+        # 获取文件路径
+        file_path = file_data['path']
+        
+        result = await file_manager.import_to_rag(file_id=request.file_id, file_path=file_path, no_save_db=request.no_save_db)
         return result
         
     except Exception as e:

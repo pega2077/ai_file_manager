@@ -195,19 +195,23 @@ const Home = () => {
   };
 
   const handleImportToRag = async (record: FileItem) => {
+    if (record.type !== 'file') return;
     const separator = getPathSeparator();
     const fullPath = `${currentDirectory}${separator}${record.name}`;
-    
+
     try {
       const loadingKey = message.loading(t('home.messages.importingToRag'), 0);
-      const ragResponse = await apiService.importToRag(fullPath);
-      loadingKey();
-      
-      if (ragResponse.success) {
-        message.success(t('home.messages.importedToRagSuccess'));
-      } else {
-        message.warning(t('home.messages.importToRagFailed'));
+      // Save the file to ensure a file_id exists in DB (overwrite to avoid duplicates)
+      const saveResp = await apiService.saveFile(fullPath, currentDirectory, true);
+      const fileId = (saveResp.data as { file_id?: string } | undefined)?.file_id;
+      if (!saveResp.success || !fileId) {
+        loadingKey();
+        message.error(saveResp.message || t('home.messages.importToRagFailed'));
+        return;
       }
+      // Now import to RAG using file_id
+      await handleRagImport(fileId);
+      loadingKey();
     } catch (error) {
       message.error(t('home.messages.importToRagFailed'));
       console.error(error);
@@ -289,10 +293,13 @@ const Home = () => {
           message.success(t('home.messages.fileAutoSavedTo', { path: recommendedDirectory }));
           // 刷新当前目录列表
           loadDirectory(currentDirectory);
-          // 导入到RAG库
-          const fileName = getFileName(filePath);
-          const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-          await handleRagImport(savedFilePath);
+          // 导入到RAG库：使用 saveFile 返回的 file_id
+          const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
+          if (fileId) {
+            await handleRagImport(fileId);
+          } else {
+            message.warning(t('home.messages.saveSuccessRagFailed'));
+          }
         } else {
           message.error(saveResponse.message || t('home.messages.fileSaveFailed'));
         }
@@ -311,19 +318,15 @@ const Home = () => {
     return navigator.userAgent.includes('Windows') ? '\\' : '/';
   };
 
-  // 提取文件名从路径
-  const getFileName = (filePath: string) => {
-    const separator = getPathSeparator();
-    return filePath.split(separator).pop() || '';
-  };
+  // 文件名解析不再需要；RAG 导入基于 file_id
 
   // 处理RAG导入
-  const handleRagImport = async (savedFilePath: string) => {
+  const handleRagImport = async (fileId: string) => {
     try {
       const settings = await window.electronStore.get('settings') as Settings;
       if (settings?.autoSaveRAG) {
         const loadingKey = message.loading(t('home.messages.importingRag'), 0);
-        const ragResponse = await apiService.importToRag(savedFilePath);
+        const ragResponse = await apiService.importToRag(fileId);
         loadingKey();
         if (ragResponse.success) {
           message.success(t('home.messages.importedRagSuccess'));
@@ -453,10 +456,13 @@ const Home = () => {
         message.success(t('home.import.fileSavedTo', { path: selectedDirectory }));
         loadDirectory(currentDirectory);
         setImportModalVisible(false);
-        // 导入到RAG库
-        const fileName = getFileName(importFilePath);
-        const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-        await handleRagImport(savedFilePath);
+        // 导入到RAG库：使用 saveFile 返回的 file_id
+        const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
+        if (fileId) {
+          await handleRagImport(fileId);
+        } else {
+          message.warning(t('home.messages.saveSuccessRagFailed'));
+        }
       } else {
         message.error(saveResponse.message || t('home.import.fileSaveFailed'));
       }
@@ -498,10 +504,13 @@ const Home = () => {
         message.success(t('home.import.fileSavedTo', { path: selectedDirectory }));
         loadDirectory(currentDirectory);
         setManualSelectModalVisible(false);
-        // 导入到RAG库
-        const fileName = getFileName(importFilePath);
-        const savedFilePath = `${fullTargetDirectory}${separator}${fileName}`;
-        await handleRagImport(savedFilePath);
+        // 导入到RAG库：使用 saveFile 返回的 file_id
+        const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
+        if (fileId) {
+          await handleRagImport(fileId);
+        } else {
+          message.warning(t('home.messages.saveSuccessRagFailed'));
+        }
       } else {
         message.error(saveResponse.message || t('home.import.fileSaveFailed'));
       }
