@@ -9,12 +9,62 @@ import aiohttp
 from typing import List, Dict, Any, Optional
 import numpy as np
 from pathlib import Path
+from abc import ABC, abstractmethod
 
 from loguru import logger
 from config import settings
 
 
-class EmbeddingGenerator:
+class BaseEmbeddingGenerator(ABC):
+    """Embedding生成器基类，定义通用接口"""
+    
+    @abstractmethod
+    def load_model(self) -> bool:
+        """加载模型"""
+        pass
+    
+    @abstractmethod
+    def is_model_loaded(self) -> bool:
+        """检查模型是否已加载"""
+        pass
+    
+    @abstractmethod
+    def generate_embedding(self, text: str) -> Optional[List[float]]:
+        """为单个文本生成embedding"""
+        pass
+    
+    @abstractmethod
+    def generate_embeddings_batch(self, texts: List[str]) -> List[Optional[np.ndarray]]:
+        """批量生成embeddings"""
+        pass
+    
+    @abstractmethod
+    def compute_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
+        """计算两个embedding的相似度"""
+        pass
+    
+    @abstractmethod
+    def get_model_info(self) -> Dict[str, Any]:
+        """获取模型信息"""
+        pass
+    
+    @abstractmethod
+    def normalize_chinese_text(self, text: str) -> str:
+        """规范化中文文本"""
+        pass
+    
+    @abstractmethod
+    def preprocess_chinese_text(self, text: str) -> str:
+        """预处理中文文本"""
+        pass
+    
+    @abstractmethod
+    def split_chinese_text(self, text: str, max_length: int = 512) -> List[str]:
+        """分割中文文本"""
+        pass
+
+
+class EmbeddingGenerator(BaseEmbeddingGenerator):
     """Embedding生成器 - 使用 SentenceTransformer 处理中文和多语言内容"""
     
     def __init__(self, model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"):
@@ -48,7 +98,7 @@ class EmbeddingGenerator:
                 (local_path / "config.json").exists() and
                 (local_path / "pytorch_model.bin").exists())
     
-    def load_model(self):
+    def load_model(self) -> bool:
         """加载embedding模型 - 优先使用本地模型"""
         if self._loading:
             return False
@@ -344,6 +394,353 @@ class EmbeddingGenerator:
     
     def split_chinese_text(self, text: str, max_length: int = 512) -> List[str]:
         """按适当的长度分割中文文本，避免破坏句子结构"""
+        if not text or len(text) <= max_length:
+            return [text] if text else []
+        
+        # 中文句子分隔符
+        sentence_endings = ['。', '！', '？', '；', '\n']
+        chunks = []
+        current_chunk = ""
+        
+        sentences = []
+        current_sentence = ""
+        
+        # 先按句子分割
+        for char in text:
+            current_sentence += char
+            if char in sentence_endings:
+                sentences.append(current_sentence.strip())
+                current_sentence = ""
+        
+        # 如果还有剩余内容
+        if current_sentence.strip():
+            sentences.append(current_sentence.strip())
+        
+        # 合并句子到chunks
+        for sentence in sentences:
+            if len(current_chunk) + len(sentence) <= max_length:
+                current_chunk += sentence
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = sentence
+        
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+        
+        return [chunk for chunk in chunks if chunk]
+
+
+class OllamaEmbeddingGenerator(BaseEmbeddingGenerator):
+    """Ollama Embedding生成器 - 使用 Ollama API 调用 bge-m3 模型"""
+    
+    def __init__(self, 
+                 endpoint: str = "http://localhost:11434",
+                 model_name: str = "bge-m3",
+                 dimension: int = 1024):
+        self.endpoint = endpoint.rstrip('/')
+        self.model_name = model_name
+        self.dimension = dimension
+        self._model_available = None
+        
+    async def _check_model_availability(self) -> bool:
+        """检查模型是否在 Ollama 中可用 - 简化版本，直接认为模型已安装"""
+        logger.info(f"假设 Ollama 模型 {self.model_name} 已安装并可用")
+        self._model_available = True
+        return True
+    
+    async def _call_ollama_embedding(self, text: str) -> Optional[List[float]]:
+        """调用 Ollama API 生成单个文本的 embedding"""
+        try:
+            url = f"{self.endpoint}/api/embed"
+            payload = {
+                "model": self.model_name,
+                "input": [text]  # 使用 input 字段，传递数组
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        
+                        # 记录统计信息
+                        if "total_duration" in result:
+                            duration_ms = result["total_duration"] / 1_000_000  # 转换为毫秒
+                            logger.debug(f"Ollama embedding 耗时: {duration_ms:.2f}ms")
+                        
+                        embeddings = result.get("embeddings", [])
+                        if embeddings and len(embeddings) > 0:
+                            embedding = embeddings[0]
+                            logger.debug(f"生成 embedding，维度: {len(embedding)}")
+                            return embedding
+                        else:
+                            logger.error(f"Ollama API 返回无效的 embedding: {result}")
+                            return None
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"Ollama API 错误: HTTP {response.status}, {error_text}")
+                        return None
+        except Exception as e:
+            logger.error(f"调用 Ollama embedding API 失败: {e}")
+            return None
+    
+    async def _call_ollama_embedding_batch(self, texts: List[str]) -> List[Optional[List[float]]]:
+        """批量调用 Ollama API 生成 embeddings - 使用原生批量接口"""
+        try:
+            # 过滤空文本并预处理
+            processed_texts = []
+            valid_indices = []
+            
+            for i, text in enumerate(texts):
+                if text.strip():
+                    processed_texts.append(self.normalize_chinese_text(text))
+                    valid_indices.append(i)
+            
+            if not processed_texts:
+                logger.warning("没有有效的文本用于批量 embedding 生成")
+                return [None] * len(texts)
+            
+            logger.info(f"准备批量生成 {len(processed_texts)} 个文本的 embeddings")
+            
+            # 使用 Ollama 的批量 embed API
+            url = f"{self.endpoint}/api/embed"
+            payload = {
+                "model": self.model_name,
+                "input": processed_texts  # 直接传递文本数组
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        
+                        # 记录统计信息
+                        if "total_duration" in result:
+                            duration_ms = result["total_duration"] / 1_000_000  # 转换为毫秒
+                            logger.info(f"Ollama 批量 embedding 耗时: {duration_ms:.2f}ms")
+                        
+                        if "prompt_eval_count" in result:
+                            logger.debug(f"处理的 token 数量: {result['prompt_eval_count']}")
+                        
+                        embeddings = result.get("embeddings", [])
+                        
+                        if len(embeddings) != len(processed_texts):
+                            logger.error(f"返回的 embedding 数量 ({len(embeddings)}) 与输入文本数量 ({len(processed_texts)}) 不匹配")
+                            return [None] * len(texts)
+                        
+                        # 验证 embedding 维度
+                        if embeddings and len(embeddings) > 0:
+                            actual_dim = len(embeddings[0])
+                            logger.debug(f"实际 embedding 维度: {actual_dim}")
+                            if actual_dim != self.dimension:
+                                logger.warning(f"实际维度 ({actual_dim}) 与配置维度 ({self.dimension}) 不匹配")
+                        
+                        # 构建结果数组，为无效文本插入 None
+                        results = [None] * len(texts)
+                        for i, valid_idx in enumerate(valid_indices):
+                            results[valid_idx] = embeddings[i]
+                        
+                        logger.info(f"成功生成 {len(embeddings)} 个 embeddings")
+                        return results
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"Ollama 批量 API 错误: HTTP {response.status}, {error_text}")
+                        return [None] * len(texts)
+        except Exception as e:
+            logger.error(f"批量调用 Ollama embedding API 失败: {e}")
+            return [None] * len(texts)
+    
+    def is_model_loaded(self) -> bool:
+        """检查模型是否已加载（简化版本，直接返回 True）"""
+        return True
+    
+    def load_model(self) -> bool:
+        """加载模型（简化版本，直接返回 True）"""
+        logger.info(f"Ollama 模型 {self.model_name} 加载完成（简化模式）")
+        self._model_available = True
+        return True
+    
+    def generate_embedding(self, text: str) -> Optional[List[float]]:
+        """为单个文本生成embedding"""
+        if not text.strip():
+            return None
+            
+        try:
+            # 统一使用同步方式，避免异步复杂性
+            return self._sync_call_ollama_embedding(self.normalize_chinese_text(text))
+            
+        except Exception as e:
+            logger.error(f"生成 Ollama embedding 失败: {e}")
+            raise RuntimeError(f"生成 Ollama embedding 失败: {str(e)}")
+    
+    def _sync_call_ollama_embedding(self, text: str) -> Optional[List[float]]:
+        """同步方式调用 Ollama API 生成单个文本的 embedding"""
+        try:
+            import requests
+            
+            url = f"{self.endpoint}/api/embed"
+            payload = {
+                "model": self.model_name,
+                "input": [text]  # 使用 input 字段，传递数组
+            }
+            
+            response = requests.post(url, json=payload, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                
+                # 记录统计信息
+                if "total_duration" in result:
+                    duration_ms = result["total_duration"] / 1_000_000  # 转换为毫秒
+                    logger.debug(f"Ollama embedding 耗时: {duration_ms:.2f}ms")
+                
+                embeddings = result.get("embeddings", [])
+                if embeddings and len(embeddings) > 0:
+                    embedding = embeddings[0]
+                    logger.debug(f"生成 embedding，维度: {len(embedding)}")
+                    return embedding
+                else:
+                    logger.error(f"Ollama API 返回无效的 embedding: {result}")
+                    return None
+            else:
+                logger.error(f"Ollama API 错误: HTTP {response.status_code}, {response.text}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"同步调用 Ollama embedding API 失败: {e}")
+            return None
+    
+    def generate_embeddings_batch(self, texts: List[str]) -> List[Optional[np.ndarray]]:
+        """批量生成embeddings - 逐个同步处理"""
+        if not texts:
+            return []
+            
+        try:
+            logger.info(f"使用 Ollama 逐个同步生成 {len(texts)} 个文本的 embeddings")
+            
+            # 统一使用同步方式逐个处理，避免异步复杂性
+            embeddings_list = self._sync_call_ollama_embedding_batch(texts)
+            
+            # 转换为 numpy 数组格式
+            results = []
+            for embedding in embeddings_list:
+                if embedding is not None:
+                    results.append(np.array(embedding, dtype=np.float32))
+                else:
+                    results.append(None)
+            
+            logger.info(f"成功生成 {sum(1 for r in results if r is not None)} 个 Ollama embeddings")
+            return results
+            
+        except Exception as e:
+            logger.error(f"批量生成 Ollama embedding 失败: {e}")
+            raise RuntimeError(f"批量生成 Ollama embedding 失败: {str(e)}")
+    
+    def _sync_call_ollama_embedding_batch(self, texts: List[str]) -> List[Optional[List[float]]]:
+        """同步方式逐个调用 Ollama API 生成 embeddings"""
+        results = []
+        
+        # 过滤空文本
+        for i, text in enumerate(texts):
+            if text.strip():
+                processed_text = self.normalize_chinese_text(text)
+                logger.debug(f"处理文本 {i+1}/{len(texts)}")
+                embedding = self._sync_call_ollama_embedding(processed_text)
+                results.append(embedding)
+            else:
+                results.append(None)
+        
+        return results
+    
+    def normalize_chinese_text(self, text: str) -> str:
+        """规范化中文文本 - 与原始 EmbeddingGenerator 保持一致"""
+        if not text:
+            return ""
+        
+        # Basic text cleaning
+        text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+        text = text.strip()
+        
+        # Handle Chinese punctuation normalization
+        chinese_punct_map = {
+            '，': ', ',
+            '。': '. ',
+            '！': '! ',
+            '？': '? ',
+            '；': '; ',
+            '：': ': ',
+            '"': '"',
+            '"': '"',
+            ''': "'",
+            ''': "'",
+            '（': ' (',
+            '）': ') ',
+            '【': ' [',
+            '】': '] '
+        }
+        
+        for chinese, english in chinese_punct_map.items():
+            text = text.replace(chinese, english)
+        
+        # Clean up extra spaces
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        return text
+    
+    def compute_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
+        """计算两个embedding的相似度（余弦相似度）"""
+        try:
+            vec1 = np.array(embedding1)
+            vec2 = np.array(embedding2)
+            
+            # 余弦相似度
+            dot_product = np.dot(vec1, vec2)
+            norm1 = np.linalg.norm(vec1)
+            norm2 = np.linalg.norm(vec2)
+            
+            if norm1 == 0 or norm2 == 0:
+                return 0.0
+                
+            similarity = dot_product / (norm1 * norm2)
+            return float(similarity)
+            
+        except Exception as e:
+            logger.error(f"计算相似度失败: {e}")
+            return 0.0
+    
+    def get_model_info(self) -> Dict[str, Any]:
+        """获取模型信息"""
+        return {
+            "model_name": self.model_name,
+            "dimension": self.dimension,
+            "is_loaded": True,  # 简化模式，总是返回已加载
+            "status": "loaded",  # 简化模式，总是返回已加载状态
+            "supports_multilingual": True,
+            "supports_chinese": True,
+            "embedding_type": "ollama",
+            "endpoint": self.endpoint,
+            "model_available": True,  # 简化模式，总是认为模型可用
+            "simplified_mode": True  # 标识这是简化模式
+        }
+    
+    def preprocess_chinese_text(self, text: str) -> str:
+        """预处理中文文本 - 与原始 EmbeddingGenerator 保持一致"""
+        if not text:
+            return text
+            
+        # 移除多余的空白字符
+        text = ' '.join(text.split())
+        
+        # 处理中英文之间的空格
+        import re
+        # 在中文和英文/数字之间添加空格
+        text = re.sub(r'([\u4e00-\u9fff])([a-zA-Z0-9])', r'\1 \2', text)
+        text = re.sub(r'([a-zA-Z0-9])([\u4e00-\u9fff])', r'\1 \2', text)
+        
+        return text.strip()
+    
+    def split_chinese_text(self, text: str, max_length: int = 512) -> List[str]:
+        """按适当的长度分割中文文本，避免破坏句子结构 - 与原始 EmbeddingGenerator 保持一致"""
         if not text or len(text) <= max_length:
             return [text] if text else []
         
@@ -892,15 +1289,26 @@ class LLMClient:
 
 # Global instances
 _embedding_generator = None
+_ollama_embedding_generator = None
 _llm_client = None
 
 
-def get_embedding_generator() -> EmbeddingGenerator:
-    """Get global embedding generator instance"""
-    global _embedding_generator
-    if _embedding_generator is None:
-        _embedding_generator = EmbeddingGenerator(settings.embedding_model)
-    return _embedding_generator
+def get_embedding_generator() -> BaseEmbeddingGenerator:
+    """Get global embedding generator instance based on configuration"""
+    global _embedding_generator, _ollama_embedding_generator
+    
+    if settings.embedding_type == "ollama":
+        if _ollama_embedding_generator is None:
+            _ollama_embedding_generator = OllamaEmbeddingGenerator(
+                endpoint=settings.ollama_embedding_endpoint,
+                model_name=settings.ollama_embedding_model,
+                dimension=settings.ollama_embedding_dimension
+            )
+        return _ollama_embedding_generator
+    else:  # 默认使用 sentence-transformers
+        if _embedding_generator is None:
+            _embedding_generator = EmbeddingGenerator(settings.embedding_model)
+        return _embedding_generator
 
 
 def get_llm_client() -> Optional[LLMClient]:

@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     pandoc_path: str = Field(default="", env="PANDOC_PATH")  # 将在 __init__ 中设置默认路径
     
     # Embedding配置
+    embedding_type: str = Field(default="sentence-transformers", env="EMBEDDING_TYPE")  # sentence-transformers, ollama
     embedding_model: str = Field(
         default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", 
         env="EMBEDDING_MODEL"
@@ -39,6 +40,11 @@ class Settings(BaseSettings):
     embedding_local_path: Optional[str] = Field(default=None, env="EMBEDDING_LOCAL_PATH")
     embedding_cache_dir: Optional[str] = Field(default=None, env="EMBEDDING_CACHE_DIR")
     hf_endpoint: str = Field(default="https://hf-mirror.com", env="HF_ENDPOINT")
+    
+    # Ollama Embedding配置
+    ollama_embedding_endpoint: str = Field(default="http://localhost:11434", env="OLLAMA_EMBEDDING_ENDPOINT")
+    ollama_embedding_model: str = Field(default="bge-m3", env="OLLAMA_EMBEDDING_MODEL")
+    ollama_embedding_dimension: int = Field(default=1024, env="OLLAMA_EMBEDDING_DIMENSION")  # bge-m3 的向量维度
     
     # 搜索配置
     similarity_threshold: float = Field(default=0.7, env="SIMILARITY_THRESHOLD")
@@ -114,7 +120,10 @@ class Settings(BaseSettings):
     def get_config_dict(self) -> Dict[str, Any]:
         """获取配置字典"""
         return {
+            "embedding_type": self.embedding_type,
             "embedding_model": self.embedding_model,
+            "ollama_embedding_endpoint": self.ollama_embedding_endpoint,
+            "ollama_embedding_model": self.ollama_embedding_model,
             "llm_model": self.llm_model,
             "llm_type": self.llm_type,
             "llm_endpoint": self.llm_endpoint,
@@ -136,7 +145,8 @@ class Settings(BaseSettings):
         restart_required = False
         # 定义需要重启的配置项
         restart_required_fields = {
-            "embedding_model", "llm_type", "llm_endpoint", 
+            "embedding_type", "embedding_model", "ollama_embedding_endpoint", "ollama_embedding_model",
+            "llm_type", "llm_endpoint", 
             "database_path", "workdir_path", "temp_path", "pandoc_path"
         }
         path_fields = {"database_path", "workdir_path", "logs_path", "temp_path"}
