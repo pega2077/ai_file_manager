@@ -244,7 +244,8 @@
       "preview": "预览",
       "openDirectory": "打开目录",
       "openFile": "打开文件",
-      "importToRag": "导入知识库"
+      "importToRag": "导入知识库",
+      "askQuestion": "提问"
     },
     "placeholders": {
       "searchFileName": "搜索文件名",

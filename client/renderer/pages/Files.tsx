@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Layout, Button, message, Modal, Select, TreeSelect, Table, Input, Tag, Space, Pagination } from 'antd';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Layout, Button, message, Select, Table, Input, Tag, Space, Pagination } from 'antd';
 import type { TableProps } from 'antd';
-import { FileAddOutlined, ReloadOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { ReloadOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined, QuestionCircleOutlined, FileAddOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import FilePreview from "../components/FilePreview";
+import FileImport, { FileImportRef } from "../components/FileImport";
 import { apiService } from '../services/api';
-import { DirectoryStructureResponse, RecommendDirectoryResponse, Settings, TreeNode, ImportedFileItem } from '../shared/types';
-import { isTextFile } from '../shared/utils';
+import { ImportedFileItem } from '../shared/types';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 
 const { Content } = Layout;
@@ -132,7 +132,8 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
     try {
       const loadingKey = message.loading(t('files.messages.importingToRag', { name: file.name }), 0);
       
-      const response = await apiService.importToRag(file.file_id);
+  // The file is already recorded in DB after save; avoid duplicate DB insert in RAG import.
+  const response = await apiService.importToRag(file.file_id, true);
       loadingKey();
       
       if (response.success) {
@@ -492,314 +493,13 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
 const FilesPage: React.FC = () => {
   const { t } = useTranslation();
   const selectedMenu = 'file-list';
-  const [workDirectory, setWorkDirectory] = useState<string>('workdir');
-  const [importModalVisible, setImportModalVisible] = useState(false);
-  const [selectedDirectory, setSelectedDirectory] = useState<string>('');
-  const [importFilePath, setImportFilePath] = useState<string>('');
-  const [directoryOptions, setDirectoryOptions] = useState<TreeNode[]>([]);
-  const [manualSelectModalVisible, setManualSelectModalVisible] = useState(false);
-  const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const importRef = useRef<FileImportRef>(null);
 
-  useEffect(() => {
-    // 从store读取工作目录和设置
-    const loadInitialData = async () => {
-      if (window.electronStore) {
-        try {
-          const storedWorkDirectory = await window.electronStore.get('workDirectory') as string;
-          
-          if (storedWorkDirectory) {
-            setWorkDirectory(storedWorkDirectory);
-          } else {
-            setWorkDirectory('workdir');
-          }
-        } catch (error) {
-          console.error('Failed to load initial data:', error);
-          setWorkDirectory('workdir');
-        }
-      } else {
-        setWorkDirectory('workdir');
-      }
-    };
-
-    loadInitialData();
-  }, []);
-
-  const handleImportFile = async () => {
-    try {
-      // 选择要导入的文件
-      const filePath = await window.electronAPI.selectFile();
-      if (!filePath) {
-        return; // 用户取消了选择
-      }
-
-      // 步骤1: 获取工作目录的目录结构
-      const directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
-      if (!directoryStructureResponse.success) {
-        message.error(t('files.messages.getDirectoryStructureFailed'));
-        return;
-      }
-
-      // 提取目录路径列表
-      const directories = extractDirectoriesFromStructure(directoryStructureResponse.data as DirectoryStructureResponse);
-
-      // 步骤2: 调用推荐保存目录接口
-      const loadingKey = message.loading(t('files.messages.analyzingFile'), 0);
-      const recommendResponse = await apiService.recommendDirectory(filePath, directories);
-      loadingKey();
-      
-      if (!recommendResponse.success) {
-        message.error(t('files.messages.getRecommendationFailed'));
-        return;
-      }
-
-      const recommendedDirectory = (recommendResponse.data as RecommendDirectoryResponse)?.recommended_directory;
-      const alternatives = (recommendResponse.data as RecommendDirectoryResponse)?.alternatives || [];
-
-      // 步骤3: 获取设置选项 autoClassifyWithoutConfirmation
-      const settings = await window.electronStore.get('settings') as Settings;
-      const autoClassifyWithoutConfirmation = settings?.autoClassifyWithoutConfirmation || false;
-
-      if (autoClassifyWithoutConfirmation) {
-        // 步骤4: 自动保存到推荐目录
-        const separator = getPathSeparator();
-        const fullTargetDirectory = recommendedDirectory.startsWith(workDirectory) 
-          ? recommendedDirectory 
-          : `${workDirectory}${separator}${recommendedDirectory.replace(/\//g, separator)}`;
-        
-        const saveResponse = await apiService.saveFile(filePath, fullTargetDirectory, false);
-        if (saveResponse.success) {
-          message.success(t('files.messages.fileAutoSavedTo', { path: recommendedDirectory }));
-          // 刷新文件列表
-          setRefreshTrigger(prev => prev + 1);
-          // 导入到RAG库（使用数据库返回的 file_id）
-          const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
-          if (fileId) {
-            await handleRagImport(fileId, isTextFile(filePath));
-          }
-        } else {
-          message.error(saveResponse.message || t('files.messages.fileSaveFailed'));
-        }
-      } else {
-        // 步骤5: 弹出确认对话框
-        await showImportConfirmationDialog(filePath, recommendedDirectory, alternatives, directoryStructureResponse.data as DirectoryStructureResponse);
-      }
-    } catch (error) {
-      message.error(t('files.messages.fileImportFailed'));
-      console.error(error);
-    }
-  };
-
-  const getPathSeparator = () => {
-    // 使用 userAgent 检测 Windows 平台，避免使用已弃用的 platform 属性
-    return navigator.userAgent.includes('Windows') ? '\\' : '/';
-  };
-
-  // 处理RAG导入
-  const handleRagImport = async (fileId: string, noSaveDb: boolean = false) => {
-    try {
-      const settings = await window.electronStore.get('settings') as Settings;
-      if (settings?.autoSaveRAG) {
-        const loadingKey = message.loading(t('files.messages.importingRag'), 0);
-        const ragResponse = await apiService.importToRag(fileId, noSaveDb);
-        loadingKey();
-        if (ragResponse.success) {
-          message.success(t('files.messages.importedRagSuccess'));
-        } else {
-          message.warning(t('files.messages.saveSuccessRagFailed'));
-        }
-      }
-    } catch (error) {
-      message.warning(t('files.messages.saveSuccessRagFailed'));
-      console.error(error);
-    }
-  };
-
-  // 从目录结构响应中提取目录路径列表
-  const extractDirectoriesFromStructure = (structureData: DirectoryStructureResponse): string[] => {
-    const directories: string[] = [];
-
-    if (structureData && structureData.items) {
-      for (const item of structureData.items) {
-        if (item.type === 'folder' && item.relative_path && item.relative_path !== '.') {
-          directories.push(item.relative_path);
-        }
-      }
-    }
-
-    return directories;
-  };
-
-  // 显示导入确认对话框
-  const showImportConfirmationDialog = async (filePath: string, recommendedDirectory: string, alternatives: string[], directoryStructure: DirectoryStructureResponse) => {
-    setImportFilePath(filePath);
-    setSelectedDirectory(recommendedDirectory);
-
-    // 构建选择数据，只包含推荐目录和备选目录
-    const options = buildDirectoryOptions(recommendedDirectory, alternatives);
-    setDirectoryOptions(options);
-
-    // 构建完整的目录树数据
-    const treeData = buildDirectoryTreeData(directoryStructure);
-    setDirectoryTreeData(treeData);
-
-    setImportModalVisible(true);
-  };
-
-  // 构建目录选择选项
-  const buildDirectoryOptions = (recommendedDirectory: string, alternatives: string[]): TreeNode[] => {
-    const options: TreeNode[] = [];
-
-    // 添加推荐目录
-    options.push({
-      title: `${recommendedDirectory} ${t('files.import.suffixRecommended')}`,
-      value: recommendedDirectory,
-      key: recommendedDirectory,
-      children: [],
-    });
-
-    // 添加备选目录
-    alternatives.forEach(alt => {
-      if (alt !== recommendedDirectory) { // 避免重复
-        options.push({
-          title: `${alt} ${t('files.import.suffixAlternative')}`,
-          value: alt,
-          key: alt,
-          children: [],
-        });
-      }
-    });
-
-    return options;
-  };
-
-  // 构建目录树数据
-  const buildDirectoryTreeData = (structureData: DirectoryStructureResponse): TreeNode[] => {
-    const treeData: TreeNode[] = [];
-    const pathMap = new Map<string, TreeNode>();
-
-    if (structureData && structureData.items) {
-      // 首先创建所有节点
-      structureData.items.forEach(item => {
-        if (item.type === 'folder' && item.relative_path && item.relative_path !== '.') {
-          const node: TreeNode = {
-            title: item.name,
-            value: item.relative_path,
-            key: item.relative_path,
-            children: [],
-          };
-          pathMap.set(item.relative_path, node);
-        }
-      });
-
-      // 然后构建树结构
-      pathMap.forEach((node, path) => {
-        const parts = path.split('/');
-        if (parts.length === 1) {
-          // 根级目录
-          treeData.push(node);
-        } else {
-          // 子目录
-          const parentPath = parts.slice(0, -1).join('/');
-          const parentNode = pathMap.get(parentPath);
-          if (parentNode) {
-            parentNode.children.push(node);
-          }
-        }
-      });
-    }
-
-    return treeData;
-  };
-
-  // 处理导入确认
-  const handleImportConfirm = async () => {
-    if (!selectedDirectory) {
-      message.error(t('files.import.selectSaveDirectory'));
-      return;
-    }
-
-    try {
-      // 拼接完整的目标目录路径
-      const separator = getPathSeparator();
-      const fullTargetDirectory = selectedDirectory.startsWith(workDirectory) 
-        ? selectedDirectory 
-        : `${workDirectory}${separator}${selectedDirectory.replace(/\//g, separator)}`;
-      
-      const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
-      if (saveResponse.success) {
-        message.success(t('files.import.fileSavedTo', { path: selectedDirectory }));
-        setImportModalVisible(false);
-        // 刷新文件列表
-        setRefreshTrigger(prev => prev + 1);
-        // 导入到RAG库（使用数据库返回的 file_id）
-        const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
-        if (fileId) {
-          await handleRagImport(fileId, isTextFile(importFilePath));
-        }
-      } else {
-        message.error(saveResponse.message || t('files.messages.fileSaveFailed'));
-      }
-    } catch (error) {
-      message.error(t('files.messages.fileSaveFailed'));
-      console.error(error);
-    }
-  };
-
-  // 处理导入取消
-  const handleImportCancel = () => {
-    setImportModalVisible(false);
-    setSelectedDirectory('');
-    setImportFilePath('');
-  };
-
-  // 处理手动选择目录
-  const handleManualSelectDirectory = () => {
-    setImportModalVisible(false); // 隐藏确认对话框
-    setManualSelectModalVisible(true);
-  };
-
-  // 处理手动选择确认
-  const handleManualSelectConfirm = async () => {
-    if (!selectedDirectory) {
-      message.error(t('files.import.selectSaveDirectory'));
-      return;
-    }
-
-    try {
-      // 拼接完整的目标目录路径
-      const separator = getPathSeparator();
-      const fullTargetDirectory = selectedDirectory.startsWith(workDirectory)
-        ? selectedDirectory
-        : `${workDirectory}${separator}${selectedDirectory.replace(/\//g, separator)}`;
-
-      const saveResponse = await apiService.saveFile(importFilePath, fullTargetDirectory, false);
-      if (saveResponse.success) {
-        message.success(t('files.import.fileSavedTo', { path: selectedDirectory }));
-        setManualSelectModalVisible(false);
-        // 刷新文件列表
-        setRefreshTrigger(prev => prev + 1);
-        // 导入到RAG库（使用数据库返回的 file_id）
-        const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
-        if (fileId) {
-          await handleRagImport(fileId, isTextFile(importFilePath));
-        }
-      } else {
-        message.error(saveResponse.message || t('files.messages.fileSaveFailed'));
-      }
-    } catch (error) {
-      message.error(t('files.messages.fileSaveFailed'));
-      console.error(error);
-    }
-  };
+  // Import flow is encapsulated in FileImport component now.
 
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
-  };
-
-  // 处理手动选择取消
-  const handleManualSelectCancel = () => {
-    setManualSelectModalVisible(false);
   };
 
   return (
@@ -830,7 +530,7 @@ const FilesPage: React.FC = () => {
               <Button
                 type="primary"
                 icon={<FileAddOutlined />}
-                onClick={handleImportFile}
+                onClick={() => importRef.current?.startImport()}
                 size="large"
               >
                 {t('files.buttons.importFile')}
@@ -839,73 +539,9 @@ const FilesPage: React.FC = () => {
           </div>
 
           <FileList refreshTrigger={refreshTrigger} />
+          <FileImport ref={importRef} onImported={() => setRefreshTrigger(prev => prev + 1)} />
         </Content>
       </Layout>
-
-      <Modal
-        title={t('files.import.modalTitle')}
-        open={importModalVisible}
-        onOk={handleImportConfirm}
-        onCancel={handleImportCancel}
-        okText={t('files.import.confirmSave')}
-        cancelText={t('common.cancel')}
-        footer={[
-          <Button key="cancel" onClick={handleImportCancel}>
-            {t('common.cancel')}
-          </Button>,
-          <Button key="manual" onClick={handleManualSelectDirectory}>
-            {t('files.import.manualSelectButton')}
-          </Button>,
-          <Button key="confirm" type="primary" onClick={handleImportConfirm}>
-            {t('files.import.confirmSave')}
-          </Button>,
-        ]}
-      >
-        <div style={{ marginBottom: 16 }}>
-          <p>{t('files.import.recommendText', { path: selectedDirectory })}</p>
-          <p>{t('files.import.selectTargetPrompt')}</p>
-          <Select
-            style={{ width: '100%' }}
-            value={selectedDirectory}
-            onChange={(value: string) => setSelectedDirectory(value)}
-            placeholder={t('files.import.selectPlaceholder')}
-          >
-            {directoryOptions.map(option => (
-              <Select.Option key={option.key} value={option.value}>
-                {option.title}
-              </Select.Option>
-            ))}
-          </Select>
-        </div>
-      </Modal>
-
-      <Modal
-        title={t('files.import.manualModalTitle')}
-        open={manualSelectModalVisible}
-        onOk={handleManualSelectConfirm}
-        onCancel={handleManualSelectCancel}
-        okText={t('files.import.confirmSelect')}
-        cancelText={t('common.cancel')}
-        width={600}
-      >
-        <div style={{ marginBottom: 16 }}>
-          <p>{t('files.import.selectTargetPrompt')}</p>
-          <TreeSelect
-            style={{ width: '100%' }}
-            value={selectedDirectory}
-            styles={{ popup: { root: { maxHeight: 400, overflow: 'auto' } } }}
-            treeData={directoryTreeData}
-            placeholder={t('files.import.selectPlaceholder')}
-            treeDefaultExpandAll
-            treeLine
-            showSearch
-            filterTreeNode={(input, treeNode) =>
-              String(treeNode?.title).toLowerCase().includes(input.toLowerCase())
-            }
-            onChange={(value: string) => setSelectedDirectory(value)}
-          />
-        </div>
-      </Modal>
     </Layout>
   );
 };

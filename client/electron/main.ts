@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import Store from "electron-store";
 import { ImportService } from "./importService";
-import { checkServiceStatus, startPythonServer, startPythonServerWithConfig, stopPythonServer } from "./backendService";
+import { checkServiceStatus, startPythonServerWithConfig, stopPythonServer } from "./backendService";
 import { logger } from "./logger";
 import { configManager, AppConfig } from "./configManager";
 
@@ -244,6 +244,14 @@ function setupIpcHandlers() {
     void syncWorkDirectoryConfig();
     void syncLanguageConfig();
     return true;
+  });
+
+  // IPC handler for getting API base URL
+  ipcMain.handle("get-api-base-url", () => {
+    const stored = store.get("apiBaseUrl", "http://localhost:8000") as string;
+    // Normalize: remove trailing slash for consistent concatenation in renderer
+    const normalized = typeof stored === "string" ? stored.replace(/\/$/, "") : "http://localhost:8000";
+    return normalized;
   });
 
   // IPC handler for showing main window

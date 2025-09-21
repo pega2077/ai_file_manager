@@ -247,7 +247,8 @@
       "preview": "Preview",
       "openDirectory": "Open Directory",
       "openFile": "Open File",
-      "importToRag": "Import to Knowledge Base"
+      "importToRag": "Import to Knowledge Base",
+      "askQuestion": "Ask Question"
     },
     "placeholders": {
       "searchFileName": "Search file name",
