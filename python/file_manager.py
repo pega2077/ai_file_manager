@@ -929,21 +929,26 @@ If no suitable directory is found, you can suggest creating a new one by specify
                     from database import DatabaseManager
                     db_manager = DatabaseManager()
 
-                    rag_file_info = {
-                        'file_id': file_id,
-                        'path': str(final_file_path.relative_to(settings.workdir_path)) if final_file_path != source_path else str(source_path),
-                        'name': filename,
-                        'type': "text/markdown",
-                        'category': "RAG_Import",
-                        'summary': f"RAG imported file from {file_path}",
-                        'tags': ["rag_import"],
-                        'size': final_file_size,
-                        'added_at': datetime.now().isoformat(),
-                        'processed': True
-                    }
+                    # Avoid duplicate records: check if file_id already exists
+                    existing = db_manager.get_file_by_id(file_id)
+                    if existing:
+                        logger.info(f"File record already exists in DB for file_id={file_id}, skipping insert.")
+                    else:
+                        rag_file_info = {
+                            'file_id': file_id,
+                            'path': str(final_file_path.relative_to(settings.workdir_path)) if final_file_path != source_path else str(source_path),
+                            'name': filename,
+                            'type': "text/markdown",
+                            'category': "RAG_Import",
+                            'summary': f"RAG imported file from {file_path}",
+                            'tags': ["rag_import"],
+                            'size': final_file_size,
+                            'added_at': datetime.now().isoformat(),
+                            'processed': True
+                        }
 
-                    db_id = db_manager.insert_file(rag_file_info)
-                    logger.info(f"RAG file record saved to database with ID: {db_id}")
+                        db_id = db_manager.insert_file(rag_file_info)
+                        logger.info(f"RAG file record saved to database with ID: {db_id}")
 
                 except Exception as db_error:
                     logger.error(f"Failed to save RAG file record to database: {db_error}")
