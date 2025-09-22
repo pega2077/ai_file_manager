@@ -7,7 +7,8 @@ import fs from "fs";
 import { promises as fsp } from "fs";
 import { MAX_TEXT_PREVIEW_BYTES, getMimeByExt, isImageExt, decodeTextBuffer, CATEGORY_EXTENSIONS, toNumber, isNonEmptyString, parseTags } from "./utils/fileHelpers";
 import { ensureTxtFile, chunkText } from "./utils/fileConversion";
-import { embedWithOllama } from "./utils/ollama";
+import { embedWithOllama, generateStructuredJsonWithOllama } from "./utils/ollama";
+import { app } from "electron";
 
 interface ListFilesRequestBody {
   page?: unknown;
@@ -157,6 +158,10 @@ export function registerFilesRoutes(app: Express) {
   app.post("/api/files/save-file", saveFileHandler);
   // POST /api/files/import-to-rag
   app.post("/api/files/import-to-rag", importToRagHandler);
+  // POST /api/files/list-directory-recursive
+  app.post("/api/files/list-directory-recursive", listDirectoryRecursiveHandler);
+  // POST /api/files/recommend-directory
+  app.post("/api/files/recommend-directory", recommendDirectoryHandler);
 }
 
 // -------- Handlers --------
@@ -257,6 +262,211 @@ export async function previewFileHandler(req: Request, res: Response): Promise<v
       message: "internal_error",
       data: null,
       error: { code: "INTERNAL_ERROR", message: "Preview failed", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+// -------- List Directory Recursive --------
+interface ListDirRecursiveBody {
+  directory_path?: unknown;
+  max_depth?: unknown;
+}
+
+function iso(d: Date | null | undefined): string | null {
+  try {
+    return d ? new Date(d).toISOString() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function countImmediateChildren(absDir: string): Promise<number> {
+  try {
+    const list = await fsp.readdir(absDir);
+    return list.length;
+  } catch {
+    return 0;
+  }
+}
+
+function resolveDirectoryBase(inputPath: string): string | null {
+  // absolute path
+  if (path.isAbsolute(inputPath)) return path.normalize(inputPath);
+  const candidates: string[] = [];
+  try {
+    const appRoot = app.getAppPath();
+    // Try a few likely bases (dev/build)
+    candidates.push(path.resolve(process.cwd(), inputPath));
+    candidates.push(path.resolve(appRoot, inputPath));
+    candidates.push(path.resolve(appRoot, "..", inputPath));
+    candidates.push(path.resolve(appRoot, "..", "..", inputPath));
+  } catch {
+    candidates.push(path.resolve(process.cwd(), inputPath));
+  }
+  for (const c of candidates) {
+    try {
+      const st = fs.statSync(c);
+      if (st.isDirectory()) return path.normalize(c);
+    } catch {
+      // continue
+    }
+  }
+  return null;
+}
+
+export async function listDirectoryRecursiveHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as ListDirRecursiveBody | undefined;
+    const dirInput = typeof body?.directory_path === "string" ? body.directory_path : undefined;
+    const depthInput = toNumber(body?.max_depth, 3);
+    const maxDepth = Math.max(1, Math.min(10, depthInput));
+
+    if (!dirInput || !dirInput.trim()) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "directory_path is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const baseAbs = resolveDirectoryBase(dirInput);
+    if (!baseAbs) {
+      res.status(404).json({
+        success: false,
+        message: "not_found",
+        data: null,
+        error: { code: "RESOURCE_NOT_FOUND", message: "directory not found", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const rootStat = await fsp.stat(baseAbs);
+    if (!rootStat.isDirectory()) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "directory_path is not a directory", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    type Item = {
+      name: string;
+      type: "file" | "folder";
+      path: string;
+      relative_path: string;
+      depth: number;
+      size?: number | null;
+      created_at?: string | null;
+      modified_at?: string | null;
+      item_count?: number | null;
+    };
+    const items: Item[] = [];
+
+    // Root folder entry
+    items.push({
+      name: path.basename(baseAbs),
+      type: "folder",
+      path: baseAbs,
+      relative_path: ".",
+      depth: 0,
+      size: null,
+      created_at: iso(rootStat.birthtime),
+      modified_at: iso(rootStat.mtime),
+      item_count: await countImmediateChildren(baseAbs),
+    });
+
+    // BFS traversal up to maxDepth
+    const queue: Array<{ dir: string; depth: number }> = [{ dir: baseAbs, depth: 0 }];
+    while (queue.length > 0) {
+      const { dir, depth } = queue.shift()!;
+      if (depth >= maxDepth) continue;
+      let dirents: fs.Dirent[] = [];
+      try {
+        dirents = await fsp.readdir(dir, { withFileTypes: true });
+      } catch (err) {
+        logger.warn("Failed to read directory", { dir, err: String(err) });
+        continue;
+      }
+
+      for (const de of dirents) {
+        const full = path.join(dir, de.name);
+        let st: fs.Stats | null = null;
+        try {
+          st = await fsp.lstat(full);
+        } catch {
+          continue;
+        }
+        // Avoid cycles
+        if (st.isSymbolicLink()) continue;
+        const itemDepth = depth + 1;
+        const rel = path.relative(baseAbs, full) || ".";
+
+        if (de.isDirectory()) {
+          let cnt: number | null = null;
+          try { cnt = await countImmediateChildren(full); } catch { cnt = null; }
+          items.push({
+            name: de.name,
+            type: "folder",
+            path: full,
+            relative_path: rel.replace(/\\/g, "/"),
+            depth: itemDepth,
+            size: null,
+            created_at: iso(st.birthtime),
+            modified_at: iso(st.mtime),
+            item_count: cnt,
+          });
+          queue.push({ dir: full, depth: itemDepth });
+        } else if (de.isFile()) {
+          items.push({
+            name: de.name,
+            type: "file",
+            path: full,
+            relative_path: rel.replace(/\\/g, "/"),
+            depth: itemDepth,
+            size: st.size,
+            created_at: iso(st.birthtime),
+            modified_at: iso(st.mtime),
+            item_count: null,
+          });
+        } else {
+          // Skip special types
+          continue;
+        }
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        directory_path: baseAbs,
+        max_depth: maxDepth,
+        items,
+        total_count: items.length,
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/files/list-directory-recursive failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "List directory failed", details: null },
       timestamp: new Date().toISOString(),
       request_id: "",
     });
@@ -439,6 +649,141 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
       message: "internal_error",
       data: null,
       error: { code: "SAVE_FILE_ERROR", message: "Failed to save file", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+// -------- Recommend Directory --------
+export async function recommendDirectoryHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as { file_path?: unknown; available_directories?: unknown } | undefined;
+    const filePath = typeof body?.file_path === "string" ? body.file_path : undefined;
+    const availableDirs = Array.isArray(body?.available_directories)
+      ? (body!.available_directories as unknown[]).filter((v) => typeof v === "string").map((v) => String(v))
+      : [];
+
+    if (!filePath) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "file_path is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+    if (!path.isAbsolute(filePath)) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "file_path must be an absolute path", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const st = await fsp.stat(filePath).catch(() => null);
+    if (!st || !st.isFile()) {
+      res.status(404).json({
+        success: false,
+        message: "not_found",
+        data: null,
+        error: { code: "SOURCE_FILE_MISSING", message: "source file does not exist", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const filename = path.basename(filePath);
+
+    // Convert to text for analysis
+    const txtPath = await ensureTxtFile(filePath);
+    const content = await fsp.readFile(txtPath, "utf8");
+    const snippet = content.slice(0, 500);
+
+    // Build messages and JSON schema per API.md
+    const directoriesList = availableDirs.length > 0 ? availableDirs.join("\n") : "";
+    const messages = [
+      {
+        role: "system" as const,
+        content:
+          "You are a file classification expert. Recommend the most appropriate directory to store the file. Output JSON only, no extra text.",
+      },
+      {
+        role: "user" as const,
+        content:
+          `Available directories (one per line, may be empty):\n${directoriesList}\n\nFile name: ${filename}\nFile content (first 500 chars): ${snippet}\n\nReturn JSON with fields: recommended_directory (string), confidence (number 0-1), reasoning (string), alternatives (array of strings). Do not include any other fields.`,
+      },
+    ];
+
+    const responseFormat = {
+      json_schema: {
+        name: "recommend_directory_schema",
+        schema: {
+          type: "object",
+          properties: {
+            recommended_directory: { type: "string" },
+            confidence: { type: "number" },
+            reasoning: { type: "string" },
+            alternatives: { type: "array", items: { type: "string" } },
+          },
+          required: ["recommended_directory", "confidence", "reasoning", "alternatives"],
+        },
+        strict: true,
+      },
+    } as const;
+
+    let result: unknown;
+    try {
+      result = await generateStructuredJsonWithOllama(messages, responseFormat, 0.7, 1000);
+    } catch (err) {
+      logger.error("LLM recommend-directory call failed", err as unknown);
+      res.status(500).json({
+        success: false,
+        message: "llm_error",
+        data: null,
+        error: { code: "LLM_ERROR", message: (err as Error).message, details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    // Basic runtime validation
+    const obj = result as Record<string, unknown>;
+    const recommended_directory = typeof obj?.recommended_directory === "string" ? (obj.recommended_directory as string) : "未分类";
+    const confidence = typeof obj?.confidence === "number" ? (obj.confidence as number) : 0.0;
+    const reasoning = typeof obj?.reasoning === "string" ? (obj.reasoning as string) : "";
+    const alternatives = Array.isArray(obj?.alternatives) ? (obj.alternatives as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : [];
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        file_path: filePath,
+        filename,
+        recommended_directory,
+        confidence: Math.max(0, Math.min(1, confidence)),
+        reasoning,
+        alternatives,
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/files/recommend-directory failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "ANALYSIS_ERROR", message: "Recommend directory failed", details: null },
       timestamp: new Date().toISOString(),
       request_id: "",
     });

@@ -5,6 +5,7 @@ import { logger } from "./logger";
 import { registerSystemRoutes } from "./backend/systemController";
 import { registerFilesRoutes } from "./backend/filesController";
 import { authenticateDB } from "./backend/db";
+import { registerChatRoutes } from "./backend/chatController";
 
 let server: Server | null = null;
 
@@ -50,8 +51,9 @@ export const startServer = async (): Promise<void> => {
     // Initialize DB connection
     await authenticateDB();
     // Register backend routes
-    registerSystemRoutes(app);
-    registerFilesRoutes(app);
+  registerSystemRoutes(app);
+  registerFilesRoutes(app);
+  registerChatRoutes(app);
 
     // Generic error handler (last middleware)
     app.use(
