@@ -536,7 +536,7 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
     }
 
     // 4) Persist chunks to DB (replace existing for file_id)
-    const nowIso = new Date().toISOString();
+  const nowIso = new Date().toISOString();
     // naive replace: delete then bulk create
     try {
       await ChunkModel.destroy({ where: { file_id: fileId } });
