@@ -3,6 +3,8 @@ import type { Server } from "http";
 import { configManager } from "./configManager";
 import { logger } from "./logger";
 import { registerSystemRoutes } from "./backend/systemController";
+import { registerFilesRoutes } from "./backend/filesController";
+import { authenticateDB } from "./backend/db";
 
 let server: Server | null = null;
 
@@ -24,8 +26,32 @@ export const startServer = async (): Promise<void> => {
     }
 
     const app = express();
+    // Body parsers
+    app.use(express.json({ limit: "2mb" }));
+    app.use(express.urlencoded({ extended: true }));
+
+    // CORS: allow all origins and handle preflight
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header(
+        "Access-Control-Allow-Headers",
+        "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+      );
+      res.header(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+      );
+      if (req.method === "OPTIONS") {
+        return res.sendStatus(204);
+      }
+      next();
+    });
+
+    // Initialize DB connection
+    await authenticateDB();
     // Register backend routes
     registerSystemRoutes(app);
+    registerFilesRoutes(app);
 
     // Generic error handler (last middleware)
     app.use(

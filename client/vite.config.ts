@@ -11,6 +11,23 @@ export default defineConfig({
       main: {
         // Shortcut of `build.lib.entry`.
         entry: 'electron/main.ts',
+        // Avoid bundling Sequelize and optional dialect deps into main process bundle.
+        // This prevents Rollup from turning optional requires into static imports (e.g., 'pg-hstore').
+        vite: {
+          build: {
+            rollupOptions: {
+              external: [
+                'sequelize',
+                'sqlite3',
+                'pg-hstore',
+                'pg',
+                'mysql2',
+                'tedious',
+                'mariadb',
+              ],
+            },
+          },
+        },
       },
       preload: {
         // Shortcut of `build.rollupOptions.input`.

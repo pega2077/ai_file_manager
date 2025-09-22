@@ -20,7 +20,7 @@ const DEFAULT_CONFIG: AppConfig = {
   localServicePort: 8000,
   localServiceHost: "127.0.0.1",
   // Default to repository-standard SQLite location; can be overridden in config.json
-  sqliteDbPath: "database/files.db"
+  sqliteDbPath: path.join(app.getAppPath(), "database/files.db")
 };
 
 export class ConfigManager {
