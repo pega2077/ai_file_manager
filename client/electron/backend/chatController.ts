@@ -8,6 +8,8 @@ export function registerChatRoutes(app: Express) {
   app.post("/api/chat/recommend-directory", chatRecommendDirectoryHandler);
   // POST /api/chat/directory-structure
   app.post("/api/chat/directory-structure", chatDirectoryStructureHandler);
+  // POST /api/chat/ask
+  app.post("/api/chat/ask", chatAskHandler);
 }
 
 type ChatRecommendBody = {
@@ -123,6 +125,307 @@ export async function chatRecommendDirectoryHandler(req: Request, res: Response)
       message: "internal_error",
       data: null,
       error: { code: "INTERNAL_ERROR", message: "Recommend directory failed", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+// ------------- Chat Ask (RAG) -------------
+import ChunkModel from "./models/chunk";
+import FileModel from "./models/file";
+import { embedWithOllama } from "./utils/ollama";
+import { isFaissAvailable, globalIndexExists, searchGlobalFaissIndex } from "./utils/vectorStore";
+
+type ChatAskBody = {
+  question?: unknown;
+  context_limit?: unknown;
+  similarity_threshold?: unknown;
+  temperature?: unknown;
+  max_tokens?: unknown;
+  stream?: unknown;
+  file_filters?: unknown;
+};
+
+export async function chatAskHandler(req: Request, res: Response): Promise<void> {
+  const startAll = Date.now();
+  try {
+    const body = req.body as ChatAskBody | undefined;
+    const question = typeof body?.question === "string" ? body!.question.trim() : "";
+    const contextLimitRaw = typeof body?.context_limit === "number" ? body!.context_limit : undefined;
+    const simThreshRaw = typeof body?.similarity_threshold === "number" ? body!.similarity_threshold : undefined;
+    const temperature = typeof body?.temperature === "number" ? body!.temperature : 0.7;
+    const maxTokens = typeof body?.max_tokens === "number" ? body!.max_tokens : 1000;
+  // stream flag is accepted but not supported in current backend; ignore for now to keep API compatibility
+  // const stream = typeof body?.stream === "boolean" ? body!.stream : false;
+    const fileFilters = ((): { file_ids?: string[]; categories?: string[]; tags?: string[] } => {
+      const f = body?.file_filters;
+      if (!f || typeof f !== "object") return {};
+      const obj = f as Record<string, unknown>;
+      const ids = Array.isArray(obj.file_ids) ? (obj.file_ids as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
+      const cats = Array.isArray(obj.categories) ? (obj.categories as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
+      const tags = Array.isArray(obj.tags) ? (obj.tags as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
+      return { file_ids: ids, categories: cats, tags };
+    })();
+
+    if (!question) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "question is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    // Validate numeric ranges
+    const contextLimit = Math.max(1, Math.min(20, Math.floor(contextLimitRaw ?? 5)));
+    const similarityThreshold = Math.max(0, Math.min(1, Number.isFinite(simThreshRaw as number) ? (simThreshRaw as number) : 0.7));
+    const tempClamped = Math.max(0, Math.min(2, temperature));
+    const maxTokensClamped = Math.max(100, Math.min(4000, Math.floor(maxTokens)));
+
+    // Embedding for the question
+    const t0 = Date.now();
+    let qEmbedding: number[] = [];
+    try {
+      const emb = await embedWithOllama([question]);
+      qEmbedding = emb[0] ?? [];
+      if (qEmbedding.length === 0) throw new Error("empty embedding");
+    } catch (e) {
+      logger.error("/api/chat/ask embed failed", e as unknown);
+      res.status(500).json({
+        success: false,
+        message: "embedding_error",
+        data: null,
+        error: { code: "EMBED_ERROR", message: (e as Error).message, details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+    const embedMs = Date.now() - t0;
+
+    // FAISS search
+    const t1 = Date.now();
+    let chunkIds: number[] = [];
+    let distances: number[] = [];
+    if (!isFaissAvailable() || !(await globalIndexExists())) {
+      res.status(200).json({
+        success: true,
+        message: "ok",
+        data: {
+          answer: "Knowledge base is empty, please import files first.",
+          confidence: 0.0,
+          sources: [],
+          metadata: {
+            model_used: configManager.getConfig().ollamaModel || "",
+            tokens_used: 0,
+            response_time_ms: Date.now() - startAll,
+            retrieval_time_ms: 0,
+            generation_time_ms: 0,
+          },
+        },
+        error: null,
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    try {
+      const resFaiss = await searchGlobalFaissIndex({ query: qEmbedding, k: Math.min(100, contextLimit * 5), oversample: 1.0 });
+      chunkIds = resFaiss.ids;
+      distances = resFaiss.distances;
+    } catch (e) {
+      logger.error("/api/chat/ask faiss search failed", e as unknown);
+      res.status(500).json({
+        success: false,
+        message: "search_error",
+        data: null,
+        error: { code: "VECTOR_SEARCH_ERROR", message: (e as Error).message, details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+    const retrievalMs = Date.now() - t1 + embedMs;
+
+    // Convert L2 distance to a crude similarity score in [0,1]
+    const simScores = distances.map((d) => 1 / (1 + d));
+
+    // Load chunk rows and join files; then apply file_filters
+    let rows: Array<{
+      id: number;
+      chunk_id: string;
+      file_id: string;
+      chunk_index: number;
+      content: string;
+      file_name: string;
+      file_path: string;
+      file_category: string;
+      file_tags: string | null;
+      relevance_score: number;
+    }> = [];
+    if (chunkIds.length > 0) {
+      const chunks = await ChunkModel.findAll({
+        where: { id: chunkIds },
+        raw: true,
+      }).catch(() => []) as Array<{
+        id: number;
+        file_id: string;
+        chunk_index: number;
+        content: string;
+        chunk_id: string;
+      }>;
+
+      // Map by id for quick access
+  const byId = new Map<number, { id: number; file_id: string; chunk_index: number; content: string; chunk_id: string }>();
+  for (const c of chunks) byId.set(c.id, c);
+
+      // Gather unique file_ids
+      const fileIds = Array.from(new Set(chunks.map((c) => c.file_id)));
+      const files = fileIds.length > 0
+        ? await FileModel.findAll({ where: { file_id: fileIds }, raw: true }).catch(() => []) as Array<{
+            file_id: string;
+            name: string;
+            path: string;
+            category: string;
+            tags: string | null;
+          }>
+        : [];
+      const fileById = new Map<string, { file_id: string; name: string; path: string; category: string; tags: string | null }>();
+      for (const f of files) fileById.set(f.file_id, f);
+
+      // Assemble rows in the order of faiss ids list, attach similarity
+      for (let i = 0; i < chunkIds.length; i++) {
+        const id = chunkIds[i];
+        const sim = simScores[i] ?? 0;
+        const c = byId.get(id);
+        if (!c) continue;
+  const f = fileById.get(c.file_id);
+        rows.push({
+          id,
+          chunk_id: String(c.chunk_id),
+          file_id: String(c.file_id),
+          chunk_index: Number(c.chunk_index),
+          content: String(c.content),
+          file_name: f ? String(f.name) : "",
+          file_path: f ? String(f.path) : "",
+          file_category: f ? String(f.category) : "",
+          file_tags: f ? (f.tags as string | null) : null,
+          relevance_score: sim,
+        });
+      }
+    }
+
+    // Apply file_filters
+    if (rows.length > 0) {
+      rows = rows.filter((r) => {
+        if (fileFilters.file_ids && fileFilters.file_ids.length > 0 && !fileFilters.file_ids.includes(r.file_id)) return false;
+        if (fileFilters.categories && fileFilters.categories.length > 0 && !fileFilters.categories.includes(r.file_category)) return false;
+        if (fileFilters.tags && fileFilters.tags.length > 0) {
+          try {
+            const tagsArr = r.file_tags ? (JSON.parse(r.file_tags) as string[]) : [];
+            if (!fileFilters.tags.some((t) => tagsArr.includes(t))) return false;
+          } catch {
+            return false;
+          }
+        }
+        return true;
+      });
+    }
+
+    // Similarity threshold
+    rows = rows.filter((r) => r.relevance_score >= similarityThreshold);
+    // Take top-N by score
+    rows.sort((a, b) => b.relevance_score - a.relevance_score);
+    const top = rows.slice(0, contextLimit);
+
+    // Build context string
+    const contextStr = top.map((r, i) => `[#${i + 1}] File: ${r.file_name} (${r.file_path})\nChunk ${r.chunk_index}: ${r.content}`).join("\n\n");
+
+    // LLM prompt for answer generation with JSON schema
+    const messages = [
+      { role: "system" as const, content: "You are a helpful assistant that answers questions using provided context accurately. If the answer is not in the context, say you are not sure. Output JSON only." },
+      { role: "user" as const, content: `Question: ${question}\n\nContext:\n${contextStr}\n\nReturn JSON: {\n  "answer": string,\n  "confidence": number\n}` },
+    ];
+    const responseFormat = {
+      json_schema: {
+        name: "chat_qa_answer_schema",
+        schema: {
+          type: "object",
+          properties: {
+            answer: { type: "string" },
+            confidence: { type: "number" },
+          },
+          required: ["answer", "confidence"],
+        },
+        strict: true,
+      },
+    } as const;
+
+    const tGen = Date.now();
+    let genObj: Record<string, unknown> = {};
+    try {
+      const result = await generateStructuredJsonWithOllama(messages, responseFormat, tempClamped, maxTokensClamped);
+      genObj = (result as Record<string, unknown>) || {};
+    } catch (e) {
+      logger.error("/api/chat/ask generation failed", e as unknown);
+      res.status(500).json({
+        success: false,
+        message: "llm_error",
+        data: null,
+        error: { code: "LLM_ERROR", message: (e as Error).message, details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+    const genMs = Date.now() - tGen;
+
+    const answer = typeof genObj.answer === "string" ? (genObj.answer as string) : "";
+    const conf = typeof genObj.confidence === "number" ? (genObj.confidence as number) : 0.0;
+
+    // Build sources output
+    const sources = top.map((r) => ({
+      file_id: r.file_id,
+      file_name: r.file_name,
+      file_path: r.file_path,
+      chunk_id: r.chunk_id,
+      chunk_content: r.content,
+      chunk_index: r.chunk_index,
+      relevance_score: r.relevance_score,
+    }));
+
+    const cfg = configManager.getConfig();
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        answer,
+        confidence: Math.max(0, Math.min(1, conf)),
+        sources,
+        metadata: {
+          model_used: cfg.ollamaModel || "",
+          tokens_used: 0,
+          response_time_ms: Date.now() - startAll,
+          retrieval_time_ms: retrievalMs,
+          generation_time_ms: genMs,
+        },
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/chat/ask failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Chat ask failed", details: null },
       timestamp: new Date().toISOString(),
       request_id: "",
     });

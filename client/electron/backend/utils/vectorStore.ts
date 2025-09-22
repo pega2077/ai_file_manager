@@ -30,6 +30,20 @@ export function getGlobalIndexPath(): string {
   return path.join(getRagDir(), `faiss_index.bin`);
 }
 
+export function isFaissAvailable(): boolean {
+  return !!faiss;
+}
+
+export async function globalIndexExists(): Promise<boolean> {
+  const p = getGlobalIndexPath();
+  try {
+    await fsp.access(p, fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function toBigInt64Array(ids: number[]): BigInt64Array {
   const arr = new BigInt64Array(ids.length);
   for (let i = 0; i < ids.length; i++) arr[i] = BigInt(ids[i]);
@@ -60,11 +74,12 @@ export async function updateGlobalFaissIndex(params: {
   for (const v of vectors) { for (let i = 0; i < dim; i++) flat[o++] = v[i] as number; }
   const ids64 = toBigInt64Array(addIds);
 
-  const p = getGlobalIndexPath();
+  const vectorDbPath = getGlobalIndexPath();
+  logger.info(`Using FAISS vector DB path: ${vectorDbPath}`);
   let index: unknown;
-  const exists = await fsp.access(p, fs.constants.F_OK).then(() => true).catch(() => false);
+  const exists = await fsp.access(vectorDbPath, fs.constants.F_OK).then(() => true).catch(() => false);
   if (exists && ffi.deserializeIndex) {
-    const bytes = await fsp.readFile(p);
+    const bytes = await fsp.readFile(vectorDbPath);
     index = ffi.deserializeIndex(bytes);
   } else {
     const base = new ffi.IndexFlatL2(dim);
@@ -90,6 +105,58 @@ export async function updateGlobalFaissIndex(params: {
   }
 
   const out: Buffer = idx.serialize();
-  await fsp.writeFile(p, out);
-  return { path: p, dim, addCount: vectors.length, removed };
+  await fsp.writeFile(vectorDbPath, out);
+  return { path: vectorDbPath, dim, addCount: vectors.length, removed };
+}
+
+/**
+ * Search the global FAISS index for nearest neighbors of a single query vector.
+ * Returns arrays of ids (chunk row ids) and distances (L2 or metric-specific).
+ */
+export async function searchGlobalFaissIndex(params: {
+  query: number[];
+  k: number;
+  oversample?: number; // fetch more then filter client-side if needed
+}): Promise<{ ids: number[]; distances: number[]; dim: number }>{
+  if (!faiss) throw new Error("faiss-node not available");
+  const ffi = faiss as {
+    deserializeIndex?: (buf: Buffer) => unknown;
+  };
+  const vectorDbPath = getGlobalIndexPath();
+  const exists = await fsp.access(vectorDbPath, fs.constants.F_OK).then(() => true).catch(() => false);
+  if (!exists) throw new Error("FAISS index file not found");
+
+  const bytes = await fsp.readFile(vectorDbPath);
+  if (!ffi.deserializeIndex) throw new Error("faiss-node missing deserializeIndex API");
+  const index = ffi.deserializeIndex(bytes) as unknown as {
+    d?: number; // dimension (some builds expose)
+    ntotal?: number; // size
+    search: (queries: Float32Array, k: number) => { distances: Float32Array; labels: BigInt64Array } | [Float32Array, BigInt64Array];
+  };
+
+  const kFetch = Math.max(1, Math.floor((params.oversample ?? 1) * params.k));
+  const q = new Float32Array(params.query);
+  const res = index.search(q, kFetch) as unknown as { distances: Float32Array; labels: BigInt64Array } | [Float32Array, BigInt64Array];
+  let distances: Float32Array;
+  let labels: BigInt64Array;
+  if (Array.isArray(res)) {
+    distances = res[0];
+    labels = res[1];
+  } else {
+    distances = res.distances;
+    labels = res.labels;
+  }
+  const outIds: number[] = [];
+  const outDist: number[] = [];
+  const n = Math.min(params.k, labels.length);
+  for (let i = 0; i < n; i++) {
+    const id = Number(labels[i]);
+    if (id < 0) continue; // FAISS uses -1 for missing
+    outIds.push(id);
+    outDist.push(Number(distances[i]));
+  }
+  // Some builds expose dimension as property 'd', otherwise derive from query length
+  const maybeDim = (index as unknown as { d?: number }).d;
+  const dim = typeof maybeDim === "number" && Number.isFinite(maybeDim) ? maybeDim : q.length;
+  return { ids: outIds, distances: outDist, dim };
 }
