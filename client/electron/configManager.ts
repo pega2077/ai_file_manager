@@ -9,6 +9,9 @@ export interface AppConfig {
   localServicePythonExe: string;
   localServicePort: number;
   localServiceHost: string;
+  ollamaEndpoint?: string;
+  ollamaModel?: string;
+  ollamaEmbedModel?: string;
   /** Relative or absolute path to the local SQLite database file */
   sqliteDbPath: string;
 }
@@ -19,6 +22,9 @@ const DEFAULT_CONFIG: AppConfig = {
   localServicePythonExe: "python/venv/Scripts/python.exe",
   localServicePort: 8000,
   localServiceHost: "127.0.0.1",
+  ollamaEndpoint: "http://127.0.0.1:11434",
+  ollamaModel: "qwen3:8b",
+  ollamaEmbedModel: "bge-m3",
   // Default to repository-standard SQLite location; can be overridden in config.json
   sqliteDbPath: path.join(app.getAppPath(), "database/files.db")
 };
