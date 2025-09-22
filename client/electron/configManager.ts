@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { logger } from "./logger";
-import { log } from "console";
+import {app} from "electron";
 
 export interface AppConfig {
   useLocalService: boolean;
@@ -9,6 +9,8 @@ export interface AppConfig {
   localServicePythonExe: string;
   localServicePort: number;
   localServiceHost: string;
+  /** Relative or absolute path to the local SQLite database file */
+  sqliteDbPath: string;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -16,7 +18,9 @@ const DEFAULT_CONFIG: AppConfig = {
   localServicePath: "python/server.py",
   localServicePythonExe: "python/venv/Scripts/python.exe",
   localServicePort: 8000,
-  localServiceHost: "127.0.0.1"
+  localServiceHost: "127.0.0.1",
+  // Default to repository-standard SQLite location; can be overridden in config.json
+  sqliteDbPath: "database/files.db"
 };
 
 export class ConfigManager {
@@ -24,8 +28,10 @@ export class ConfigManager {
   private config: AppConfig;
 
   constructor() {
+    console.log("App path:", app.getAppPath());
+
     // 获取程序所在目录（项目根目录）
-    const appRoot = process.env.APP_ROOT || path.dirname(process.execPath);
+    const appRoot = app.getAppPath();
 
     if (process.env.APP_ROOT) {
       // 开发模式：使用 client/config.json
@@ -147,6 +153,20 @@ export class ConfigManager {
       args: [servicePath],
       cwd: projectRoot
     };
+  }
+
+  /**
+   * Resolve the configured SQLite database path to an absolute path.
+   * If the path in config is relative, it will be resolved against the project root.
+   */
+  getDatabaseAbsolutePath(): string {
+    const appRoot = process.env.APP_ROOT || path.dirname(process.execPath);
+    const projectRoot = process.env.APP_ROOT
+      ? path.join(appRoot, '..', '..')
+      : path.join(appRoot, '..');
+
+    const dbPath = this.config.sqliteDbPath;
+    return path.isAbsolute(dbPath) ? dbPath : path.join(projectRoot, dbPath);
   }
 }
 
