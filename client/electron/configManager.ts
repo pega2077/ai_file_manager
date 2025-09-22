@@ -12,6 +12,8 @@ export interface AppConfig {
   ollamaEndpoint?: string;
   ollamaModel?: string;
   ollamaEmbedModel?: string;
+  /** Optional HTTP endpoint for third-party file conversion service */
+  fileConvertEndpoint?: string;
   /** Relative or absolute path to the local SQLite database file */
   sqliteDbPath: string;
 }
@@ -25,6 +27,7 @@ const DEFAULT_CONFIG: AppConfig = {
   ollamaEndpoint: "http://127.0.0.1:11434",
   ollamaModel: "qwen3:8b",
   ollamaEmbedModel: "bge-m3",
+  fileConvertEndpoint: "",
   // Default to repository-standard SQLite location; can be overridden in config.json
   sqliteDbPath: path.join(app.getAppPath(), "database/files.db")
 };
@@ -38,14 +41,7 @@ export class ConfigManager {
 
     // 获取程序所在目录（项目根目录）
     const appRoot = app.getAppPath();
-
-    if (process.env.APP_ROOT) {
-      // 开发模式：使用 client/config.json
-      this.configPath = path.join(appRoot, 'config.json');
-    } else {
-      // 生产模式：使用程序安装目录/config.json
-      this.configPath = path.join(appRoot, 'config.json');
-    }
+    this.configPath = path.join(appRoot, 'config.json');
 
     logger.info('ConfigManager: Config path set to', this.configPath);
     this.config = { ...DEFAULT_CONFIG };

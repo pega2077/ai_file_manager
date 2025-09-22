@@ -6,6 +6,8 @@ import path from "path";
 import fs from "fs";
 import { promises as fsp } from "fs";
 import { MAX_TEXT_PREVIEW_BYTES, getMimeByExt, isImageExt, decodeTextBuffer, CATEGORY_EXTENSIONS, toNumber, isNonEmptyString, parseTags } from "./utils/fileHelpers";
+import { ensureTxtFile, chunkText } from "./utils/fileConversion";
+import { embedWithOllama } from "./utils/ollama";
 
 interface ListFilesRequestBody {
   page?: unknown;
@@ -153,6 +155,8 @@ export function registerFilesRoutes(app: Express) {
   app.post("/api/files/preview", previewFileHandler);
   // POST /api/files/save-file
   app.post("/api/files/save-file", saveFileHandler);
+  // POST /api/files/import-to-rag
+  app.post("/api/files/import-to-rag", importToRagHandler);
 }
 
 // -------- Handlers --------
@@ -253,6 +257,85 @@ export async function previewFileHandler(req: Request, res: Response): Promise<v
       message: "internal_error",
       data: null,
       error: { code: "INTERNAL_ERROR", message: "Preview failed", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+// Import a file into RAG pipeline: convert to txt, chunk, embed via Ollama
+export async function importToRagHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as { file_path?: unknown; chunk_size?: unknown; overlap?: unknown; model?: unknown } | undefined;
+    const filePath = typeof body?.file_path === "string" ? body.file_path : undefined;
+    const chunkSize = toNumber(body?.chunk_size, 1000);
+    const overlap = toNumber(body?.overlap, 200);
+    const model = typeof body?.model === "string" && body.model.trim() ? body.model.trim() : undefined;
+
+    if (!filePath) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "file_path is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+    if (!path.isAbsolute(filePath)) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "file_path must be absolute", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+    const st = await fsp.stat(filePath).catch(() => null);
+    if (!st || !st.isFile()) {
+      res.status(404).json({
+        success: false,
+        message: "not_found",
+        data: null,
+        error: { code: "RESOURCE_NOT_FOUND", message: "file does not exist", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    // 1) ensure .txt
+    const txtPath = await ensureTxtFile(filePath);
+    const content = await fsp.readFile(txtPath, "utf8");
+    // 2) chunk
+    const chunks = chunkText(content, chunkSize, overlap);
+    // 3) embed via Ollama
+    const embeddings = await embedWithOllama(chunks, model);
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        file_path: filePath,
+        txt_path: txtPath,
+        chunk_count: chunks.length,
+        embedding_count: embeddings.length,
+        dims: embeddings[0]?.length ?? 0,
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/files/import-to-rag failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "IMPORT_RAG_ERROR", message: (err as Error).message, details: null },
       timestamp: new Date().toISOString(),
       request_id: "",
     });
