@@ -5,6 +5,7 @@ import { logger } from "../logger";
 import path from "path";
 import fs from "fs";
 import { promises as fsp } from "fs";
+import { MAX_TEXT_PREVIEW_BYTES, getMimeByExt, isImageExt, decodeTextBuffer, CATEGORY_EXTENSIONS, toNumber, isNonEmptyString, parseTags } from "./utils/fileHelpers";
 
 interface ListFilesRequestBody {
   page?: unknown;
@@ -15,30 +16,7 @@ interface ListFilesRequestBody {
   tags?: unknown;
 }
 
-const CATEGORY_EXTENSIONS: Record<string, string[]> = {
-  document: ["txt", "doc", "docx", "pdf", "ppt", "pptx", "rtf", "odt", "ods", "odp"],
-  sheet: ["xlsx", "xls", "csv", "ods"],
-  image: ["jpg", "png", "gif", "jpeg", "bmp", "tiff", "tif", "webp", "svg"],
-  video: ["mp4", "avi", "mkv", "mov", "wmv", "flv", "webm", "m4v"],
-  audio: ["mp3", "wav", "flac", "aac", "ogg", "wma", "m4a"],
-  archive: ["zip", "rar", "7z", "tar", "gz", "bz2", "xz"],
-  other: [],
-};
-
-function toNumber(val: unknown, def: number): number {
-  const n = typeof val === "string" || typeof val === "number" ? Number(val) : NaN;
-  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : def;
-}
-
-function isNonEmptyString(v: unknown): v is string {
-  return typeof v === "string" && v.trim().length > 0;
-}
-
-function parseTags(v: unknown): string[] | undefined {
-  if (!v) return undefined;
-  if (Array.isArray(v)) return v.filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim());
-  return undefined;
-}
+// moved helpers to utils/fileHelpers
 
 export async function listFilesHandler(req: Request, res: Response): Promise<void> {
   try {
@@ -177,93 +155,6 @@ export function registerFilesRoutes(app: Express) {
   app.post("/api/files/save-file", saveFileHandler);
 }
 
-// -------- Helpers --------
-const MAX_TEXT_PREVIEW_BYTES = 10 * 1024; // 10KB
-
-const IMAGE_EXTENSIONS = new Set([
-  "jpg", "jpeg", "png", "gif", "bmp", "webp", "svg", "ico"
-]);
-
-function getProjectRoot(): string {
-  const appRoot = process.env.APP_ROOT || path.dirname(process.execPath);
-  return process.env.APP_ROOT ? path.join(appRoot, "..", "..") : path.join(appRoot, "..");
-}
-
-function getDefaultWorkdir(): string {
-  return path.join(getProjectRoot(), "workdir");
-}
-
-function getMimeByExt(ext: string): string {
-  const e = ext.toLowerCase();
-  switch (e) {
-    case "txt": return "text/plain";
-    case "md": return "text/markdown";
-    case "json": return "application/json";
-    case "csv": return "text/csv";
-    case "html":
-    case "htm": return "text/html";
-    case "css": return "text/css";
-    case "xml": return "application/xml";
-    case "js": return "application/javascript";
-    case "ts": return "text/plain";
-    case "rtf": return "application/rtf";
-    case "jpg":
-    case "jpeg": return "image/jpeg";
-    case "png": return "image/png";
-    case "gif": return "image/gif";
-    case "bmp": return "image/bmp";
-    case "webp": return "image/webp";
-    case "svg": return "image/svg+xml";
-    case "ico": return "image/x-icon";
-    default: return "application/octet-stream";
-  }
-}
-
-function isImageExt(ext: string): boolean {
-  return IMAGE_EXTENSIONS.has(ext.toLowerCase());
-}
-
-function hasUTF8BOM(buf: Buffer): boolean {
-  return buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf;
-}
-
-function hasUTF16LEBOM(buf: Buffer): boolean {
-  return buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe;
-}
-
-function hasUTF16BEBOM(buf: Buffer): boolean {
-  return buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff;
-}
-
-function decodeTextBuffer(buf: Buffer): { text: string; encoding: string } {
-  // Try BOM first
-  if (hasUTF8BOM(buf)) {
-    return { text: buf.toString("utf8"), encoding: "utf-8" };
-  }
-  if (hasUTF16LEBOM(buf)) {
-    // Strip BOM automatically by toString
-    return { text: buf.toString("utf16le"), encoding: "utf-16le" };
-  }
-  if (hasUTF16BEBOM(buf)) {
-    // Convert BE to LE by swapping pairs
-    const swapped = Buffer.from(buf);
-    for (let i = 0; i + 1 < swapped.length; i += 2) {
-      const a = swapped[i];
-      swapped[i] = swapped[i + 1];
-      swapped[i + 1] = a;
-    }
-    return { text: swapped.toString("utf16le"), encoding: "utf-16be" };
-  }
-  // Heuristic: try utf8, check replacement char count; fallback to latin1
-  const utf8 = buf.toString("utf8");
-  const bad = (utf8.match(/\uFFFD/g) || []).length;
-  if (bad / Math.max(1, utf8.length) < 0.01) {
-    return { text: utf8, encoding: "utf-8" };
-  }
-  const latin1 = buf.toString("latin1");
-  return { text: latin1, encoding: "latin-1" };
-}
-
 // -------- Handlers --------
 export async function previewFileHandler(req: Request, res: Response): Promise<void> {
   try {
@@ -275,6 +166,17 @@ export async function previewFileHandler(req: Request, res: Response): Promise<v
         message: "invalid_request",
         data: null,
         error: { code: "INVALID_REQUEST", message: "file_path is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+    if (!path.isAbsolute(filePath)) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "file_path must be an absolute path", details: null },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -394,26 +296,19 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
       return;
     }
 
-    const workdir = getDefaultWorkdir();
-    const absTargetDir = path.isAbsolute(targetDirInput)
-      ? path.normalize(targetDirInput)
-      : path.normalize(path.join(workdir, targetDirInput));
-
-    // Ensure target stays within workdir when relative provided
     if (!path.isAbsolute(targetDirInput)) {
-      const rel = path.relative(workdir, absTargetDir);
-      if (rel.startsWith("..") || path.isAbsolute(rel)) {
-        res.status(400).json({
-          success: false,
-          message: "invalid_request",
-          data: null,
-          error: { code: "INVALID_REQUEST", message: "target_directory escapes workdir", details: null },
-          timestamp: new Date().toISOString(),
-          request_id: "",
-        });
-        return;
-      }
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "target_directory must be an absolute path", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
     }
+
+    const absTargetDir = path.normalize(targetDirInput);
 
     await fsp.mkdir(absTargetDir, { recursive: true });
 
