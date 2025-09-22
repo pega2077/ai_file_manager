@@ -10,6 +10,7 @@ type FileImportProps = {
 
 export type FileImportRef = {
   startImport: () => Promise<void> | void;
+  importFile: (filePath: string) => Promise<void>;
 };
 
 const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, ref) => {
@@ -144,70 +145,72 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
     [buildDirectoryOptions, buildDirectoryTreeData],
   );
 
+  const processFile = useCallback(async (filePath: string) => {
+    const directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
+    if (!directoryStructureResponse.success) {
+      message.error(t('files.messages.getDirectoryStructureFailed'));
+      return;
+    }
+
+    const directories = extractDirectoriesFromStructure(
+      directoryStructureResponse.data as DirectoryStructureResponse,
+    );
+
+    const loadingKey = message.loading(t('files.messages.analyzingFile'), 0);
+    const recommendResponse = await apiService.recommendDirectory(filePath, directories);
+    loadingKey();
+    if (!recommendResponse.success) {
+      message.error(t('files.messages.getRecommendationFailed'));
+      return;
+    }
+
+    const recommendedDirectory = (recommendResponse.data as RecommendDirectoryResponse)
+      ?.recommended_directory;
+    const alternatives = (recommendResponse.data as RecommendDirectoryResponse)?.alternatives || [];
+
+    const settings = (await window.electronStore.get('settings')) as Settings;
+    const autoClassifyWithoutConfirmation = settings?.autoClassifyWithoutConfirmation || false;
+
+    if (autoClassifyWithoutConfirmation) {
+      const separator = getPathSeparator();
+      const fullTargetDirectory = recommendedDirectory.startsWith(workDirectory)
+        ? recommendedDirectory
+        : `${workDirectory}${separator}${recommendedDirectory.replace(/\//g, separator)}`;
+
+      const saveResponse = await apiService.saveFile(filePath, fullTargetDirectory, false);
+      if (saveResponse.success) {
+        message.success(t('files.messages.fileAutoSavedTo', { path: recommendedDirectory }));
+        onImported?.();
+        const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
+        if (fileId) {
+          await handleRagImport(fileId, true);
+        }
+      } else {
+        message.error(saveResponse.message || t('files.messages.fileSaveFailed'));
+      }
+    } else {
+      await showImportConfirmationDialog(
+        filePath,
+        recommendedDirectory,
+        alternatives,
+        directoryStructureResponse.data as DirectoryStructureResponse,
+      );
+    }
+  }, [workDirectory, t, extractDirectoriesFromStructure, showImportConfirmationDialog, handleRagImport, onImported]);
+
   const handleStartImport = useCallback(async () => {
     try {
       const filePath = await window.electronAPI.selectFile();
       if (!filePath) return;
-
-      const directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
-      if (!directoryStructureResponse.success) {
-        message.error(t('files.messages.getDirectoryStructureFailed'));
-        return;
-      }
-
-      const directories = extractDirectoriesFromStructure(
-        directoryStructureResponse.data as DirectoryStructureResponse,
-      );
-
-      const loadingKey = message.loading(t('files.messages.analyzingFile'), 0);
-      const recommendResponse = await apiService.recommendDirectory(filePath, directories);
-      loadingKey();
-      if (!recommendResponse.success) {
-        message.error(t('files.messages.getRecommendationFailed'));
-        return;
-      }
-
-      const recommendedDirectory = (recommendResponse.data as RecommendDirectoryResponse)
-        ?.recommended_directory;
-      const alternatives = (recommendResponse.data as RecommendDirectoryResponse)?.alternatives || [];
-
-      const settings = (await window.electronStore.get('settings')) as Settings;
-      const autoClassifyWithoutConfirmation = settings?.autoClassifyWithoutConfirmation || false;
-
-      if (autoClassifyWithoutConfirmation) {
-        const separator = getPathSeparator();
-        const fullTargetDirectory = recommendedDirectory.startsWith(workDirectory)
-          ? recommendedDirectory
-          : `${workDirectory}${separator}${recommendedDirectory.replace(/\//g, separator)}`;
-
-        const saveResponse = await apiService.saveFile(filePath, fullTargetDirectory, false);
-        if (saveResponse.success) {
-          message.success(t('files.messages.fileAutoSavedTo', { path: recommendedDirectory }));
-          onImported?.();
-          const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
-          if (fileId) {
-            // The file has been saved and recorded in DB; avoid duplicate DB insert in RAG import
-            await handleRagImport(fileId, true);
-          }
-        } else {
-          message.error(saveResponse.message || t('files.messages.fileSaveFailed'));
-        }
-      } else {
-        await showImportConfirmationDialog(
-          filePath,
-          recommendedDirectory,
-          alternatives,
-          directoryStructureResponse.data as DirectoryStructureResponse,
-        );
-      }
+      await processFile(filePath);
     } catch (error) {
       message.error(t('files.messages.fileImportFailed'));
       console.error(error);
     }
-  }, [workDirectory, t, showImportConfirmationDialog, handleRagImport, onImported, extractDirectoriesFromStructure]);
+  }, [processFile, t]);
 
   // Expose imperative API
-  useImperativeHandle(ref, () => ({ startImport: handleStartImport }), [handleStartImport]);
+  useImperativeHandle(ref, () => ({ startImport: handleStartImport, importFile: processFile }), [handleStartImport, processFile]);
 
   const handleImportConfirm = async () => {
     if (!selectedDirectory) {

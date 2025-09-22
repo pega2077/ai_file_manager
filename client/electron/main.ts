@@ -13,6 +13,7 @@
 
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { promises as fs } from "node:fs";
 import Store from "electron-store";
 import { ImportService } from "./importService";
 import { checkServiceStatus, startPythonServerWithConfig, stopPythonServer } from "./backendService";
@@ -152,14 +153,34 @@ function setupIpcHandlers() {
     }
   });
 
-  // IPC handler for opening folder containing a file
-  ipcMain.handle("open-folder", async (_event, filePath: string) => {
+  // IPC handler for opening a folder. Accepts either a file path or a directory path.
+  ipcMain.handle("open-folder", async (_event, fileOrFolderPath: string) => {
     try {
-      const folderPath = path.dirname(filePath);
-      await shell.openPath(folderPath);
+      let targetPath = fileOrFolderPath;
+
+      try {
+        const stats = await fs.stat(fileOrFolderPath);
+        if (stats.isFile()) {
+          targetPath = path.dirname(fileOrFolderPath);
+        } else if (!stats.isDirectory()) {
+          // Not a regular directory or file; fallback to parent directory
+          targetPath = path.dirname(fileOrFolderPath);
+        }
+      } catch {
+        // If stat fails (path may not exist), fallback to parent directory
+        targetPath = path.dirname(fileOrFolderPath);
+      }
+
+      logger.info(`Opening folder: ${targetPath}`);
+      const result = await shell.openPath(targetPath);
+      if (result) {
+        // Non-empty string indicates an error message
+        logger.error(`Failed to open folder: ${result}`);
+        return false;
+      }
       return true;
     } catch (error) {
-      console.error("Failed to open folder:", error);
+      logger.error("Failed to open folder:", error);
       return false;
     }
   });
