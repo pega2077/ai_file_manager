@@ -19,6 +19,7 @@ import { ImportService } from "./importService";
 import { checkServiceStatus, startPythonServerWithConfig, stopPythonServer } from "./backendService";
 import { logger } from "./logger";
 import { configManager, AppConfig } from "./configManager";
+import { startServer as startLocalExpressServer, stopServer as stopLocalExpressServer } from "./server";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Initialize electron-store
@@ -29,7 +30,7 @@ const SUPPORTED_LOCALES = new Set<string>(["en", "zh"]);
 
 const normalizeLocaleValue = (value: string | null | undefined): string => {
   if (!value) {
-    return "en";
+    return "zh";
   }
 
   const lowerCase = value.toLowerCase();
@@ -651,6 +652,7 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   logger.info('Application before-quit event triggered');
   stopPythonServer();
+  void stopLocalExpressServer();
 });
 
 app.on("activate", () => {
@@ -717,6 +719,8 @@ app.whenReady().then(async () => {
   createWindow();
   createBotWindow();
   createTray();
+  // Start internal lightweight Express server
+  await startLocalExpressServer();
   logger.info('Application startup complete');
 });
 
