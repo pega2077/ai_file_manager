@@ -9,6 +9,9 @@ import { MAX_TEXT_PREVIEW_BYTES, getMimeByExt, isImageExt, decodeTextBuffer, CAT
 import { ensureTxtFile, chunkText } from "./utils/fileConversion";
 import { embedWithOllama, generateStructuredJsonWithOllama } from "./utils/ollama";
 import { app } from "electron";
+import { randomUUID } from "crypto";
+import ChunkModel from "./models/chunk";
+import { updateGlobalFaissIndex } from "./utils/vectorStore";
 
 interface ListFilesRequestBody {
   page?: unknown;
@@ -476,41 +479,45 @@ export async function listDirectoryRecursiveHandler(req: Request, res: Response)
 // Import a file into RAG pipeline: convert to txt, chunk, embed via Ollama
 export async function importToRagHandler(req: Request, res: Response): Promise<void> {
   try {
-    const body = req.body as { file_path?: unknown; chunk_size?: unknown; overlap?: unknown; model?: unknown } | undefined;
-    const filePath = typeof body?.file_path === "string" ? body.file_path : undefined;
+    const body = req.body as { file_id?: unknown; chunk_size?: unknown; overlap?: unknown; model?: unknown } | undefined;
+    const fileId = typeof body?.file_id === "string" ? body.file_id : undefined;
     const chunkSize = toNumber(body?.chunk_size, 1000);
     const overlap = toNumber(body?.overlap, 200);
     const model = typeof body?.model === "string" && body.model.trim() ? body.model.trim() : undefined;
 
-    if (!filePath) {
+    if (!fileId) {
       res.status(400).json({
         success: false,
         message: "invalid_request",
         data: null,
-        error: { code: "INVALID_REQUEST", message: "file_path is required", details: null },
+        error: { code: "INVALID_REQUEST", message: "file_id is required", details: null },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
       return;
     }
-    if (!path.isAbsolute(filePath)) {
-      res.status(400).json({
+    // Load file record from DB
+    const record = await FileModel.findOne({ where: { file_id: fileId }, raw: true }).catch(() => null);
+    if (!record) {
+      res.status(404).json({
         success: false,
-        message: "invalid_request",
+        message: "not_found",
         data: null,
-        error: { code: "INVALID_REQUEST", message: "file_path must be absolute", details: null },
+        error: { code: "RESOURCE_NOT_FOUND", message: "file record not found", details: null },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
       return;
     }
+
+    const filePath = (record as { path: string }).path;
     const st = await fsp.stat(filePath).catch(() => null);
     if (!st || !st.isFile()) {
       res.status(404).json({
         success: false,
         message: "not_found",
         data: null,
-        error: { code: "RESOURCE_NOT_FOUND", message: "file does not exist", details: null },
+        error: { code: "RESOURCE_NOT_FOUND", message: "file path missing on disk", details: null },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -524,16 +531,59 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
     const chunks = chunkText(content, chunkSize, overlap);
     // 3) embed via Ollama
     const embeddings = await embedWithOllama(chunks, model);
+    if (embeddings.length !== chunks.length) {
+      throw new Error("Embeddings count does not match chunks count");
+    }
+
+    // 4) Persist chunks to DB (replace existing for file_id)
+    const nowIso = new Date().toISOString();
+    // naive replace: delete then bulk create
+    try {
+      await ChunkModel.destroy({ where: { file_id: fileId } });
+    } catch (e) {
+      logger.warn("Failed to clear existing chunks", e as unknown);
+    }
+  const bulkRows = chunks.map((c, i) => ({
+    chunk_id: `${fileId}_chunk_${i}`,
+    file_id: fileId,
+    chunk_index: i,
+    content: c,
+    content_type: "text",
+    char_count: c.length,
+    token_count: c.split(/\s+/).filter(Boolean).length,
+    embedding_id: `${fileId}_chunk_${i}`,
+    start_pos: null as number | null,
+    end_pos: null as number | null,
+    created_at: nowIso,
+  }));
+  await ChunkModel.bulkCreate(bulkRows);
+  // Re-query to get actual chunk IDs in correct order
+  const savedChunks = await ChunkModel.findAll({ where: { file_id: fileId }, order: [["chunk_index", "ASC"]], raw: true }) as Array<{ id: number; chunk_index: number; }>;
+  const chunkIds = savedChunks.map((r) => r.id);
+
+    // 5) Update global FAISS index using chunk IDs as vector IDs
+    let faissPath: string | null = null;
+    try {
+      // First, remove existing vectors for this file_id by deleting any old chunk IDs
+      // We need existing IDs. Query previous chunks before deletion? We deleted before insert, so none remain.
+      // To cover reruns where index already has stale IDs, we can attempt to remove by the IDs we just created (safe no-op if absent).
+      const result = await updateGlobalFaissIndex({ addIds: chunkIds, vectors: embeddings, removeIds: chunkIds });
+      faissPath = result.path;
+    } catch (e) {
+      logger.error("Failed to update global FAISS index", e as unknown);
+    }
 
     res.status(200).json({
       success: true,
       message: "ok",
       data: {
+        file_id: fileId,
         file_path: filePath,
         txt_path: txtPath,
         chunk_count: chunks.length,
         embedding_count: embeddings.length,
         dims: embeddings[0]?.length ?? 0,
+        faiss_index_path: faissPath,
       },
       error: null,
       timestamp: new Date().toISOString(),
@@ -629,6 +679,66 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
     // Copy file
     await fsp.copyFile(source, destPath);
 
+    // After successful copy, insert a record into database
+    // Determine file metadata
+    let destStat: fs.Stats | null = null;
+    try {
+      destStat = await fsp.stat(destPath);
+    } catch (e) {
+      // If we cannot stat, treat as error and attempt cleanup
+      logger.error("Stat on saved file failed", e as unknown);
+      try { await fsp.unlink(destPath); } catch { /* ignore */ }
+      res.status(500).json({
+        success: false,
+        message: "internal_error",
+        data: null,
+        error: { code: "SAVE_FILE_ERROR", message: "Saved file but failed to validate", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const ext = path.extname(baseName).replace(/^\./, "").toLowerCase();
+    const mime = getMimeByExt(ext);
+    // Infer category by extension
+    let category = "other";
+    for (const [cat, exts] of Object.entries(CATEGORY_EXTENSIONS)) {
+      if (cat === "other") continue;
+      if (exts.includes(ext)) { category = cat; break; }
+    }
+
+    const nowIso = new Date().toISOString();
+    const newFileId = randomUUID();
+    try {
+      await FileModel.create({
+        file_id: newFileId,
+        path: destPath,
+        name: path.basename(destPath),
+        type: mime,
+        category,
+        summary: null,
+        tags: JSON.stringify([]),
+        size: destStat.size,
+        created_at: nowIso,
+        updated_at: null,
+        processed: false,
+      });
+    } catch (e) {
+      logger.error("DB insert failed after saving file", e as unknown);
+      // Best effort rollback: remove the copied file to keep consistency
+      try { await fsp.unlink(destPath); } catch { /* ignore */ }
+      res.status(500).json({
+        success: false,
+        message: "internal_error",
+        data: null,
+        error: { code: "DB_INSERT_ERROR", message: "Failed to insert file record", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
     res.status(200).json({
       success: true,
       message: "ok",
@@ -637,6 +747,7 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
         saved_path: destPath,
         filename: path.basename(destPath),
         overwritten,
+        file_id: newFileId,
       },
       error: null,
       timestamp: new Date().toISOString(),

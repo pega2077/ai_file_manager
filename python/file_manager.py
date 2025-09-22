@@ -1060,8 +1060,9 @@ async def process_file_embeddings(file_id: str, content: str, file_path: str, ca
                     'char_count': len(chunk),
                     'token_count': len(chunk.split()),
                     'embedding_id': f"{file_id}_chunk_{i}",
-                    'file_path': file_path,
-                    'category': category,
+                    # start_pos and end_pos are optional per schema; not computed in current chunking
+                    'start_pos': None,
+                    'end_pos': None,
                     'created_at': datetime.now().isoformat()
                 }
                 chunks_data.append(chunk_data)
