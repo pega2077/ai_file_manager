@@ -116,7 +116,7 @@ export async function listFilesHandler(req: Request, res: Response): Promise<voi
         summary: row.summary ?? "",
         tags: tagsArr,
         size: row.size,
-  added_at: row.created_at,
+        created_at: row.created_at,
         updated_at: row.updated_at,
       };
     });
@@ -537,6 +537,9 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
 
     // 4) Persist chunks to DB (replace existing for file_id)
   const nowIso = new Date().toISOString();
+    // Capture previous chunk row ids to remove stale vectors from FAISS
+    const prevChunkRows = (await ChunkModel.findAll({ where: { file_id: fileId }, attributes: ["id"], raw: true }).catch(() => [])) as Array<{ id: number }>;
+    const prevChunkIds = prevChunkRows.map((r) => r.id);
     // naive replace: delete then bulk create
     try {
       await ChunkModel.destroy({ where: { file_id: fileId } });
@@ -562,13 +565,9 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
   const chunkIds = savedChunks.map((r) => r.id);
 
     // 5) Update global FAISS index using chunk IDs as vector IDs
-    let faissPath: string | null = null;
     try {
-      // First, remove existing vectors for this file_id by deleting any old chunk IDs
-      // We need existing IDs. Query previous chunks before deletion? We deleted before insert, so none remain.
-      // To cover reruns where index already has stale IDs, we can attempt to remove by the IDs we just created (safe no-op if absent).
-      const result = await updateGlobalFaissIndex({ addIds: chunkIds, vectors: embeddings, removeIds: chunkIds });
-      faissPath = result.path;
+      // Remove stale vectors by previous chunk row ids, then add fresh ones
+      await updateGlobalFaissIndex({ addIds: chunkIds, vectors: embeddings, removeIds: prevChunkIds });
     } catch (e) {
       logger.error("Failed to update global FAISS index", e as unknown);
     }
@@ -582,8 +581,7 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
         txt_path: txtPath,
         chunk_count: chunks.length,
         embedding_count: embeddings.length,
-        dims: embeddings[0]?.length ?? 0,
-        faiss_index_path: faissPath,
+        dims: embeddings[0]?.length ?? 0
       },
       error: null,
       timestamp: new Date().toISOString(),
