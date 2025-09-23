@@ -116,12 +116,7 @@ const Setup = () => {
       });
 
       if (response.success) {
-        const data = response.data as { directories: unknown; metadata?: { description?: string } };
-        const dirsArr = Array.isArray(data.directories) ? data.directories : [];
-        const normalized: DirectoryStructure[] = (dirsArr as unknown[])
-          .filter((v) => typeof v === 'string')
-          .map((p) => ({ path: String(p), description: '' }));
-        setDirectoryStructure(normalized);
+        setDirectoryStructure((response.data as { directories: DirectoryStructure[] }).directories);
         message.success(t('setup.messages.fetchSuccess'));
       } else {
         message.error(t('setup.messages.fetchError'));
@@ -276,6 +271,7 @@ const Setup = () => {
 
             {directoryStructure.length > 0 && (
               <Card title={t('setup.cards.recommendations')} style={{ marginTop: 24 }}>
+
                 <Space style={{ marginTop: 2, marginBottom: 16 }}>
                   <Button onClick={handleRegenerate} loading={loading}>
                     {t('setup.actions.regenerate')}

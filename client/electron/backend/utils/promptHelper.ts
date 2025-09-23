@@ -72,7 +72,7 @@ export function buildDirectoryStructureMessages(params: {
       {
         role: "user",
         content:
-          `请根据下面输入参数，返回一个推荐的、便于长期维护的目录结构。输出必须仅为 JSON 字符串，不要额外文字。职业：${profession}\n目标：${purpose}\n\n请提出一个清晰的目录结构，总目录数量在 ${minDirectories} 到 ${maxDirectories} 之间，目录风格扁平化。\n重点是帮助整理文档的实际可用性。\n返回`,
+          `请根据下面输入参数，返回一个推荐的、便于长期维护的目录结构。输出必须仅为 JSON 字符串，不要额外文字。职业：${profession}\n目标：${purpose}\n\n请提出一个清晰的目录结构，总目录数量在 ${minDirectories} 到 ${maxDirectories} 之间，目录可以有子目录（使用 '目录/子目录' 表示）。\n重点是帮助整理文档的实际可用性。\n返回`,
       },
     ];
   }
