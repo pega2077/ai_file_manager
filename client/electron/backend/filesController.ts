@@ -171,6 +171,8 @@ export function registerFilesRoutes(app: Express) {
   app.get("/api/files/chunks/:chunk_id", getChunkContentHandler);
   // GET /api/files/{file_id}
   app.get("/api/files/:file_id", getFileDetailsHandler);
+  // POST /api/files/delete
+  app.post("/api/files/delete", deleteFileHandler);
 }
 
 // -------- Handlers --------
@@ -600,6 +602,113 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
       message: "internal_error",
       data: null,
       error: { code: "IMPORT_RAG_ERROR", message: (err as Error).message, details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+// -------- Delete File (and RAG) --------
+interface DeleteFileBody {
+  file_id?: unknown;
+  confirm_delete?: unknown; // whether to delete the actual file from disk; default false
+}
+
+export async function deleteFileHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as DeleteFileBody | undefined;
+    const fileId = typeof body?.file_id === "string" ? body.file_id.trim() : "";
+    const confirmDelete = typeof body?.confirm_delete === "boolean" ? body.confirm_delete : false;
+
+    if (!fileId) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "file_id is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    // Load file record
+    const fileRow = await FileModel.findOne({ where: { file_id: fileId }, raw: true }).catch(() => null) as
+      | {
+          file_id: string;
+          path: string;
+        }
+      | null;
+    if (!fileRow) {
+      res.status(404).json({
+        success: false,
+        message: "not_found",
+        data: null,
+        error: { code: "RESOURCE_NOT_FOUND", message: "file not found", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    // Find all chunks belonging to this file
+    const chunks = (await ChunkModel.findAll({ where: { file_id: fileId }, raw: true }).catch(() => [])) as Array<{
+      id: number;
+    }>;
+
+    // Remove from FAISS global index by external IDs (chunk row ids)
+    if (chunks.length > 0) {
+      const removeIds = chunks.map((c) => c.id);
+      try {
+        await updateGlobalFaissIndex({ addIds: [], vectors: [], removeIds });
+      } catch (e) {
+        logger.warn("Failed to remove chunk vectors from FAISS index during delete", e as unknown);
+        // proceed even if vector removal fails
+      }
+    }
+
+    // Delete chunk rows
+    try {
+      await ChunkModel.destroy({ where: { file_id: fileId } });
+    } catch (e) {
+      logger.warn("Failed to delete chunk rows", e as unknown);
+    }
+
+    // Optionally delete the actual file from disk
+    if (confirmDelete) {
+      const absPath = fileRow.path;
+      try {
+        if (absPath && typeof absPath === "string") {
+          await fsp.unlink(absPath);
+        }
+      } catch (e) {
+        // If file missing or cannot delete, log but continue
+        logger.warn("Failed to delete file from disk", { path: absPath, err: String(e) });
+      }
+    }
+
+    // Delete the file record itself
+    try {
+      await FileModel.destroy({ where: { file_id: fileId } });
+    } catch (e) {
+      logger.warn("Failed to delete file record", e as unknown);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: { file_id: fileId, rag_removed_chunks: chunks.length, file_deleted: confirmDelete },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/files/delete failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Delete file failed", details: null },
       timestamp: new Date().toISOString(),
       request_id: "",
     });
