@@ -158,6 +158,7 @@ class ApiService {
     max_directories?: number;
     temperature?: number;
     language?: string; // pass to backend for prompt localization
+    style?: 'flat' | 'hierarchical';
   }) {
     return this.request('/chat/directory-structure', {
       method: 'POST',
@@ -170,6 +171,7 @@ class ApiService {
         max_directories: params.max_directories || 20,
         temperature: params.temperature || 0.7,
         language: params.language,
+        style: params.style || 'flat',
       }),
     });
   }

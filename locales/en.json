@@ -33,7 +33,8 @@
       "maxDepth": "Directory Depth",
       "minDirectories": "Minimum Directories",
       "maxDirectories": "Maximum Directories",
-      "temperature": "Temperature"
+      "temperature": "Temperature",
+      "directoryStyle": "Directory Style"
     },
     "actions": {
       "fetchRecommendation": "Fetch Recommended Structure",
@@ -74,6 +75,10 @@
         "student": "Student",
         "projectManager": "Project Manager",
         "contentCreator": "Content Creator"
+      },
+      "style": {
+        "flat": "Flat",
+        "hierarchical": "Hierarchical"
       }
     }
   },

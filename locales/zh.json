@@ -30,7 +30,8 @@
       "maxDepth": "目录层级",
       "minDirectories": "最少目录数量",
       "maxDirectories": "最多目录数量",
-      "temperature": "温度"
+      "temperature": "温度",
+      "directoryStyle": "目录风格"
     },
     "actions": {
       "fetchRecommendation": "获取推荐目录结构",
@@ -71,6 +72,10 @@
         "student": "学生",
         "projectManager": "项目经理",
         "contentCreator": "内容创作者"
+      },
+      "style": {
+        "flat": "扁平风格",
+        "hierarchical": "多层级风格"
       }
     }
   },

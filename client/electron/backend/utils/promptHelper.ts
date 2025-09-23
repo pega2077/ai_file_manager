@@ -11,6 +11,35 @@ export function normalizeLanguage(input: unknown, fallback: SupportedLang = "en"
   return s === "zh" || s === "zh-cn" || s === "zh_cn" || s === "cn" ? "zh" : "en";
 }
 
+export type DirectoryStyle = "flat" | "hierarchical";
+
+export function normalizeDirectoryStyle(
+  input: unknown,
+  fallback: DirectoryStyle = "flat"
+): DirectoryStyle {
+  if (typeof input !== "string") return fallback;
+  const s = input.trim().toLowerCase();
+  if (
+    s === "flat" ||
+    s === "flat-style" ||
+    s === "flat_style" ||
+    s === "扁平" ||
+    s === "扁平风格" ||
+    s === "平铺"
+  )
+    return "flat";
+  if (
+    s === "hierarchical" ||
+    s === "multi-level" ||
+    s === "multilevel" ||
+    s === "多层级" ||
+    s === "多层级风格" ||
+    s === "层级"
+  )
+    return "hierarchical";
+  return fallback;
+}
+
 type Message = { role: "system" | "user"; content: string };
 
 export function buildRecommendDirectoryMessages(params: {
@@ -59,8 +88,9 @@ export function buildDirectoryStructureMessages(params: {
   folderDepth: number;
   minDirectories: number;
   maxDirectories: number;
+  style: DirectoryStyle;
 }): Message[] {
-  const { language, profession, purpose, folderDepth, minDirectories, maxDirectories } = params;
+  const { language, profession, purpose, folderDepth, minDirectories, maxDirectories, style } = params;
 
   if (language === "zh") {
     return [
@@ -71,8 +101,21 @@ export function buildDirectoryStructureMessages(params: {
       },
       {
         role: "user",
-        content:
-          `请根据下面输入参数，返回一个推荐的、便于长期维护的目录结构。输出必须仅为 JSON 字符串，不要额外文字。职业：${profession}\n目标：${purpose}\n\n请提出一个清晰的目录结构，总目录数量在 ${minDirectories} 到 ${maxDirectories} 之间，目录可以有子目录（使用 '目录/子目录' 表示）。\n重点是帮助整理文档的实际可用性。\n返回`,
+        content: (() => {
+          const styleHint =
+            style === "flat"
+              ? "目录风格保持扁平化，尽量避免子目录。"
+              : "可以适当增加子目录，目录结构这样表示（目录/子目录），但不要超过最大层级。";
+          return (
+            `请根据下面输入参数，返回一个推荐的、便于长期维护的目录结构。输出必须仅为 JSON 字符串，不要额外文字。\n` +
+            `职业：${profession}\n` +
+            `目标：${purpose}\n` +
+            `目录风格：${style === "flat" ? "扁平风格" : "多层级风格"}。${styleHint}\n` +
+            `最大目录层级：${folderDepth}。总目录数量在 ${minDirectories} 到 ${maxDirectories} 之间。\n` +
+            `返回 JSON 必须符合以下结构：{\n  "directories": [\n    { "path": string, "description": string }\n  ]\n}\n` +
+            `注意：\n- 路径使用'/'分隔子目录，例如 "文档/项目"。\n- 每个条目的 path 与 description 都必须为字符串。\n- 只输出 JSON，不要任何额外文本。`
+          );
+        })(),
       },
     ];
   }
@@ -82,12 +125,24 @@ export function buildDirectoryStructureMessages(params: {
     {
       role: "system",
       content:
-        "You are a helpful assistant that designs practical, hierarchical directory structures. Output strictly valid JSON only.",
+        "You are a helpful assistant that designs practical, maintainable directory structures. Output strictly valid JSON only.",
     },
     {
       role: "user",
-      content:
-        `Profession: ${profession}\nPurpose: ${purpose}\n\nPlease propose a clear directory structure with between ${minDirectories} and ${maxDirectories} directories (flat or hierarchical using '/' to indicate subfolders).Max folder depth: ${folderDepth}.\nFocus on real-world usefulness for organizing documents.\nReturn JSON: {\n  "directories": string[],\n  "metadata": {\n    "description": string\n  }\n}`,
+      content: (() => {
+        const styleHint =
+          style === "flat"
+            ? "Keep the structure flat and avoid subfolders."
+            : "You may introduce subfolders using '/' (e.g., 'Folder/Subfolder'), but do not exceed the max depth.";
+        return (
+          `Profession: ${profession}\n` +
+          `Purpose: ${purpose}\n` +
+          `Directory style: ${style === "flat" ? "flat" : "hierarchical"}. ${styleHint}\n` +
+          `Max folder depth: ${folderDepth}. Total directories between ${minDirectories} and ${maxDirectories}.\n` +
+          `Return JSON with the following schema only:\n{\n  "directories": [\n    { "path": string, "description": string }\n  ]\n}\n` +
+          `Notes:\n- Use '/' to indicate subfolders.\n- Both 'path' and 'description' must be strings.\n- Output JSON only, no extra text.`
+        );
+      })(),
     },
   ];
 }

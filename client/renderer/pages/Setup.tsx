@@ -36,6 +36,8 @@ const Setup = () => {
   const [directoryStructure, setDirectoryStructure] = useState<DirectoryStructure[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [dirStyle, setDirStyle] = useState<'flat' | 'hierarchical'>('flat');
+  const [collapseActiveKeys, setCollapseActiveKeys] = useState<string[]>([]);
 
   const professionOptions = useMemo(
     () =>
@@ -113,10 +115,13 @@ const Setup = () => {
         temperature: values.temperature || 0.7,
         // pass UI language to backend prompt selector
         language: locale,
+        style: dirStyle,
       });
 
       if (response.success) {
         setDirectoryStructure((response.data as { directories: DirectoryStructure[] }).directories);
+        // auto-collapse advanced options after successful fetch
+        setCollapseActiveKeys([]);
         message.success(t('setup.messages.fetchSuccess'));
       } else {
         message.error(t('setup.messages.fetchError'));
@@ -218,12 +223,22 @@ const Setup = () => {
 
               <Collapse
                 ghost
+                activeKey={collapseActiveKeys}
+                onChange={(keys) =>
+                  setCollapseActiveKeys(Array.isArray(keys) ? (keys as string[]) : [String(keys)])
+                }
                 items={[
                   {
                     key: 'advanced',
                     label: t('setup.optionalSettings'),
                     children: (
                       <>
+                        <Form.Item label={t('setup.form.directoryStyle')}>
+                          <Select value={dirStyle} onChange={setDirStyle} style={{ width: '100%' }}>
+                            <Select.Option value="flat">{t('setup.options.style.flat')}</Select.Option>
+                            <Select.Option value="hierarchical">{t('setup.options.style.hierarchical')}</Select.Option>
+                          </Select>
+                        </Form.Item>
                         <Form.Item
                           name="max_depth"
                           label={t('setup.form.maxDepth')}

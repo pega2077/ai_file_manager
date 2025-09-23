@@ -7,6 +7,8 @@ import {
   buildDirectoryStructureMessages,
   buildChatAskMessages,
   normalizeLanguage,
+  normalizeDirectoryStyle,
+  type DirectoryStyle,
   type SupportedLang,
 } from "./utils/promptHelper";
 
@@ -1088,6 +1090,7 @@ type ChatDirectoryStructureBody = {
   max_directories?: unknown; // default 20
   temperature?: unknown; // default 0.7
   max_tokens?: unknown; // default 1000
+  style?: unknown; // "flat" | "hierarchical" (default flat)
 };
 
 export async function chatDirectoryStructureHandler(
@@ -1111,6 +1114,7 @@ export async function chatDirectoryStructureHandler(
       typeof body?.temperature === "number" ? body.temperature : 0.7;
     const maxTokens =
       typeof body?.max_tokens === "number" ? body.max_tokens : 2000;
+    const style: DirectoryStyle = normalizeDirectoryStyle(body?.style, "flat");
 
     if (!profession || !purpose) {
       res.status(400).json({
@@ -1133,7 +1137,6 @@ export async function chatDirectoryStructureHandler(
       minDirectories,
       Math.min(100, Math.floor(maxDirsRaw))
     );
-    console.log("language:", body?.language);
     const language: SupportedLang = normalizeLanguage(body?.language);
     const messages = buildDirectoryStructureMessages({
       language,
@@ -1142,8 +1145,8 @@ export async function chatDirectoryStructureHandler(
       folderDepth,
       minDirectories,
       maxDirectories,
+      style,
     });
-    //console.log("Directory structure messages:", messages);
     const responseFormat = {
       json_schema: {
         name: "directory_schema",
@@ -1182,7 +1185,6 @@ export async function chatDirectoryStructureHandler(
         undefined,
         language
       );
-      console.log("Directory structure result:", result);
     } catch (err) {
       logger.error("/api/chat/directory-structure LLM failed", err as unknown);
       res.status(500).json({
