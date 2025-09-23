@@ -2,7 +2,13 @@ import type { Express, Request, Response } from "express";
 import { generateStructuredJsonWithOllama } from "./utils/ollama";
 import { logger } from "../logger";
 import { configManager } from "../configManager";
-import { buildRecommendDirectoryMessages, buildDirectoryStructureMessages, buildChatAskMessages, normalizeLanguage, type SupportedLang } from "./utils/promptHelper";
+import {
+  buildRecommendDirectoryMessages,
+  buildDirectoryStructureMessages,
+  buildChatAskMessages,
+  normalizeLanguage,
+  type SupportedLang,
+} from "./utils/promptHelper";
 
 export function registerChatRoutes(app: Express) {
   // POST /api/chat/recommend-directory
@@ -22,24 +28,36 @@ type ChatRecommendBody = {
   max_tokens?: unknown;
 };
 
-export async function chatRecommendDirectoryHandler(req: Request, res: Response): Promise<void> {
+export async function chatRecommendDirectoryHandler(
+  req: Request,
+  res: Response
+): Promise<void> {
   try {
     const startTs = Date.now();
     const body = req.body as ChatRecommendBody | undefined;
     const fileName = typeof body?.file_name === "string" ? body.file_name : "";
-    const fileContent = typeof body?.file_content === "string" ? body.file_content : "";
+    const fileContent =
+      typeof body?.file_content === "string" ? body.file_content : "";
     const currentStructure = Array.isArray(body?.current_structure)
-      ? (body!.current_structure as unknown[]).filter((v) => typeof v === "string").map((v) => String(v))
+      ? (body!.current_structure as unknown[])
+          .filter((v) => typeof v === "string")
+          .map((v) => String(v))
       : [];
-    const temperature = typeof body?.temperature === "number" ? body.temperature : 0.7;
-    const maxTokens = typeof body?.max_tokens === "number" ? body.max_tokens : 500;
+    const temperature =
+      typeof body?.temperature === "number" ? body.temperature : 0.7;
+    const maxTokens =
+      typeof body?.max_tokens === "number" ? body.max_tokens : 500;
 
     if (!fileName && !fileContent) {
       res.status(400).json({
         success: false,
         message: "invalid_request",
         data: null,
-        error: { code: "INVALID_REQUEST", message: "file_name or file_content is required", details: null },
+        error: {
+          code: "INVALID_REQUEST",
+          message: "file_name or file_content is required",
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -65,7 +83,12 @@ export async function chatRecommendDirectoryHandler(req: Request, res: Response)
             reasoning: { type: "string" },
             alternatives: { type: "array", items: { type: "string" } },
           },
-          required: ["recommended_directory", "confidence", "reasoning", "alternatives"],
+          required: [
+            "recommended_directory",
+            "confidence",
+            "reasoning",
+            "alternatives",
+          ],
         },
         strict: true,
       },
@@ -73,14 +96,25 @@ export async function chatRecommendDirectoryHandler(req: Request, res: Response)
 
     let result: unknown;
     try {
-      result = await generateStructuredJsonWithOllama(messages, responseFormat, temperature, maxTokens);
+      result = await generateStructuredJsonWithOllama(
+        messages,
+        responseFormat,
+        temperature,
+        maxTokens,
+        undefined,
+        language
+      );
     } catch (err) {
       logger.error("/api/chat/recommend-directory LLM failed", err as unknown);
       res.status(500).json({
         success: false,
         message: "llm_error",
         data: null,
-        error: { code: "LLM_ERROR", message: (err as Error).message, details: null },
+        error: {
+          code: "LLM_ERROR",
+          message: (err as Error).message,
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -88,13 +122,22 @@ export async function chatRecommendDirectoryHandler(req: Request, res: Response)
     }
 
     const obj = result as Record<string, unknown>;
-    const recommended_directory = typeof obj?.recommended_directory === "string" ? (obj.recommended_directory as string) : "未分类";
-    const confidence = typeof obj?.confidence === "number" ? (obj.confidence as number) : 0.0;
-    const reasoning = typeof obj?.reasoning === "string" ? (obj.reasoning as string) : "";
-    const alternatives = Array.isArray(obj?.alternatives) ? (obj.alternatives as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : [];
+    const recommended_directory =
+      typeof obj?.recommended_directory === "string"
+        ? (obj.recommended_directory as string)
+        : "未分类";
+    const confidence =
+      typeof obj?.confidence === "number" ? (obj.confidence as number) : 0.0;
+    const reasoning =
+      typeof obj?.reasoning === "string" ? (obj.reasoning as string) : "";
+    const alternatives = Array.isArray(obj?.alternatives)
+      ? (obj.alternatives as unknown[])
+          .filter((v) => typeof v === "string")
+          .map((v) => String(v))
+      : [];
 
     const cfg = configManager.getConfig();
-  const responseTime = Date.now() - startTs;
+    const responseTime = Date.now() - startTs;
 
     res.status(200).json({
       success: true,
@@ -121,7 +164,11 @@ export async function chatRecommendDirectoryHandler(req: Request, res: Response)
       success: false,
       message: "internal_error",
       data: null,
-      error: { code: "INTERNAL_ERROR", message: "Recommend directory failed", details: null },
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Recommend directory failed",
+        details: null,
+      },
       timestamp: new Date().toISOString(),
       request_id: "",
     });
@@ -132,7 +179,11 @@ export async function chatRecommendDirectoryHandler(req: Request, res: Response)
 import ChunkModel from "./models/chunk";
 import FileModel from "./models/file";
 import { embedWithOllama } from "./utils/ollama";
-import { isFaissAvailable, globalIndexExists, searchGlobalFaissIndex } from "./utils/vectorStore";
+import {
+  isFaissAvailable,
+  globalIndexExists,
+  searchGlobalFaissIndex,
+} from "./utils/vectorStore";
 import faiss from "faiss-node";
 
 type ChatAskBody = {
@@ -146,10 +197,14 @@ type ChatAskBody = {
   mode?: unknown; // "mode1" or "mode2"
 };
 
-export async function chatAskHandler(req: Request, res: Response): Promise<void> {
+export async function chatAskHandler(
+  req: Request,
+  res: Response
+): Promise<void> {
   try {
     const body = req.body as ChatAskBody | undefined;
-    const modeRaw = typeof body?.mode === "string" ? String(body!.mode).toLowerCase() : "";
+    const modeRaw =
+      typeof body?.mode === "string" ? String(body!.mode).toLowerCase() : "";
     if (modeRaw === "mode2" || modeRaw === "2") {
       return chatAskHandlerMode2(req, res);
     }
@@ -161,33 +216,63 @@ export async function chatAskHandler(req: Request, res: Response): Promise<void>
 }
 
 // Keep current behavior as Mode1 (global FAISS search + post-filter)
-export async function chatAskHandlerMode1(req: Request, res: Response): Promise<void> {
+export async function chatAskHandlerMode1(
+  req: Request,
+  res: Response
+): Promise<void> {
   const startAll = Date.now();
   try {
     const body = req.body as ChatAskBody | undefined;
-    const question = typeof body?.question === "string" ? body!.question.trim() : "";
-    const contextLimitRaw = typeof body?.context_limit === "number" ? body!.context_limit : undefined;
-    const simThreshRaw = typeof body?.similarity_threshold === "number" ? body!.similarity_threshold : undefined;
-    const temperature = typeof body?.temperature === "number" ? body!.temperature : 0.7;
-    const maxTokens = typeof body?.max_tokens === "number" ? body!.max_tokens : 1000;
-  // stream flag is accepted but not supported in current backend; ignore for now to keep API compatibility
-  // const stream = typeof body?.stream === "boolean" ? body!.stream : false;
-  const parsedFileFilters = ((): { file_ids?: string[]; categories?: string[]; tags?: string[] } => {
-    const fileFilters = body?.file_filters;
-    if (!fileFilters || typeof fileFilters !== "object") return {};
-    const obj = fileFilters as Record<string, unknown>;
-    const ids = Array.isArray(obj.file_ids) ? (obj.file_ids as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
-    const cats = Array.isArray(obj.categories) ? (obj.categories as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
-    const tags = Array.isArray(obj.tags) ? (obj.tags as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
-    return { file_ids: ids, categories: cats, tags };
-  })();
+    const question =
+      typeof body?.question === "string" ? body!.question.trim() : "";
+    const contextLimitRaw =
+      typeof body?.context_limit === "number" ? body!.context_limit : undefined;
+    const simThreshRaw =
+      typeof body?.similarity_threshold === "number"
+        ? body!.similarity_threshold
+        : undefined;
+    const temperature =
+      typeof body?.temperature === "number" ? body!.temperature : 0.7;
+    const maxTokens =
+      typeof body?.max_tokens === "number" ? body!.max_tokens : 1000;
+    // stream flag is accepted but not supported in current backend; ignore for now to keep API compatibility
+    // const stream = typeof body?.stream === "boolean" ? body!.stream : false;
+    const parsedFileFilters = ((): {
+      file_ids?: string[];
+      categories?: string[];
+      tags?: string[];
+    } => {
+      const fileFilters = body?.file_filters;
+      if (!fileFilters || typeof fileFilters !== "object") return {};
+      const obj = fileFilters as Record<string, unknown>;
+      const ids = Array.isArray(obj.file_ids)
+        ? (obj.file_ids as unknown[])
+            .filter((v) => typeof v === "string")
+            .map((v) => String(v))
+        : undefined;
+      const cats = Array.isArray(obj.categories)
+        ? (obj.categories as unknown[])
+            .filter((v) => typeof v === "string")
+            .map((v) => String(v))
+        : undefined;
+      const tags = Array.isArray(obj.tags)
+        ? (obj.tags as unknown[])
+            .filter((v) => typeof v === "string")
+            .map((v) => String(v))
+        : undefined;
+      return { file_ids: ids, categories: cats, tags };
+    })();
 
     if (!question) {
       res.status(400).json({
         success: false,
         message: "invalid_request",
         data: null,
-        error: { code: "INVALID_REQUEST", message: "question is required", details: null },
+        error: {
+          code: "INVALID_REQUEST",
+          message: "question is required",
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -195,10 +280,22 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
     }
 
     // Validate numeric ranges
-    const contextLimit = Math.max(1, Math.min(20, Math.floor(contextLimitRaw ?? 5)));
-    const similarityThreshold = Math.max(0, Math.min(1, Number.isFinite(simThreshRaw as number) ? (simThreshRaw as number) : 0.7));
+    const contextLimit = Math.max(
+      1,
+      Math.min(20, Math.floor(contextLimitRaw ?? 5))
+    );
+    const similarityThreshold = Math.max(
+      0,
+      Math.min(
+        1,
+        Number.isFinite(simThreshRaw as number) ? (simThreshRaw as number) : 0.7
+      )
+    );
     const tempClamped = Math.max(0, Math.min(2, temperature));
-    const maxTokensClamped = Math.max(100, Math.min(4000, Math.floor(maxTokens)));
+    const maxTokensClamped = Math.max(
+      100,
+      Math.min(4000, Math.floor(maxTokens))
+    );
 
     // Embedding for the question
     const t0 = Date.now();
@@ -213,7 +310,11 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
         success: false,
         message: "embedding_error",
         data: null,
-        error: { code: "EMBED_ERROR", message: (e as Error).message, details: null },
+        error: {
+          code: "EMBED_ERROR",
+          message: (e as Error).message,
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -249,7 +350,11 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
     }
 
     try {
-      const resFaiss = await searchGlobalFaissIndex({ query: qEmbedding, k: Math.min(100, contextLimit * 5), oversample: 1.0 });
+      const resFaiss = await searchGlobalFaissIndex({
+        query: qEmbedding,
+        k: Math.min(100, contextLimit * 5),
+        oversample: 1.0,
+      });
       chunkIds = resFaiss.ids;
       distances = resFaiss.distances;
     } catch (e) {
@@ -258,7 +363,11 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
         success: false,
         message: "search_error",
         data: null,
-        error: { code: "VECTOR_SEARCH_ERROR", message: (e as Error).message, details: null },
+        error: {
+          code: "VECTOR_SEARCH_ERROR",
+          message: (e as Error).message,
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -283,10 +392,10 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
       relevance_score: number;
     }> = [];
     if (chunkIds.length > 0) {
-      const chunks = await ChunkModel.findAll({
+      const chunks = (await ChunkModel.findAll({
         where: { id: chunkIds },
         raw: true,
-      }).catch(() => []) as Array<{
+      }).catch(() => [])) as Array<{
         id: number;
         file_id: string;
         chunk_index: number;
@@ -295,21 +404,43 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
       }>;
 
       // Map by id for quick access
-  const byId = new Map<number, { id: number; file_id: string; chunk_index: number; content: string; chunk_id: string }>();
-  for (const c of chunks) byId.set(c.id, c);
+      const byId = new Map<
+        number,
+        {
+          id: number;
+          file_id: string;
+          chunk_index: number;
+          content: string;
+          chunk_id: string;
+        }
+      >();
+      for (const c of chunks) byId.set(c.id, c);
 
       // Gather unique file_ids
       const fileIds = Array.from(new Set(chunks.map((c) => c.file_id)));
-      const files = fileIds.length > 0
-        ? await FileModel.findAll({ where: { file_id: fileIds }, raw: true }).catch(() => []) as Array<{
-            file_id: string;
-            name: string;
-            path: string;
-            category: string;
-            tags: string | null;
-          }>
-        : [];
-      const fileById = new Map<string, { file_id: string; name: string; path: string; category: string; tags: string | null }>();
+      const files =
+        fileIds.length > 0
+          ? ((await FileModel.findAll({
+              where: { file_id: fileIds },
+              raw: true,
+            }).catch(() => [])) as Array<{
+              file_id: string;
+              name: string;
+              path: string;
+              category: string;
+              tags: string | null;
+            }>)
+          : [];
+      const fileById = new Map<
+        string,
+        {
+          file_id: string;
+          name: string;
+          path: string;
+          category: string;
+          tags: string | null;
+        }
+      >();
       for (const f of files) fileById.set(f.file_id, f);
 
       // Assemble rows in the order of faiss ids list, attach similarity
@@ -318,7 +449,7 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
         const sim = simScores[i] ?? 0;
         const c = byId.get(id);
         if (!c) continue;
-  const f = fileById.get(c.file_id);
+        const f = fileById.get(c.file_id);
         rows.push({
           id,
           chunk_id: String(c.chunk_id),
@@ -337,12 +468,25 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
     // Apply file_filters
     if (rows.length > 0) {
       rows = rows.filter((r) => {
-        if (parsedFileFilters.file_ids && parsedFileFilters.file_ids.length > 0 && !parsedFileFilters.file_ids.includes(r.file_id)) return false;
-        if (parsedFileFilters.categories && parsedFileFilters.categories.length > 0 && !parsedFileFilters.categories.includes(r.file_category)) return false;
+        if (
+          parsedFileFilters.file_ids &&
+          parsedFileFilters.file_ids.length > 0 &&
+          !parsedFileFilters.file_ids.includes(r.file_id)
+        )
+          return false;
+        if (
+          parsedFileFilters.categories &&
+          parsedFileFilters.categories.length > 0 &&
+          !parsedFileFilters.categories.includes(r.file_category)
+        )
+          return false;
         if (parsedFileFilters.tags && parsedFileFilters.tags.length > 0) {
           try {
-            const tagsArr = r.file_tags ? (JSON.parse(r.file_tags) as string[]) : [];
-            if (!parsedFileFilters.tags.some((t) => tagsArr.includes(t))) return false;
+            const tagsArr = r.file_tags
+              ? (JSON.parse(r.file_tags) as string[])
+              : [];
+            if (!parsedFileFilters.tags.some((t) => tagsArr.includes(t)))
+              return false;
           } catch {
             return false;
           }
@@ -358,7 +502,14 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
     const top = rows.slice(0, contextLimit);
 
     // Build context string
-    const contextStr = top.map((r, i) => `[#${i + 1}] File: ${r.file_name} (${r.file_path})\nChunk ${r.chunk_index}: ${r.content}`).join("\n\n");
+    const contextStr = top
+      .map(
+        (r, i) =>
+          `[#${i + 1}] File: ${r.file_name} (${r.file_path})\nChunk ${
+            r.chunk_index
+          }: ${r.content}`
+      )
+      .join("\n\n");
 
     // LLM prompt for answer generation with JSON schema
     const messages = buildChatAskMessages({ question, contextStr });
@@ -380,7 +531,12 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
     const tGen = Date.now();
     let genObj: Record<string, unknown> = {};
     try {
-      const result = await generateStructuredJsonWithOllama(messages, responseFormat, tempClamped, maxTokensClamped);
+      const result = await generateStructuredJsonWithOllama(
+        messages,
+        responseFormat,
+        tempClamped,
+        maxTokensClamped
+      );
       genObj = (result as Record<string, unknown>) || {};
     } catch (e) {
       logger.error("/api/chat/ask generation failed", e as unknown);
@@ -388,7 +544,11 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
         success: false,
         message: "llm_error",
         data: null,
-        error: { code: "LLM_ERROR", message: (e as Error).message, details: null },
+        error: {
+          code: "LLM_ERROR",
+          message: (e as Error).message,
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -396,8 +556,12 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
     }
     const genMs = Date.now() - tGen;
 
-    const answer = typeof genObj.answer === "string" ? (genObj.answer as string) : "";
-    const conf = typeof genObj.confidence === "number" ? (genObj.confidence as number) : 0.0;
+    const answer =
+      typeof genObj.answer === "string" ? (genObj.answer as string) : "";
+    const conf =
+      typeof genObj.confidence === "number"
+        ? (genObj.confidence as number)
+        : 0.0;
 
     // Build sources output
     const sources = top.map((r) => ({
@@ -436,7 +600,11 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
       success: false,
       message: "internal_error",
       data: null,
-      error: { code: "INTERNAL_ERROR", message: "Chat ask failed", details: null },
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Chat ask failed",
+        details: null,
+      },
       timestamp: new Date().toISOString(),
       request_id: "",
     });
@@ -444,22 +612,48 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
 }
 
 // Mode2: Build an in-memory FAISS index from filtered files, then search
-export async function chatAskHandlerMode2(req: Request, res: Response): Promise<void> {
+export async function chatAskHandlerMode2(
+  req: Request,
+  res: Response
+): Promise<void> {
   const startAll = Date.now();
   try {
     const body = req.body as ChatAskBody | undefined;
-    const question = typeof body?.question === "string" ? body!.question.trim() : "";
-    const contextLimitRaw = typeof body?.context_limit === "number" ? body!.context_limit : undefined;
-    const simThreshRaw = typeof body?.similarity_threshold === "number" ? body!.similarity_threshold : undefined;
-    const temperature = typeof body?.temperature === "number" ? body!.temperature : 0.7;
-    const maxTokens = typeof body?.max_tokens === "number" ? body!.max_tokens : 1000;
-    const parsedFileFilters = ((): { file_ids?: string[]; categories?: string[]; tags?: string[] } => {
+    const question =
+      typeof body?.question === "string" ? body!.question.trim() : "";
+    const contextLimitRaw =
+      typeof body?.context_limit === "number" ? body!.context_limit : undefined;
+    const simThreshRaw =
+      typeof body?.similarity_threshold === "number"
+        ? body!.similarity_threshold
+        : undefined;
+    const temperature =
+      typeof body?.temperature === "number" ? body!.temperature : 0.7;
+    const maxTokens =
+      typeof body?.max_tokens === "number" ? body!.max_tokens : 1000;
+    const parsedFileFilters = ((): {
+      file_ids?: string[];
+      categories?: string[];
+      tags?: string[];
+    } => {
       const fileFilters = body?.file_filters;
       if (!fileFilters || typeof fileFilters !== "object") return {};
       const obj = fileFilters as Record<string, unknown>;
-      const ids = Array.isArray(obj.file_ids) ? (obj.file_ids as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
-      const cats = Array.isArray(obj.categories) ? (obj.categories as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
-      const tags = Array.isArray(obj.tags) ? (obj.tags as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
+      const ids = Array.isArray(obj.file_ids)
+        ? (obj.file_ids as unknown[])
+            .filter((v) => typeof v === "string")
+            .map((v) => String(v))
+        : undefined;
+      const cats = Array.isArray(obj.categories)
+        ? (obj.categories as unknown[])
+            .filter((v) => typeof v === "string")
+            .map((v) => String(v))
+        : undefined;
+      const tags = Array.isArray(obj.tags)
+        ? (obj.tags as unknown[])
+            .filter((v) => typeof v === "string")
+            .map((v) => String(v))
+        : undefined;
       return { file_ids: ids, categories: cats, tags };
     })();
 
@@ -468,7 +662,11 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
         success: false,
         message: "invalid_request",
         data: null,
-        error: { code: "INVALID_REQUEST", message: "question is required", details: null },
+        error: {
+          code: "INVALID_REQUEST",
+          message: "question is required",
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -476,13 +674,27 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
     }
 
     // Validate numeric ranges
-    const contextLimit = Math.max(1, Math.min(20, Math.floor(contextLimitRaw ?? 5)));
-    const similarityThreshold = Math.max(0, Math.min(1, Number.isFinite(simThreshRaw as number) ? (simThreshRaw as number) : 0.7));
+    const contextLimit = Math.max(
+      1,
+      Math.min(20, Math.floor(contextLimitRaw ?? 5))
+    );
+    const similarityThreshold = Math.max(
+      0,
+      Math.min(
+        1,
+        Number.isFinite(simThreshRaw as number) ? (simThreshRaw as number) : 0.7
+      )
+    );
     const tempClamped = Math.max(0, Math.min(2, temperature));
-    const maxTokensClamped = Math.max(100, Math.min(4000, Math.floor(maxTokens)));
+    const maxTokensClamped = Math.max(
+      100,
+      Math.min(4000, Math.floor(maxTokens))
+    );
 
     // Build whitelist of file_ids by applying file_filters to files table first
-    const allFiles = await FileModel.findAll({ raw: true }).catch(() => []) as Array<{
+    const allFiles = (await FileModel.findAll({ raw: true }).catch(
+      () => []
+    )) as Array<{
       file_id: string;
       name: string;
       path: string;
@@ -493,14 +705,25 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
     if (allFiles.length > 0) {
       for (const f of allFiles) {
         // file_ids filter
-        if (parsedFileFilters.file_ids && parsedFileFilters.file_ids.length > 0 && !parsedFileFilters.file_ids.includes(f.file_id)) continue;
+        if (
+          parsedFileFilters.file_ids &&
+          parsedFileFilters.file_ids.length > 0 &&
+          !parsedFileFilters.file_ids.includes(f.file_id)
+        )
+          continue;
         // categories filter
-        if (parsedFileFilters.categories && parsedFileFilters.categories.length > 0 && !parsedFileFilters.categories.includes(f.category)) continue;
+        if (
+          parsedFileFilters.categories &&
+          parsedFileFilters.categories.length > 0 &&
+          !parsedFileFilters.categories.includes(f.category)
+        )
+          continue;
         // tags filter (OR semantics)
         if (parsedFileFilters.tags && parsedFileFilters.tags.length > 0) {
           try {
             const tagsArr = f.tags ? (JSON.parse(f.tags) as string[]) : [];
-            if (!parsedFileFilters.tags.some((t) => tagsArr.includes(t))) continue;
+            if (!parsedFileFilters.tags.some((t) => tagsArr.includes(t)))
+              continue;
           } catch {
             continue;
           }
@@ -509,13 +732,20 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
       }
     }
     // If no filters provided, allow all files
-    const usingFilters = Boolean((parsedFileFilters.file_ids && parsedFileFilters.file_ids.length) || (parsedFileFilters.categories && parsedFileFilters.categories.length) || (parsedFileFilters.tags && parsedFileFilters.tags.length));
+    const usingFilters = Boolean(
+      (parsedFileFilters.file_ids && parsedFileFilters.file_ids.length) ||
+        (parsedFileFilters.categories && parsedFileFilters.categories.length) ||
+        (parsedFileFilters.tags && parsedFileFilters.tags.length)
+    );
     if (!usingFilters) {
       allowedFileIds = new Set(allFiles.map((f) => f.file_id));
     }
 
     // Load chunks for allowed files
-    const chunks = await ChunkModel.findAll({ where: { file_id: Array.from(allowedFileIds) }, raw: true }).catch(() => []) as Array<{
+    const chunks = (await ChunkModel.findAll({
+      where: { file_id: Array.from(allowedFileIds) },
+      raw: true,
+    }).catch(() => [])) as Array<{
       id: number;
       file_id: string;
       chunk_index: number;
@@ -529,7 +759,8 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
         success: true,
         message: "ok",
         data: {
-          answer: "No chunks matched the filter; please adjust file_filters or import files first.",
+          answer:
+            "No chunks matched the filter; please adjust file_filters or import files first.",
           confidence: 0.0,
           sources: [],
           metadata: {
@@ -560,7 +791,11 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
         success: false,
         message: "embedding_error",
         data: null,
-        error: { code: "EMBED_ERROR", message: (e as Error).message, details: null },
+        error: {
+          code: "EMBED_ERROR",
+          message: (e as Error).message,
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -583,7 +818,11 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
         success: false,
         message: "embedding_error",
         data: null,
-        error: { code: "EMBED_ERROR", message: (e as Error).message, details: null },
+        error: {
+          code: "EMBED_ERROR",
+          message: (e as Error).message,
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -596,7 +835,11 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
         success: false,
         message: "embedding_error",
         data: null,
-        error: { code: "EMBED_ERROR", message: "No embeddings produced for chunks", details: null },
+        error: {
+          code: "EMBED_ERROR",
+          message: "No embeddings produced for chunks",
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -606,7 +849,9 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
     // Create in-memory index and add vectors
     let index: faiss.Index;
     try {
-      const { IndexFlatL2 } = faiss as unknown as { IndexFlatL2: new (d: number) => faiss.Index };
+      const { IndexFlatL2 } = faiss as unknown as {
+        IndexFlatL2: new (d: number) => faiss.Index;
+      };
       index = new IndexFlatL2(dim);
     } catch (e) {
       logger.error("Failed to create in-memory FAISS index", e as unknown);
@@ -614,7 +859,11 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
         success: false,
         message: "search_error",
         data: null,
-        error: { code: "VECTOR_INDEX_ERROR", message: (e as Error).message, details: null },
+        error: {
+          code: "VECTOR_INDEX_ERROR",
+          message: (e as Error).message,
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -635,7 +884,11 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
         success: false,
         message: "search_error",
         data: null,
-        error: { code: "VECTOR_INDEX_ADD_ERROR", message: (e as Error).message, details: null },
+        error: {
+          code: "VECTOR_INDEX_ADD_ERROR",
+          message: (e as Error).message,
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -669,16 +922,29 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
 
     // Build file map for metadata enrichment
     const fileIds = Array.from(new Set(selectedChunks.map((c) => c.file_id)));
-    const files = fileIds.length > 0
-      ? await FileModel.findAll({ where: { file_id: fileIds }, raw: true }).catch(() => []) as Array<{
-          file_id: string;
-          name: string;
-          path: string;
-          category: string;
-          tags: string | null;
-        }>
-      : [];
-    const fileById = new Map<string, { file_id: string; name: string; path: string; category: string; tags: string | null }>();
+    const files =
+      fileIds.length > 0
+        ? ((await FileModel.findAll({
+            where: { file_id: fileIds },
+            raw: true,
+          }).catch(() => [])) as Array<{
+            file_id: string;
+            name: string;
+            path: string;
+            category: string;
+            tags: string | null;
+          }>)
+        : [];
+    const fileById = new Map<
+      string,
+      {
+        file_id: string;
+        name: string;
+        path: string;
+        category: string;
+        tags: string | null;
+      }
+    >();
     for (const f of files) fileById.set(f.file_id, f);
 
     for (let i = 0; i < labels.length; i++) {
@@ -700,11 +966,20 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
     }
 
     // Apply similarity threshold
-    const filteredRows = rows.filter((r) => r.relevance_score >= similarityThreshold);
+    const filteredRows = rows.filter(
+      (r) => r.relevance_score >= similarityThreshold
+    );
     filteredRows.sort((a, b) => b.relevance_score - a.relevance_score);
     const top = filteredRows.slice(0, contextLimit);
 
-    const contextStr = top.map((r, i) => `[#${i + 1}] File: ${r.file_name} (${r.file_path})\nChunk ${r.chunk_index}: ${r.content}`).join("\n\n");
+    const contextStr = top
+      .map(
+        (r, i) =>
+          `[#${i + 1}] File: ${r.file_name} (${r.file_path})\nChunk ${
+            r.chunk_index
+          }: ${r.content}`
+      )
+      .join("\n\n");
 
     const messages = buildChatAskMessages({ question, contextStr });
     const responseFormat = {
@@ -725,7 +1000,12 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
     const tGen = Date.now();
     let genObj: Record<string, unknown> = {};
     try {
-      const result = await generateStructuredJsonWithOllama(messages, responseFormat, tempClamped, maxTokensClamped);
+      const result = await generateStructuredJsonWithOllama(
+        messages,
+        responseFormat,
+        tempClamped,
+        maxTokensClamped
+      );
       genObj = (result as Record<string, unknown>) || {};
     } catch (e) {
       logger.error("/api/chat/ask(mode2) generation failed", e as unknown);
@@ -733,7 +1013,11 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
         success: false,
         message: "llm_error",
         data: null,
-        error: { code: "LLM_ERROR", message: (e as Error).message, details: null },
+        error: {
+          code: "LLM_ERROR",
+          message: (e as Error).message,
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -741,8 +1025,12 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
     }
     const genMs = Date.now() - tGen;
 
-    const answer = typeof genObj.answer === "string" ? (genObj.answer as string) : "";
-    const conf = typeof genObj.confidence === "number" ? (genObj.confidence as number) : 0.0;
+    const answer =
+      typeof genObj.answer === "string" ? (genObj.answer as string) : "";
+    const conf =
+      typeof genObj.confidence === "number"
+        ? (genObj.confidence as number)
+        : 0.0;
 
     const sources = top.map((r) => ({
       file_id: r.file_id,
@@ -780,7 +1068,11 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
       success: false,
       message: "internal_error",
       data: null,
-      error: { code: "INTERNAL_ERROR", message: "Chat ask (mode2) failed", details: null },
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Chat ask (mode2) failed",
+        details: null,
+      },
       timestamp: new Date().toISOString(),
       request_id: "",
     });
@@ -798,24 +1090,38 @@ type ChatDirectoryStructureBody = {
   max_tokens?: unknown; // default 1000
 };
 
-export async function chatDirectoryStructureHandler(req: Request, res: Response): Promise<void> {
+export async function chatDirectoryStructureHandler(
+  req: Request,
+  res: Response
+): Promise<void> {
   try {
     const startTs = Date.now();
     const body = req.body as ChatDirectoryStructureBody | undefined;
-    const profession = typeof body?.profession === "string" ? body.profession.trim() : "";
-    const purpose = typeof body?.purpose === "string" ? body.purpose.trim() : "";
-    const folderDepth = typeof body?.folder_depth === "number" ? body.folder_depth : 2;
-    const minDirsRaw = typeof body?.min_directories === "number" ? body.min_directories : 6;
-    const maxDirsRaw = typeof body?.max_directories === "number" ? body.max_directories : 20;
-    const temperature = typeof body?.temperature === "number" ? body.temperature : 0.7;
-    const maxTokens = typeof body?.max_tokens === "number" ? body.max_tokens : 1000;
+    const profession =
+      typeof body?.profession === "string" ? body.profession.trim() : "";
+    const purpose =
+      typeof body?.purpose === "string" ? body.purpose.trim() : "";
+    const folderDepth =
+      typeof body?.folder_depth === "number" ? body.folder_depth : 2;
+    const minDirsRaw =
+      typeof body?.min_directories === "number" ? body.min_directories : 6;
+    const maxDirsRaw =
+      typeof body?.max_directories === "number" ? body.max_directories : 20;
+    const temperature =
+      typeof body?.temperature === "number" ? body.temperature : 0.7;
+    const maxTokens =
+      typeof body?.max_tokens === "number" ? body.max_tokens : 2000;
 
     if (!profession || !purpose) {
       res.status(400).json({
         success: false,
         message: "invalid_request",
         data: null,
-        error: { code: "INVALID_REQUEST", message: "profession and purpose are required", details: null },
+        error: {
+          code: "INVALID_REQUEST",
+          message: "profession and purpose are required",
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -823,8 +1129,11 @@ export async function chatDirectoryStructureHandler(req: Request, res: Response)
     }
 
     const minDirectories = Math.max(1, Math.min(50, Math.floor(minDirsRaw)));
-    const maxDirectories = Math.max(minDirectories, Math.min(100, Math.floor(maxDirsRaw)));
-
+    const maxDirectories = Math.max(
+      minDirectories,
+      Math.min(100, Math.floor(maxDirsRaw))
+    );
+    console.log("language:", body?.language);
     const language: SupportedLang = normalizeLanguage(body?.language);
     const messages = buildDirectoryStructureMessages({
       language,
@@ -834,23 +1143,30 @@ export async function chatDirectoryStructureHandler(req: Request, res: Response)
       minDirectories,
       maxDirectories,
     });
-
+    //console.log("Directory structure messages:", messages);
     const responseFormat = {
       json_schema: {
-        name: "directory_structure_schema",
+        name: "directory_schema",
         schema: {
           type: "object",
           properties: {
-            directories: { type: "array", items: { type: "string" } },
-            metadata: {
-              type: "object",
-              properties: {
-                description: { type: "string" },
-              },
-              required: ["description"],
-            },
+            directories: { 
+              type: "array", 
+              items: { 
+                type: "object",
+                properties: {
+                  "path": { 
+                    type: "string" 
+                  },
+                  "description": { 
+                    type: "string" 
+                  }
+                },
+                required: ["path", "description"]
+              } 
+            }
           },
-          required: ["directories", "metadata"],
+          required: ["directories"],
         },
         strict: true,
       },
@@ -858,14 +1174,26 @@ export async function chatDirectoryStructureHandler(req: Request, res: Response)
 
     let result: unknown;
     try {
-      result = await generateStructuredJsonWithOllama(messages, responseFormat, temperature, maxTokens);
+      result = await generateStructuredJsonWithOllama(
+        messages,
+        responseFormat,
+        temperature,
+        maxTokens,
+        undefined,
+        language
+      );
+      console.log("Directory structure result:", result);
     } catch (err) {
       logger.error("/api/chat/directory-structure LLM failed", err as unknown);
       res.status(500).json({
         success: false,
         message: "llm_error",
         data: null,
-        error: { code: "LLM_ERROR", message: (err as Error).message, details: null },
+        error: {
+          code: "LLM_ERROR",
+          message: (err as Error).message,
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -874,15 +1202,18 @@ export async function chatDirectoryStructureHandler(req: Request, res: Response)
 
     const cfg = configManager.getConfig();
     const responseTime = Date.now() - startTs;
-    const obj = result as Record<string, unknown>;
-    const directories = Array.isArray(obj?.directories)
-      ? (obj.directories as unknown[]).filter((v) => typeof v === "string").map((v) => String(v))
-      : [];
-    const metaVal = obj && typeof obj === "object" && (obj as Record<string, unknown>).metadata;
-    const description =
-      metaVal && typeof (metaVal as Record<string, unknown>).description === "string"
-        ? String((metaVal as Record<string, unknown>).description)
-        : "";
+    const directories: { path: string; description: string }[] = [];
+    type DirectoryItem = { path: string; description: string };
+    const resultObj = result as { directories?: DirectoryItem[] } | undefined;
+    for (const item of resultObj?.directories ?? []) {
+      if (
+        item && typeof item === "object" && "path" in item && "description" in item &&
+        typeof item.path === "string" &&
+        typeof item.description === "string"
+      ) {
+        directories.push({ path: item.path, description: item.description });
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -894,7 +1225,7 @@ export async function chatDirectoryStructureHandler(req: Request, res: Response)
           tokens_used: 0,
           response_time_ms: responseTime,
           generation_time_ms: responseTime,
-          description,
+          
         },
       },
       error: null,
@@ -907,7 +1238,11 @@ export async function chatDirectoryStructureHandler(req: Request, res: Response)
       success: false,
       message: "internal_error",
       data: null,
-      error: { code: "INTERNAL_ERROR", message: "Directory structure generation failed", details: null },
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Directory structure generation failed",
+        details: null,
+      },
       timestamp: new Date().toISOString(),
       request_id: "",
     });

@@ -116,7 +116,12 @@ const Setup = () => {
       });
 
       if (response.success) {
-        setDirectoryStructure((response.data as { directories: DirectoryStructure[] }).directories);
+        const data = response.data as { directories: unknown; metadata?: { description?: string } };
+        const dirsArr = Array.isArray(data.directories) ? data.directories : [];
+        const normalized: DirectoryStructure[] = (dirsArr as unknown[])
+          .filter((v) => typeof v === 'string')
+          .map((p) => ({ path: String(p), description: '' }));
+        setDirectoryStructure(normalized);
         message.success(t('setup.messages.fetchSuccess'));
       } else {
         message.error(t('setup.messages.fetchError'));

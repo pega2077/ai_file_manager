@@ -67,12 +67,12 @@ export function buildDirectoryStructureMessages(params: {
       {
         role: "system",
         content:
-          "你是一个擅长设计实用分层目录结构的助手。必须只输出有效的 JSON。",
+          "你是一个擅长为不同职业设计、可维护并易于扩展的文件夹/目录结构的助手。输出必须严格符合给定的 JSON Schema。",
       },
       {
         role: "user",
         content:
-          `职业：${profession}\n目标：${purpose}\n\n请提出一个清晰的目录结构，总目录数量在 ${minDirectories} 到 ${maxDirectories} 之间（可以是扁平结构，或使用 '/' 表示子目录的分层结构）。最大目录层级：${folderDepth}。\n重点是帮助整理文档的实际可用性。\n返回 JSON：{\n  "directories": string[],\n  "metadata": {\n    "description": string\n  }\n}`,
+          `请根据下面输入参数，返回一个推荐的、便于长期维护的目录结构。输出必须仅为 JSON 字符串，不要额外文字。职业：${profession}\n目标：${purpose}\n\n请提出一个清晰的目录结构，总目录数量在 ${minDirectories} 到 ${maxDirectories} 之间，目录风格扁平化。\n重点是帮助整理文档的实际可用性。\n返回`,
       },
     ];
   }

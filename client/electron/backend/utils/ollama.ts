@@ -1,6 +1,8 @@
 import { configManager } from "../../configManager";
 import { httpPostJson } from "./httpClient";
 import { logger } from "../../logger";
+import type { SupportedLang } from "./promptHelper";
+import { json } from "sequelize";
 
 export interface OllamaEmbedRequest {
   input: string[];
@@ -15,7 +17,10 @@ export interface OllamaEmbedResponse {
   prompt_eval_count?: number;
 }
 
-export async function embedWithOllama(inputs: string[], overrideModel?: string): Promise<number[][]> {
+export async function embedWithOllama(
+  inputs: string[],
+  overrideModel?: string
+): Promise<number[][]> {
   if (!Array.isArray(inputs) || inputs.length === 0) {
     return [];
   }
@@ -27,9 +32,12 @@ export async function embedWithOllama(inputs: string[], overrideModel?: string):
   }
   const url = `${endpoint}/api/embed`;
   const payload = { model, input: inputs } satisfies OllamaEmbedRequest;
-  const resp = await httpPostJson<OllamaEmbedResponse>(url, payload, { "Accept": "application/json" });
+  const resp = await httpPostJson<OllamaEmbedResponse>(url, payload, {
+    Accept: "application/json",
+  });
   if (!resp.ok || !resp.data) {
-    const msg = resp.error?.message || `Failed embedding via Ollama: HTTP ${resp.status}`;
+    const msg =
+      resp.error?.message || `Failed embedding via Ollama: HTTP ${resp.status}`;
     logger.error("embedWithOllama failed", msg);
     throw new Error(msg);
   }
@@ -41,20 +49,24 @@ export async function embedWithOllama(inputs: string[], overrideModel?: string):
 
 // -------- Structured Generation (JSON) --------
 export type OllamaRole = "system" | "user" | "assistant";
-export interface OllamaMessage { role: OllamaRole; content: string }
+export interface OllamaMessage {
+  role: OllamaRole;
+  content: string;
+}
 
 export interface StructuredResponseFormat {
   json_schema?: {
     name?: string;
     schema: unknown;
     strict?: boolean;
-  }
+  };
 }
 
 export interface OllamaGeneratePayload {
   model: string;
   prompt: string;
   stream?: boolean;
+  think?: boolean;
   options?: {
     temperature?: number;
     num_predict?: number;
@@ -72,7 +84,11 @@ export interface OllamaGenerateResponseBody {
   eval_count?: number;
 }
 
-function messagesToPrompt(messages: OllamaMessage[], schema?: StructuredResponseFormat["json_schema"]): string {
+function messagesToPrompt(
+  messages: OllamaMessage[],
+  schema?: StructuredResponseFormat["json_schema"],
+  lang: SupportedLang = "en"
+): string {
   const parts: string[] = [];
   for (const m of messages) {
     const role = m.role || "user";
@@ -80,12 +96,33 @@ function messagesToPrompt(messages: OllamaMessage[], schema?: StructuredResponse
   }
   if (schema?.schema) {
     const schemaStr = (() => {
-      try { return JSON.stringify(schema.schema); } catch { return String(schema.schema); }
+      try {
+        return JSON.stringify(schema.schema);
+      } catch {
+        return String(schema.schema);
+      }
     })();
-    parts.push("\nSYSTEM: Output MUST be valid JSON only. Do not include backticks or extra text.");
-    parts.push(`SYSTEM: Strictly conform to this JSON Schema: ${schemaStr}`);
+    if (lang === "zh") {
+      parts.push(
+        "\nSYSTEM: 输出必须是有效的 JSON，只能输出 JSON，不要包含反引号或多余文本,目录名称使用中文。"
+      );
+      parts.push(`SYSTEM: 严格遵守此 JSON Schema：${schemaStr}`);
+    } else {
+      parts.push(
+        "\nSYSTEM: Output MUST be valid JSON only. Do not include backticks or extra text."
+      );
+      parts.push(`SYSTEM: Strictly conform to this JSON Schema: ${schemaStr}`);
+    }
   } else {
-    parts.push("\nSYSTEM: Output MUST be valid JSON only. Do not include backticks or extra text.");
+    if (lang === "zh") {
+      parts.push(
+        "\nSYSTEM: 输出必须是有效的 JSON，只能输出 JSON，不要包含反引号或多余文本,目录名称使用中文。"
+      );
+    } else {
+      parts.push(
+        "\nSYSTEM: Output MUST be valid JSON only. Do not include backticks or extra text."
+      );
+    }
   }
   return parts.join("\n\n");
 }
@@ -98,48 +135,76 @@ export async function generateStructuredJsonWithOllama(
   messages: OllamaMessage[],
   responseFormat?: StructuredResponseFormat,
   temperature = 0.7,
-  maxTokens = 1000,
-  overrideModel?: string
+  maxTokens = 3000,
+  overrideModel = "",
+  lang?: SupportedLang
 ): Promise<unknown> {
   if (!Array.isArray(messages) || messages.length === 0) {
     throw new Error("messages are required");
   }
   const cfg = configManager.getConfig();
   const endpoint = (cfg.ollamaEndpoint || "").replace(/\/$/, "");
-  const model = overrideModel || cfg.ollamaModel || "llama3";
+  const model = overrideModel || cfg.ollamaModel ;
   if (!endpoint) {
     throw new Error("Ollama endpoint not configured");
   }
+  if (!model) {
+    throw new Error("Ollama model not configured");
+  }
+
   const url = `${endpoint}/api/generate`;
-  const prompt = messagesToPrompt(messages, responseFormat?.json_schema);
+  console.log(
+    "Ollama generateStructuredJsonWithOllama, lang:",
+    lang,
+    "model:",
+    model
+  );
+  const prompt = messagesToPrompt(messages, responseFormat?.json_schema, lang);
   const payload: OllamaGeneratePayload = {
     model,
     prompt,
     stream: false,
+    think: false,
     options: { temperature, num_predict: maxTokens },
   };
   // Ollama supports forcing JSON with `format: "json"`; include schema details in prompt for stricter adherence
   if (responseFormat?.json_schema?.schema) {
     payload.format = "json";
   }
-
-  const resp = await httpPostJson<OllamaGenerateResponseBody>(url, payload, { Accept: "application/json" }, 60000);
+  logger.info("Ollama generate payload prepared", JSON.stringify(payload));
+  const resp = await httpPostJson<OllamaGenerateResponseBody>(
+    url,
+    payload,
+    { Accept: "application/json" },
+    60000
+  );
   if (!resp.ok || !resp.data) {
-    const msg = resp.error?.message || `Failed generate via Ollama: HTTP ${resp.status}`;
-    logger.error("generateStructuredJsonWithOllama failed", msg);
+    const msg =
+      resp.error?.message || `Failed generate via Ollama: HTTP ${resp.status}`;
     throw new Error(msg);
   }
-  console.log("Ollama raw response:", resp.data);
+  //console.log("Ollama raw response:", resp.data);
   const raw = resp.data.response ?? "";
   try {
-    return JSON.parse(raw);
+    const res = JSON.parse(raw);
+    res.payload = payload;
+    return res;
   } catch (e) {
+    console.error("Failed to parse JSON from Ollama response", {
+      snippet: raw.slice(0, 200),
+    });
     // If model returned text with extra notes, try to extract JSON
     const match = raw.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
     if (match) {
-      try { return JSON.parse(match[0]); } catch { /* fallthrough */ }
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        /* fallthrough */
+      }
     }
-    logger.error("Failed to parse JSON from Ollama response", { snippet: raw.slice(0, 200) });
+    console.error("Failed to parse JSON from Ollama response", {
+      snippet: raw.slice(0, 200),
+    });
     throw new Error("Invalid JSON returned by model");
   }
 }
