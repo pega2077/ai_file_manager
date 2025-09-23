@@ -20,17 +20,17 @@ class Logger {
 
       if (process.env.APP_ROOT) {
         // 开发模式：从 client/dist-electron 向上两级到项目根目录
-        logsDir = path.join(process.env.APP_ROOT, '..', 'logs');
+        logsDir = path.join(app.getAppPath(), 'logs');
         console.log('Logger: Development mode, APP_ROOT:', process.env.APP_ROOT);
       } else {
         // 生产模式：使用用户数据目录，因为 Program Files 通常是只读的
-        const userDataPath = app.getPath('userData');
-        logsDir = path.join(userDataPath, 'logs');
-        console.log('Logger: Production mode, userData:', userDataPath);
+        // const userDataPath = app.getPath('userData');
+        // logsDir = path.join(userDataPath, 'logs');
+        logsDir = path.join(path.dirname(app.getPath('exe')), 'logs');
+        console.log('Logger: Production mode, userData:', logsDir);
       }
-
       console.log('Logger: Logs directory:', logsDir);
-
+      
       // 确保日志目录存在
       if (!fs.existsSync(logsDir)) {
         fs.mkdirSync(logsDir, { recursive: true });

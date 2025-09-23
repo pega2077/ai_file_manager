@@ -3,9 +3,13 @@ import path from "path";
 import fs from "fs";
 import { configManager } from "../configManager";
 import { logger } from "../logger";
+import {app} from "electron";
 
 // Initialize Sequelize with SQLite using configured database path
-const dbPath = configManager.getDatabaseAbsolutePath();
+const config = configManager.loadConfig();
+const dbPath = path.isAbsolute(config.sqliteDbPath)
+  ? config.sqliteDbPath
+  : path.join(path.dirname(app.getPath("exe")), config.sqliteDbPath);
 
 // Ensure directory exists (best-effort) without blocking
 try {

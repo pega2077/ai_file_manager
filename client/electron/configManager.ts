@@ -17,7 +17,7 @@ export interface AppConfig {
 }
 
 const DEFAULT_CONFIG: AppConfig = {
-  useLocalService: false,
+  useLocalService: true,
   localServicePort: 8000,
   localServiceHost: "127.0.0.1",
   ollamaEndpoint: "http://127.0.0.1:11434",
@@ -25,7 +25,7 @@ const DEFAULT_CONFIG: AppConfig = {
   ollamaEmbedModel: "bge-m3",
   fileConvertEndpoint: "",
   // Default to repository-standard SQLite location; can be overridden in config.json
-  sqliteDbPath: path.join(app.getAppPath(), "database/files.db")
+  sqliteDbPath: "database/files.db"
 };
 
 export class ConfigManager {
@@ -33,12 +33,21 @@ export class ConfigManager {
   private config: AppConfig;
 
   constructor() {
-    console.log("App path:", app.getAppPath());
-
-    // 获取程序所在目录（项目根目录）
-    const appRoot = app.getAppPath();
+    logger.info("App path:", app.getAppPath());
+    logger.info("Exe path:", app.getPath("exe"));
+    // 获取程序所在目录
+    let appRoot = "";
+    
+    if (process.env.APP_ROOT) {
+      // 开发模式
+      appRoot = app.getAppPath();
+      console.log('ConfigManager: Development mode :', process.env.APP_ROOT);
+    } else {
+      // 生产模式
+      appRoot = path.dirname(app.getPath("exe"));
+      logger.info('ConfigManager: Production mode :', appRoot);
+    }
     this.configPath = path.join(appRoot, 'config.json');
-
     logger.info('ConfigManager: Config path set to', this.configPath);
     this.config = { ...DEFAULT_CONFIG };
     logger.info('ConfigManager: Initialized with default config', this.config);
@@ -55,14 +64,14 @@ export class ConfigManager {
 
         // 合并用户配置和默认配置
         this.config = { ...DEFAULT_CONFIG, ...userConfig };
-        console.log('Config loaded from:', this.configPath);
+        logger.info('Config loaded from:', this.configPath);
       } else {
-        console.log('Config file not found, using defaults. Path:', this.configPath);
+        logger.warn('Config file not found, using defaults. Path:', this.configPath);
         // 如果配置文件不存在，创建默认配置文件
         this.saveConfig();
       }
     } catch (error) {
-      console.error('Failed to load config:', error);
+      logger.error('Failed to load config:', error);
       // 出错时使用默认配置
       this.config = { ...DEFAULT_CONFIG };
     }

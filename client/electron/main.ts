@@ -80,7 +80,7 @@ store.onDidChange("workDirectory", (newValue) => {
 });
 
 // The built directory structure
-process.env.APP_ROOT = path.join(__dirname, "..");
+process.env.APP_ROOT = app.getAppPath();
 
 // 🛠️ Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
