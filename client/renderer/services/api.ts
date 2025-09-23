@@ -152,20 +152,24 @@ class ApiService {
   async getDirectoryStructure(params: {
     profession: string;
     purpose: string;
-    max_depth?: number;
+    max_depth?: number; // kept for backward compatibility with callers
+    folder_depth?: number; // backend expects folder_depth
     min_directories?: number;
     max_directories?: number;
     temperature?: number;
+    language?: string; // pass to backend for prompt localization
   }) {
     return this.request('/chat/directory-structure', {
       method: 'POST',
       body: JSON.stringify({
         profession: params.profession,
         purpose: params.purpose,
-        max_depth: params.max_depth || 2,
+        // backend expects folder_depth; prefer explicit folder_depth, fallback to max_depth, then default 2
+        folder_depth: params.folder_depth ?? params.max_depth ?? 2,
         min_directories: params.min_directories || 6,
         max_directories: params.max_directories || 20,
         temperature: params.temperature || 0.7,
+        language: params.language,
       }),
     });
   }

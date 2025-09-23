@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { generateStructuredJsonWithOllama } from "./utils/ollama";
 import { logger } from "../logger";
 import { configManager } from "../configManager";
+import { buildRecommendDirectoryMessages, buildDirectoryStructureMessages, buildChatAskMessages, normalizeLanguage, type SupportedLang } from "./utils/promptHelper";
 
 export function registerChatRoutes(app: Express) {
   // POST /api/chat/recommend-directory
@@ -14,6 +15,7 @@ export function registerChatRoutes(app: Express) {
 
 type ChatRecommendBody = {
   file_name?: unknown;
+  language?: unknown;
   file_content?: unknown;
   current_structure?: unknown;
   temperature?: unknown;
@@ -44,18 +46,13 @@ export async function chatRecommendDirectoryHandler(req: Request, res: Response)
       return;
     }
 
-    const structureStr = currentStructure.length > 0 ? currentStructure.join("\n") : "";
-    const messages = [
-      {
-        role: "system" as const,
-        content:
-          "You are a file classification expert. Recommend the best directory to store the file based on its name and partial content. Output JSON strictly.",
-      },
-      {
-        role: "user" as const,
-        content: `Current structure (one per line, may be empty):\n${structureStr}\n\nFile name: ${fileName}\nFile content (partial): ${fileContent}\n\nReturn JSON: {\n  "recommended_directory": string,\n  "confidence": number,\n  "reasoning": string,\n  "alternatives": string[]\n}`,
-      },
-    ];
+    const language: SupportedLang = normalizeLanguage(body?.language);
+    const messages = buildRecommendDirectoryMessages({
+      language,
+      fileName,
+      fileContent,
+      currentStructure,
+    });
 
     const responseFormat = {
       json_schema: {
@@ -97,7 +94,7 @@ export async function chatRecommendDirectoryHandler(req: Request, res: Response)
     const alternatives = Array.isArray(obj?.alternatives) ? (obj.alternatives as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : [];
 
     const cfg = configManager.getConfig();
-    const responseTime = Date.now() - startTs;
+  const responseTime = Date.now() - startTs;
 
     res.status(200).json({
       success: true,
@@ -364,10 +361,7 @@ export async function chatAskHandlerMode1(req: Request, res: Response): Promise<
     const contextStr = top.map((r, i) => `[#${i + 1}] File: ${r.file_name} (${r.file_path})\nChunk ${r.chunk_index}: ${r.content}`).join("\n\n");
 
     // LLM prompt for answer generation with JSON schema
-    const messages = [
-      { role: "system" as const, content: "You are a helpful assistant that answers questions using provided context accurately. If the answer is not in the context, say you are not sure. Output JSON only." },
-      { role: "user" as const, content: `Question: ${question}\n\nContext:\n${contextStr}\n\nReturn JSON: {\n  "answer": string,\n  "confidence": number\n}` },
-    ];
+    const messages = buildChatAskMessages({ question, contextStr });
     const responseFormat = {
       json_schema: {
         name: "chat_qa_answer_schema",
@@ -712,10 +706,7 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
 
     const contextStr = top.map((r, i) => `[#${i + 1}] File: ${r.file_name} (${r.file_path})\nChunk ${r.chunk_index}: ${r.content}`).join("\n\n");
 
-    const messages = [
-      { role: "system" as const, content: "You are a helpful assistant that answers questions using provided context accurately. If the answer is not in the context, say you are not sure. Output JSON only." },
-      { role: "user" as const, content: `Question: ${question}\n\nContext:\n${contextStr}\n\nReturn JSON: {\n  "answer": string,\n  "confidence": number\n}` },
-    ];
+    const messages = buildChatAskMessages({ question, contextStr });
     const responseFormat = {
       json_schema: {
         name: "chat_qa_answer_schema",
@@ -799,6 +790,8 @@ export async function chatAskHandlerMode2(req: Request, res: Response): Promise<
 type ChatDirectoryStructureBody = {
   profession?: unknown;
   purpose?: unknown;
+  language?: unknown; // prompt template language, default "en"
+  folder_depth?: unknown; // default 2
   min_directories?: unknown; // default 6
   max_directories?: unknown; // default 20
   temperature?: unknown; // default 0.7
@@ -811,6 +804,7 @@ export async function chatDirectoryStructureHandler(req: Request, res: Response)
     const body = req.body as ChatDirectoryStructureBody | undefined;
     const profession = typeof body?.profession === "string" ? body.profession.trim() : "";
     const purpose = typeof body?.purpose === "string" ? body.purpose.trim() : "";
+    const folderDepth = typeof body?.folder_depth === "number" ? body.folder_depth : 2;
     const minDirsRaw = typeof body?.min_directories === "number" ? body.min_directories : 6;
     const maxDirsRaw = typeof body?.max_directories === "number" ? body.max_directories : 20;
     const temperature = typeof body?.temperature === "number" ? body.temperature : 0.7;
@@ -831,18 +825,15 @@ export async function chatDirectoryStructureHandler(req: Request, res: Response)
     const minDirectories = Math.max(1, Math.min(50, Math.floor(minDirsRaw)));
     const maxDirectories = Math.max(minDirectories, Math.min(100, Math.floor(maxDirsRaw)));
 
-    const messages = [
-      {
-        role: "system" as const,
-        content:
-          "You are a helpful assistant that designs practical, hierarchical directory structures. Output strictly valid JSON only.",
-      },
-      {
-        role: "user" as const,
-        content:
-          `Profession: ${profession}\nPurpose: ${purpose}\n\nPlease propose a clear directory structure with between ${minDirectories} and ${maxDirectories} directories (flat or hierarchical using '/' to indicate subfolders).\nFocus on real-world usefulness for organizing documents.\nReturn JSON: {\n  "directories": string[],\n  "metadata": {\n    "description": string\n  }\n}`,
-      },
-    ];
+    const language: SupportedLang = normalizeLanguage(body?.language);
+    const messages = buildDirectoryStructureMessages({
+      language,
+      profession,
+      purpose,
+      folderDepth,
+      minDirectories,
+      maxDirectories,
+    });
 
     const responseFormat = {
       json_schema: {

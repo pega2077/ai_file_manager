@@ -66,7 +66,17 @@ const Setup = () => {
     const expandedKeys: string[] = [];
 
     directories.forEach((dir) => {
-      const parts = dir.path.split('/');
+      // Normalize and validate path, avoid calling split on undefined/null
+      const rawPath = (dir && typeof dir.path !== 'undefined' && dir.path !== null) ? String(dir.path) : '';
+      // Convert Windows backslashes to forward slashes, trim redundant slashes
+      const normalizedPath = rawPath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+      if (!normalizedPath) {
+        return; // skip invalid entries
+      }
+      const parts = normalizedPath.split('/').filter(Boolean);
+      if (parts.length === 0) {
+        return;
+      }
       let currentPath = '';
       let parent: TreeNode[] = root;
 
@@ -75,7 +85,7 @@ const Setup = () => {
         if (!map.has(currentPath)) {
           const isLeaf = index === parts.length - 1;
           const node: TreeNode = {
-            title: isLeaf ? `${part} : ${dir.description}` : part,
+            title: isLeaf ? `${part} : ${dir?.description ?? ''}` : part,
             key: currentPath,
             children: [],
           };
@@ -101,6 +111,8 @@ const Setup = () => {
         min_directories: values.min_directories || 6,
         max_directories: values.max_directories || 20,
         temperature: values.temperature || 0.7,
+        // pass UI language to backend prompt selector
+        language: locale,
       });
 
       if (response.success) {

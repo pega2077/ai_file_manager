@@ -129,6 +129,7 @@ export async function generateStructuredJsonWithOllama(
     logger.error("generateStructuredJsonWithOllama failed", msg);
     throw new Error(msg);
   }
+  console.log("Ollama raw response:", resp.data);
   const raw = resp.data.response ?? "";
   try {
     return JSON.parse(raw);
