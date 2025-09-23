@@ -158,15 +158,15 @@ export async function chatAskHandler(req: Request, res: Response): Promise<void>
     const maxTokens = typeof body?.max_tokens === "number" ? body!.max_tokens : 1000;
   // stream flag is accepted but not supported in current backend; ignore for now to keep API compatibility
   // const stream = typeof body?.stream === "boolean" ? body!.stream : false;
-    const fileFilters = ((): { file_ids?: string[]; categories?: string[]; tags?: string[] } => {
-      const f = body?.file_filters;
-      if (!f || typeof f !== "object") return {};
-      const obj = f as Record<string, unknown>;
-      const ids = Array.isArray(obj.file_ids) ? (obj.file_ids as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
-      const cats = Array.isArray(obj.categories) ? (obj.categories as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
-      const tags = Array.isArray(obj.tags) ? (obj.tags as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
-      return { file_ids: ids, categories: cats, tags };
-    })();
+  const parsedFileFilters = ((): { file_ids?: string[]; categories?: string[]; tags?: string[] } => {
+    const fileFilters = body?.file_filters;
+    if (!fileFilters || typeof fileFilters !== "object") return {};
+    const obj = fileFilters as Record<string, unknown>;
+    const ids = Array.isArray(obj.file_ids) ? (obj.file_ids as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
+    const cats = Array.isArray(obj.categories) ? (obj.categories as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
+    const tags = Array.isArray(obj.tags) ? (obj.tags as unknown[]).filter((v) => typeof v === "string").map((v) => String(v)) : undefined;
+    return { file_ids: ids, categories: cats, tags };
+  })();
 
     if (!question) {
       res.status(400).json({
@@ -323,12 +323,12 @@ export async function chatAskHandler(req: Request, res: Response): Promise<void>
     // Apply file_filters
     if (rows.length > 0) {
       rows = rows.filter((r) => {
-        if (fileFilters.file_ids && fileFilters.file_ids.length > 0 && !fileFilters.file_ids.includes(r.file_id)) return false;
-        if (fileFilters.categories && fileFilters.categories.length > 0 && !fileFilters.categories.includes(r.file_category)) return false;
-        if (fileFilters.tags && fileFilters.tags.length > 0) {
+        if (parsedFileFilters.file_ids && parsedFileFilters.file_ids.length > 0 && !parsedFileFilters.file_ids.includes(r.file_id)) return false;
+        if (parsedFileFilters.categories && parsedFileFilters.categories.length > 0 && !parsedFileFilters.categories.includes(r.file_category)) return false;
+        if (parsedFileFilters.tags && parsedFileFilters.tags.length > 0) {
           try {
             const tagsArr = r.file_tags ? (JSON.parse(r.file_tags) as string[]) : [];
-            if (!fileFilters.tags.some((t) => tagsArr.includes(t))) return false;
+            if (!parsedFileFilters.tags.some((t) => tagsArr.includes(t))) return false;
           } catch {
             return false;
           }
