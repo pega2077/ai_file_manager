@@ -203,8 +203,6 @@ const Home = () => {
         message.error(saveResp.message || t('home.messages.importToRagFailed'));
         return;
       }
-      // Now import to RAG using file_id
-      await handleRagImport(fileId);
       loadingKey();
     } catch (error) {
       message.error(t('home.messages.importToRagFailed'));
