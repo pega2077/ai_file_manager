@@ -20,7 +20,8 @@ try {
 export const sequelize = new Sequelize({
   dialect: "sqlite",
   storage: dbPath,
-  logging: (msg: string) => logger.debug(msg),
+  // logging: (msg: string) => (logger.debug(msg)),
+  logging: false,
 });
 
 export async function authenticateDB(): Promise<void> {

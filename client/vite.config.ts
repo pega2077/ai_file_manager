@@ -24,6 +24,7 @@ export default defineConfig({
                 'mysql2',
                 'tedious',
                 'mariadb',
+                'faiss-node',
               ],
             },
           },

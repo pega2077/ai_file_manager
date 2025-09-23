@@ -5,6 +5,7 @@ import { logger } from "./logger";
 import { registerSystemRoutes } from "./backend/systemController";
 import { registerFilesRoutes } from "./backend/filesController";
 import { authenticateDB, initializeDB } from "./backend/db";
+import {getGlobalIndexPath} from "./backend/utils/vectorStore";
 import { registerChatRoutes } from "./backend/chatController";
 
 let server: Server | null = null;
@@ -51,7 +52,9 @@ export const startServer = async (): Promise<void> => {
   // Initialize DB connection and ensure schema exists
   await authenticateDB();
   await initializeDB();
-    // Register backend routes
+  const vectorDbPath = await getGlobalIndexPath(); 
+  logger.info(`Using FAISS vector DB path: ${vectorDbPath}`);
+  // Register backend routes
   registerSystemRoutes(app);
   registerFilesRoutes(app);
   registerChatRoutes(app);

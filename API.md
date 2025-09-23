@@ -74,6 +74,7 @@
 | 系统管理 | 系统状态 | GET | `/api/system/status` | 获取系统运行状态 |
 | 系统管理 | 系统配置 | GET | `/api/system/config` | 获取系统配置信息 |
 | 系统管理 | 更新配置 | POST | `/api/system/config/update` | 更新系统配置 |
+| 系统管理 | 清除数据 | POST | `/api/system/clear-data` | 清空应用数据（删除 SQLite 表数据与向量索引） |
 
 ## 1. 文件管理模块接口
 
