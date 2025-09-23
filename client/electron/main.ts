@@ -16,7 +16,6 @@ import path from "node:path";
 import { promises as fs } from "node:fs";
 import Store from "electron-store";
 import { ImportService } from "./importService";
-import { checkServiceStatus, startPythonServerWithConfig, stopPythonServer } from "./backendService";
 import { logger } from "./logger";
 import { configManager, AppConfig } from "./configManager";
 import { startServer as startLocalExpressServer, stopServer as stopLocalExpressServer } from "./server";
@@ -616,12 +615,7 @@ function createTray() {
         shell.openPath(logFilePath);
       },
     },
-    {
-      label: "Stop Server",
-      click: () => {
-        stopPythonServer();
-      },
-    },
+    // Removed Python backend control from tray menu
     { type: "separator" },
     {
       label: "Close App",
@@ -651,7 +645,6 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   logger.info('Application before-quit event triggered');
-  stopPythonServer();
   void stopLocalExpressServer();
 });
 
@@ -675,45 +668,7 @@ app.whenReady().then(async () => {
   setupIpcHandlers();
   setupBotWindowHandlers();
 
-  // Check if in development mode
-  const isDevelopment = !!VITE_DEV_SERVER_URL;
-
-  if (isDevelopment) {
-    logger.info('Running in development mode - skipping backend service check');
-  } else {
-    logger.info('Running in production mode - checking backend service configuration');
-
-    // 使用配置文件中的设置
-    if (appConfig.useLocalService) {
-      logger.info('Local service is enabled in config');
-
-      // 检查服务文件是否存在
-      const { pathExists, exeExists } = configManager.checkLocalServiceFiles();
-
-      if (pathExists && exeExists) {
-        logger.info('Service files exist, checking if service is running');
-
-        // 构建 API 基础 URL
-        const apiBaseUrl = `http://${appConfig.localServiceHost}:${appConfig.localServicePort}`;
-        logger.info('Checking backend service status at:', apiBaseUrl);
-
-        const isRunning = await checkServiceStatus(apiBaseUrl);
-        logger.info('Service running:', isRunning);
-
-        if (!isRunning) {
-          logger.info('Starting Python server with config settings...');
-          // 这里需要修改 startPythonServer 来使用配置文件
-          startPythonServerWithConfig(appConfig);
-        } else {
-          logger.info('Python server is already running');
-        }
-      } else {
-        logger.error('Service files not found. Path exists:', pathExists, 'Exe exists:', exeExists);
-      }
-    } else {
-      logger.info('Local service is disabled in config');
-    }
-  }
+  // Removed Python backend startup/status checks
 
   logger.info('Creating application windows and tray');
   createWindow();

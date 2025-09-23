@@ -5,8 +5,6 @@ import {app} from "electron";
 
 export interface AppConfig {
   useLocalService: boolean;
-  localServicePath: string;
-  localServicePythonExe: string;
   localServicePort: number;
   localServiceHost: string;
   ollamaEndpoint?: string;
@@ -20,8 +18,6 @@ export interface AppConfig {
 
 const DEFAULT_CONFIG: AppConfig = {
   useLocalService: false,
-  localServicePath: "python/server.py",
-  localServicePythonExe: "python/venv/Scripts/python.exe",
   localServicePort: 8000,
   localServiceHost: "127.0.0.1",
   ollamaEndpoint: "http://127.0.0.1:11434",
@@ -110,18 +106,7 @@ export class ConfigManager {
    * 检查本地服务文件是否存在
    */
   checkLocalServiceFiles(): { pathExists: boolean; exeExists: boolean } {
-    const appRoot = process.env.APP_ROOT || path.dirname(process.execPath);
-    const projectRoot = process.env.APP_ROOT
-      ? path.join(appRoot, '..', '..')  // 开发模式：从 client 向上两级到项目根
-      : path.join(appRoot, '..');       // 生产模式：从安装目录向上
-
-    const servicePath = path.isAbsolute(this.config.localServicePath)
-      ? this.config.localServicePath
-      : path.join(projectRoot, this.config.localServicePath);
-
-    const exePath = path.isAbsolute(this.config.localServicePythonExe)
-      ? this.config.localServicePythonExe
-      : path.join(projectRoot, this.config.localServicePythonExe);
+    const { servicePath, exePath } = this.resolveLocalServicePaths();
 
     const pathExists = fs.existsSync(servicePath);
     const exeExists = fs.existsSync(exePath);
@@ -137,24 +122,27 @@ export class ConfigManager {
    * 获取本地服务启动命令
    */
   getLocalServiceCommand(): { exe: string; args: string[]; cwd: string } {
+    const { servicePath, exePath, projectRoot } = this.resolveLocalServicePaths();
+    return { exe: exePath, args: [servicePath], cwd: projectRoot };
+  }
+
+  /**
+   * Resolve default paths for python server script and python executable based on
+   * project layout and current platform. This replaces config-driven paths.
+   */
+  private resolveLocalServicePaths(): { servicePath: string; exePath: string; projectRoot: string } {
     const appRoot = process.env.APP_ROOT || path.dirname(process.execPath);
     const projectRoot = process.env.APP_ROOT
-      ? path.join(appRoot, '..', '..')  // 开发模式：从 client 向上两级到项目根
-      : path.join(appRoot, '..');       // 生产模式：从安装目录向上
+      ? path.join(appRoot, '..', '..')
+      : path.join(appRoot, '..');
 
-    const servicePath = path.isAbsolute(this.config.localServicePath)
-      ? this.config.localServicePath
-      : path.join(projectRoot, this.config.localServicePath);
+    const servicePath = path.join(projectRoot, 'python', 'server.py');
+    // Windows uses Scripts\python.exe, POSIX uses bin/python
+    const exePath = process.platform === 'win32'
+      ? path.join(projectRoot, 'python', 'venv', 'Scripts', 'python.exe')
+      : path.join(projectRoot, 'python', 'venv', 'bin', 'python');
 
-    const exePath = path.isAbsolute(this.config.localServicePythonExe)
-      ? this.config.localServicePythonExe
-      : path.join(projectRoot, this.config.localServicePythonExe);
-
-    return {
-      exe: exePath,
-      args: [servicePath],
-      cwd: projectRoot
-    };
+    return { servicePath, exePath, projectRoot };
   }
 
   /**
