@@ -655,6 +655,32 @@ async def get_file_by_id(file_id: str):
         
         if not file_data:
             raise HTTPException(status_code=404, detail=f"File not found: {file_id}")
+
+        # Get chunks count for this file
+        try:
+            chunks_count = db_manager.get_chunks_count_by_file_id(file_id)
+        except Exception as _:
+            chunks_count = 0
+
+        # Build metadata from filesystem when possible
+        metadata = {
+            "author": "",
+            "created_date": None,
+            "modified_date": None
+        }
+        try:
+            from pathlib import Path
+            fp = Path(file_data["path"]) if file_data.get("path") else None
+            if fp and fp.exists():
+                stat = fp.stat()
+                # On Windows, st_ctime is creation time; on Unix it may be metadata change time.
+                created_iso = datetime.fromtimestamp(stat.st_ctime).isoformat()
+                modified_iso = datetime.fromtimestamp(stat.st_mtime).isoformat()
+                metadata["created_date"] = created_iso
+                metadata["modified_date"] = modified_iso
+        except Exception:
+            # Keep metadata nulls if filesystem info is unavailable
+            pass
         
         # Convert database format to API response format
         file_info = {
@@ -666,8 +692,10 @@ async def get_file_by_id(file_id: str):
             "summary": file_data["summary"],
             "tags": file_data["tags"],  # Already parsed from JSON
             "size": file_data["size"],
+            "chunks_count": chunks_count,
             "added_at": file_data["added_at"],
             "updated_at": file_data.get("updated_at"),
+            "metadata": metadata,
             "processed": file_data["processed"]
         }
         

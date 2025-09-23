@@ -165,6 +165,12 @@ export function registerFilesRoutes(app: Express) {
   app.post("/api/files/list-directory-recursive", listDirectoryRecursiveHandler);
   // POST /api/files/recommend-directory
   app.post("/api/files/recommend-directory", recommendDirectoryHandler);
+  // POST /api/files/chunks/list
+  app.post("/api/files/chunks/list", listChunksHandler);
+  // GET /api/files/chunks/{chunk_id}
+  app.get("/api/files/chunks/:chunk_id", getChunkContentHandler);
+  // GET /api/files/{file_id}
+  app.get("/api/files/:file_id", getFileDetailsHandler);
 }
 
 // -------- Handlers --------
@@ -893,6 +899,281 @@ export async function recommendDirectoryHandler(req: Request, res: Response): Pr
       message: "internal_error",
       data: null,
       error: { code: "ANALYSIS_ERROR", message: "Recommend directory failed", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+// -------- Chunks: List and Content --------
+interface ChunkListBody {
+  file_id?: unknown;
+  page?: unknown;
+  limit?: unknown;
+}
+
+export async function listChunksHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as ChunkListBody | undefined;
+    const fileId = typeof body?.file_id === "string" ? body.file_id : undefined;
+    const page = Math.max(1, toNumber(body?.page, 1));
+    const limit = Math.max(1, Math.min(100, toNumber(body?.limit, 50)));
+
+    if (!fileId) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "file_id is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const totalCount = await ChunkModel.count({ where: { file_id: fileId } });
+    const offset = (page - 1) * limit;
+    const rows = await ChunkModel.findAll({
+      where: { file_id: fileId },
+      order: [["chunk_index", "ASC"]],
+      limit,
+      offset,
+      raw: true,
+    });
+
+    type RawChunkRow = {
+      chunk_id: string;
+      file_id: string;
+      chunk_index: number;
+      content: string;
+      content_type: string;
+      char_count: number;
+      token_count: number | null;
+      embedding_id: string | null;
+      created_at: string;
+    };
+
+    const chunks = (rows as RawChunkRow[]).map((r) => ({
+      id: r.chunk_id,
+      file_id: r.file_id,
+      chunk_index: r.chunk_index,
+      content: r.content.length > 200 ? r.content.slice(0, 200) + "..." : r.content,
+      content_type: r.content_type,
+      char_count: r.char_count,
+      token_count: r.token_count,
+      embedding_id: r.embedding_id,
+      created_at: r.created_at,
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        chunks,
+        pagination: {
+          current_page: page,
+          total_pages: Math.max(1, Math.ceil(totalCount / limit)),
+          total_count: totalCount,
+          limit,
+        },
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/files/chunks/list failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Failed to list chunks", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+export async function getChunkContentHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const chunkId = req.params?.chunk_id;
+    if (!isNonEmptyString(chunkId)) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "chunk_id is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    interface ChunkRow {
+      chunk_id: string;
+      file_id: string;
+      chunk_index: number;
+      content: string;
+      content_type: string;
+      char_count: number;
+      token_count: number | null;
+      embedding_id: string | null;
+      created_at: string;
+    }
+
+    const chunk = (await ChunkModel.findOne({ where: { chunk_id: chunkId }, raw: true }).catch(() => null)) as
+      | ChunkRow
+      | null;
+    if (!chunk) {
+      res.status(404).json({
+        success: false,
+        message: "not_found",
+        data: null,
+        error: { code: "RESOURCE_NOT_FOUND", message: "chunk not found", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    // Fetch file info for name and path
+    const fileRow = (await FileModel.findOne({ where: { file_id: chunk.file_id }, raw: true }).catch(() => null)) as
+      | { name: string; path: string }
+      | null;
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+  id: chunk.chunk_id,
+  file_id: chunk.file_id,
+  chunk_index: chunk.chunk_index,
+  content: chunk.content,
+  content_type: chunk.content_type,
+  char_count: chunk.char_count,
+  token_count: chunk.token_count,
+  embedding_id: chunk.embedding_id,
+  created_at: chunk.created_at,
+        file_name: fileRow?.name ?? "",
+        file_path: fileRow?.path ?? "",
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/files/chunks/:chunk_id failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Failed to get chunk content", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+// -------- File details --------
+export async function getFileDetailsHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const fileId = req.params?.file_id;
+    if (!isNonEmptyString(fileId)) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "file_id is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const row = (await FileModel.findOne({ where: { file_id: fileId }, raw: true }).catch(() => null)) as
+      | {
+          file_id: string;
+          name: string;
+          path: string;
+          type: string;
+          category: string;
+          summary: string | null;
+          tags: string | null;
+          size: number;
+          created_at: string;
+          updated_at: string | null;
+          processed?: boolean | number | null;
+        }
+      | null;
+
+    if (!row) {
+      res.status(404).json({
+        success: false,
+        message: "not_found",
+        data: null,
+        error: { code: "RESOURCE_NOT_FOUND", message: "file not found", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const chunksCount = await ChunkModel.count({ where: { file_id: fileId } }).catch(() => 0);
+
+    // Parse tags JSON
+    let tags: string[] = [];
+    try {
+      tags = row.tags ? (JSON.parse(row.tags) as string[]) : [];
+      if (!Array.isArray(tags)) tags = [];
+    } catch {
+      tags = [];
+    }
+
+    // Filesystem metadata
+    let createdDate: string | null = null;
+    let modifiedDate: string | null = null;
+    try {
+      const st = await fsp.stat(row.path);
+      // On Windows, birthtime is creation time
+      createdDate = st.birthtime ? new Date(st.birthtime).toISOString() : null;
+      modifiedDate = st.mtime ? new Date(st.mtime).toISOString() : null;
+    } catch {
+      // leave nulls
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        file_id: row.file_id,
+        name: row.name,
+        path: row.path,
+        type: row.type,
+        category: row.category,
+        summary: row.summary ?? "",
+        tags,
+        size: row.size,
+        chunks_count: chunksCount,
+        added_at: row.created_at,
+        updated_at: row.updated_at,
+        metadata: {
+          author: "",
+          created_date: createdDate,
+          modified_date: modifiedDate,
+        },
+        processed: Boolean(row.processed ?? false),
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("GET /api/files/:file_id failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Failed to get file details", details: null },
       timestamp: new Date().toISOString(),
       request_id: "",
     });
