@@ -115,6 +115,7 @@
       "enablePreview": "File preview",
       "autoSaveRAG": "Auto-save to RAG",
       "autoClassify": "Auto classify without confirmation",
+      "useLocalService": "Use local service",
       "workDirectory": "Current workspace",
       "apiBaseUrl": "API base URL"
     },
@@ -122,6 +123,7 @@
       "enablePreview": "Double-click files to preview them before opening the default app.",
       "autoSaveRAG": "Automatically add imported files to the RAG knowledge base.",
       "autoClassify": "Skip confirmation dialogs when saving files to recommended directories.",
+      "useLocalService": "When enabled, use the local Python service (typically http://localhost:8000). When disabled, you can configure a remote API URL.",
       "workDirectory": "The workspace folder is defined during setup. Re-run the setup wizard to change it.",
       "apiBaseUrl": "Base URL of the Python backend, including protocol (e.g. http://localhost:8000)."
     },
