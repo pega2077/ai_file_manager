@@ -164,3 +164,25 @@ export function buildChatAskMessages(params: {
     { role: "user", content: `Question: ${question}\n\nContext:\n${contextStr}\n\nReturn JSON: {\n  "answer": string,\n  "confidence": number\n}` },
   ];
 }
+
+/** Build a localized prompt for image description. */
+export function buildVisionDescribePrompt(
+  language: SupportedLang,
+  userHint?: string
+): string {
+  const hint = typeof userHint === "string" && userHint.trim() ? userHint.trim() : "";
+  if (language === "zh") {
+    return (
+      (hint
+        ? `请详细描述这张图片的内容。重点包括：主体对象、场景、颜色、文字（如有OCR可读文字请尽量描述）、情感氛围、可能的关键标签。附加指令：${hint}\n`
+        : `请详细描述这张图片的内容。重点包括：主体对象、场景、颜色、文字（如有OCR可读文字请尽量描述）、情感氛围、可能的关键标签。\n`) +
+      "输出使用中文。"
+    );
+  }
+  return (
+    (hint
+      ? `Describe this image in detail. Focus on main objects, scene, colors, any visible text, mood, and potential tags. Additional instruction: ${hint}\n`
+      : `Describe this image in detail. Focus on main objects, scene, colors, any visible text, mood, and potential tags.\n`) +
+    "Output in English."
+  );
+}

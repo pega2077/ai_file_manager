@@ -487,11 +487,12 @@ export async function listDirectoryRecursiveHandler(req: Request, res: Response)
 // Import a file into RAG pipeline: convert to txt, chunk, embed via Ollama
 export async function importToRagHandler(req: Request, res: Response): Promise<void> {
   try {
-    const body = req.body as { file_id?: unknown; chunk_size?: unknown; overlap?: unknown; model?: unknown } | undefined;
+    const body = req.body as { file_id?: unknown; chunk_size?: unknown; overlap?: unknown; model?: unknown; content?: unknown } | undefined;
     const fileId = typeof body?.file_id === "string" ? body.file_id : undefined;
     const chunkSize = toNumber(body?.chunk_size, 1000);
     const overlap = toNumber(body?.overlap, 200);
     const model = typeof body?.model === "string" && body.model.trim() ? body.model.trim() : undefined;
+    const overrideContent = typeof body?.content === "string" ? body.content : undefined;
 
     if (!fileId) {
       res.status(400).json({
@@ -536,9 +537,12 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
     const ext = path.extname(filePath).replace(/^\./, "").toLowerCase();
     const isImage = isImageExt(ext);
 
-    let txtPath: string;
+    let txtPath: string | null = null;
     let content: string;
-    if (isImage) {
+    if (overrideContent && overrideContent.trim()) {
+      // Use provided content directly
+      content = overrideContent;
+    } else if (isImage) {
       // Read image and send to vision model
       const buf = await fsp.readFile(filePath);
       const base64 = buf.toString("base64");
@@ -558,7 +562,7 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
       content = description || `Image file ${path.basename(filePath)}.`;
       await fsp.writeFile(txtPath, content, "utf8");
     } else {
-      // 1) ensure .txt for non-image
+      // ensure .txt for non-image
       txtPath = await ensureTxtFile(filePath);
       content = await fsp.readFile(txtPath, "utf8");
     }
@@ -625,7 +629,8 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
         txt_path: txtPath,
         chunk_count: chunks.length,
         embedding_count: embeddings.length,
-        dims: embeddings[0]?.length ?? 0
+        dims: embeddings[0]?.length ?? 0,
+        used_content_source: overrideContent && overrideContent.trim() ? "request.content" : (isImage ? "vision" : "converted_file"),
       },
       error: null,
       timestamp: new Date().toISOString(),
@@ -918,11 +923,12 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
 // -------- Recommend Directory --------
 export async function recommendDirectoryHandler(req: Request, res: Response): Promise<void> {
   try {
-    const body = req.body as { file_path?: unknown; available_directories?: unknown } | undefined;
+    const body = req.body as { file_path?: unknown; available_directories?: unknown; content?: unknown } | undefined;
     const filePath = typeof body?.file_path === "string" ? body.file_path : undefined;
     const availableDirs = Array.isArray(body?.available_directories)
       ? (body!.available_directories as unknown[]).filter((v) => typeof v === "string").map((v) => String(v))
       : [];
+    const overrideContent = typeof body?.content === "string" ? body.content : undefined;
 
     if (!filePath) {
       res.status(400).json({
@@ -962,9 +968,16 @@ export async function recommendDirectoryHandler(req: Request, res: Response): Pr
 
     const filename = path.basename(filePath);
 
-    // Convert to text for analysis
-    const txtPath = await ensureTxtFile(filePath);
-    const content = await fsp.readFile(txtPath, "utf8");
+    // Convert to text for analysis unless content is provided
+    let txtPath: string | null = null;
+    let content: string;
+    if (overrideContent && overrideContent.trim()) {
+      content = overrideContent;
+      txtPath = null;
+    } else {
+      txtPath = await ensureTxtFile(filePath);
+      content = await fsp.readFile(txtPath, "utf8");
+    }
     const snippet = content.slice(0, 500);
 
     // Build messages and JSON schema per API.md
@@ -1032,6 +1045,8 @@ export async function recommendDirectoryHandler(req: Request, res: Response): Pr
         confidence: Math.max(0, Math.min(1, confidence)),
         reasoning,
         alternatives,
+        used_content_source: overrideContent && overrideContent.trim() ? "request.content" : "converted_file",
+        txt_path: txtPath,
       },
       error: null,
       timestamp: new Date().toISOString(),

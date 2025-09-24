@@ -11,6 +11,8 @@ import {
   type DirectoryStyle,
   type SupportedLang,
 } from "./utils/promptHelper";
+import { buildVisionDescribePrompt } from "./utils/promptHelper";
+import { describeImageWithOllama } from "./utils/ollama";
 
 export function registerChatRoutes(app: Express) {
   // POST /api/chat/recommend-directory
@@ -19,6 +21,8 @@ export function registerChatRoutes(app: Express) {
   app.post("/api/chat/directory-structure", chatDirectoryStructureHandler);
   // POST /api/chat/ask
   app.post("/api/chat/ask", chatAskHandler);
+  // POST /api/chat/describe-image
+  app.post("/api/chat/describe-image", chatDescribeImageHandler);
 }
 
 type ChatRecommendBody = {
@@ -171,6 +175,86 @@ export async function chatRecommendDirectoryHandler(
         message: "Recommend directory failed",
         details: null,
       },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+// ------------- Describe Image (Vision) -------------
+type ChatDescribeImageBody = {
+  image_base64?: unknown; // raw base64 string or data URL
+  language?: unknown; // 'zh' | 'en'
+  prompt_hint?: unknown; // optional user hint
+  timeout_ms?: unknown; // optional timeout override
+};
+
+export async function chatDescribeImageHandler(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const body = req.body as ChatDescribeImageBody | undefined;
+    const base64 = typeof body?.image_base64 === "string" ? body.image_base64.trim() : "";
+    const language: SupportedLang = normalizeLanguage(body?.language);
+    const hint = typeof body?.prompt_hint === "string" ? body.prompt_hint : undefined;
+    const timeoutMs = typeof body?.timeout_ms === "number" ? Math.max(10000, Math.floor(body.timeout_ms)) : 60000;
+
+    if (!base64) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "image_base64 is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    // Strip data URL prefix if present
+    const cleaned = base64.includes(",") && base64.toLowerCase().startsWith("data:")
+      ? base64.split(",")[1] ?? ""
+      : base64;
+
+    const prompt = buildVisionDescribePrompt(language, hint);
+
+    let description = "";
+    try {
+      description = await describeImageWithOllama(cleaned, { prompt, timeoutMs });
+    } catch (e) {
+      logger.error("/api/chat/describe-image vision generation failed", e as unknown);
+      res.status(500).json({
+        success: false,
+        message: "llm_error",
+        data: null,
+        error: { code: "LLM_ERROR", message: (e as Error).message, details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const cfg = configManager.getConfig();
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        description,
+        language,
+        model_used: cfg.ollamaVisionModel || cfg.ollamaModel || "",
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/chat/describe-image failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Describe image failed", details: null },
       timestamp: new Date().toISOString(),
       request_id: "",
     });
