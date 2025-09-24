@@ -38,36 +38,7 @@ const normalizeLocaleValue = (value: string | null | undefined): string => {
   return SUPPORTED_LOCALES.has(base) ? base : "en";
 };
 
-const syncWorkDirectoryConfig = async (): Promise<void> => {
-  const cfg = configManager.getConfig();
-  const workDirectory = cfg.workDirectory;
-
-  if (typeof workDirectory !== "string" || workDirectory.trim() === "") {
-    return;
-  }
-
-  const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
-
-  const endpoint = `${apiBaseUrl}/api/system/config/update`;
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-
-      headers: { "Content-Type": "application/json" },
-
-      body: JSON.stringify({ workdir_path: workDirectory }),
-    });
-
-    if (!response.ok) {
-      console.error(
-        `Failed to sync work directory config: ${response.status} ${response.statusText}`
-      );
-    }
-  } catch (error) {
-    console.error("Failed to sync work directory config", error);
-  }
-};
+// Removed deprecated syncWorkDirectoryConfig function
 
 // When config updates, caller should re-invoke syncWorkDirectoryConfig
 
@@ -236,8 +207,6 @@ function setupIpcHandlers() {
   // IPC handler for updating app config
   ipcMain.handle("update-app-config", (_event, updates: Partial<AppConfig>) => {
     configManager.updateConfig(updates);
-    void syncWorkDirectoryConfig();
-    void syncLanguageConfig();
     // Reinitialize import service with potentially new base URL
     const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
   importService = new ImportService(win ?? null, apiBaseUrl);
@@ -250,8 +219,6 @@ function setupIpcHandlers() {
     configManager.updateConfig({ apiBaseUrl: normalized, useLocalService: false });
     const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
   importService = new ImportService(win ?? null, apiBaseUrl);
-    void syncWorkDirectoryConfig();
-    void syncLanguageConfig();
     return true;
   });
 
@@ -283,33 +250,7 @@ function setupIpcHandlers() {
     return true;
   });
 
-  ipcMain.handle("sync-language-config", async () => {
-    const preferredLocale = configManager.getConfig().language;
-
-    if (!preferredLocale) {
-      return;
-    }
-
-    const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
-
-    const endpoint = `${apiBaseUrl}/api/system/config/update`;
-
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ locale: preferredLocale }),
-      });
-
-      if (!response.ok) {
-        console.error(
-          `Failed to sync language config: ${response.status} ${response.statusText}`
-        );
-      }
-    } catch (error) {
-      console.error("Failed to sync language config", error);
-    }
-  });
+  // Removed deprecated sync-language-config IPC handler
 }
 
 function setupBotWindowHandlers() {
@@ -677,31 +618,5 @@ app.whenReady().then(async () => {
 
 // Config changes handled via update-app-config IPC handler
 
-const syncLanguageConfig = async (): Promise<void> => {
-  const preferredLocale = configManager.getConfig().language;
-
-  if (!preferredLocale) {
-    return;
-  }
-
-  const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
-
-  const endpoint = `${apiBaseUrl}/api/system/config/update`;
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ locale: preferredLocale }),
-    });
-
-    if (!response.ok) {
-      console.error(
-        `Failed to sync language config: ${response.status} ${response.statusText}`
-      );
-    }
-  } catch (error) {
-    console.error("Failed to sync language config", error);
-  }
-};
+// Removed deprecated syncLanguageConfig function
 
