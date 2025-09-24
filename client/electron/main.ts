@@ -195,6 +195,19 @@ function setupIpcHandlers() {
           name: "Documents",
           extensions: ["txt", "md", "doc", "docx", "pdf", "rtf", "odt"],
         },
+        {
+          name: "Images",
+          extensions: [
+            "jpg",
+            "jpeg",
+            "png",
+            "gif",
+            "bmp",
+            "webp",
+            "svg",
+            "ico",
+          ],
+        },
         { name: "Spreadsheets", extensions: ["xlsx", "xls", "csv", "ods"] },
         { name: "Presentations", extensions: ["pptx", "ppt", "odp"] },
         { name: "Web Files", extensions: ["html", "htm", "xhtml"] },
@@ -433,6 +446,19 @@ function createMenu() {
                 {
                   name: "Documents",
                   extensions: ["txt", "md", "doc", "docx", "pdf", "rtf", "odt"],
+                },
+                {
+                  name: "Images",
+                  extensions: [
+                    "jpg",
+                    "jpeg",
+                    "png",
+                    "gif",
+                    "bmp",
+                    "webp",
+                    "svg",
+                    "ico",
+                  ],
                 },
                 {
                   name: "Spreadsheets",
