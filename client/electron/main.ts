@@ -356,8 +356,8 @@ function createWindow() {
   // Initialize import service
   const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
   importService = new ImportService(win ?? null, apiBaseUrl);
-  void syncWorkDirectoryConfig();
-  void syncLanguageConfig();
+  // void syncWorkDirectoryConfig();
+  // void syncLanguageConfig();
 }
 
 function createBotWindow() {

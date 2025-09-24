@@ -64,22 +64,35 @@ const DEFAULT_CONFIG: AppConfig = {
 export class ConfigManager {
   private configPath: string;
   private config: AppConfig;
+  /**
+   * Determine the base directory of the running app.
+   * - Development: `app.getAppPath()` (typically points to client/dist-electron)
+   * - Production: directory of the packaged executable
+   * Falls back to `process.cwd()` if Electron APIs are unavailable.
+   */
+  public getAppRoot(): string {
+    try {
+      const base = app.isPackaged
+        ? path.dirname(app.getPath('exe'))
+        : app.getAppPath();
+      return base || process.cwd();
+    } catch (err) {
+      logger.error('ConfigManager: Failed to resolve app root, using CWD', err);
+      return process.cwd();
+    }
+  }
 
   constructor() {
     logger.info("App path:", app.getAppPath());
     logger.info("Exe path:", app.getPath("exe"));
-    // 获取程序所在目录
-    let appRoot = "";
-    
-    if (process.env.APP_ROOT) {
-      // 开发模式
-      appRoot = app.getAppPath();
-      console.log('ConfigManager: Development mode :', process.env.APP_ROOT);
-    } else {
-      // 生产模式
-      appRoot = path.dirname(app.getPath("exe"));
-      logger.info('ConfigManager: Production mode :', appRoot);
-    }
+    // Determine base directory depending on packaged state
+    const appRoot = this.getAppRoot();
+
+    logger.info(
+      `ConfigManager: ${app.isPackaged ? 'Production' : 'Development'} mode :`,
+      appRoot
+    );
+
     this.configPath = path.join(appRoot, 'config.json');
     logger.info('ConfigManager: Config path set to', this.configPath);
     this.config = { ...DEFAULT_CONFIG };
@@ -173,10 +186,10 @@ export class ConfigManager {
    * project layout and current platform. This replaces config-driven paths.
    */
   private resolveLocalServicePaths(): { servicePath: string; exePath: string; projectRoot: string } {
-    const appRoot = process.env.APP_ROOT || path.dirname(process.execPath);
-    const projectRoot = process.env.APP_ROOT
-      ? path.join(appRoot, '..', '..')
-      : path.join(appRoot, '..');
+    const appRoot = this.getAppRoot();
+    // In development, appRoot usually points to client/dist-electron, so go up two levels to repo root.
+    // In production, appRoot points to the installation directory; go up one level to bundle root.
+    const projectRoot = app.isPackaged ? path.join(appRoot, '..') : path.join(appRoot, '..', '..');
 
     const servicePath = path.join(projectRoot, 'python', 'server.py');
     // Windows uses Scripts\python.exe, POSIX uses bin/python
@@ -192,10 +205,8 @@ export class ConfigManager {
    * If the path in config is relative, it will be resolved against the project root.
    */
   getDatabaseAbsolutePath(): string {
-    const appRoot = process.env.APP_ROOT || path.dirname(process.execPath);
-    const projectRoot = process.env.APP_ROOT
-      ? path.join(appRoot, '..', '..')
-      : path.join(appRoot, '..');
+    const appRoot = this.getAppRoot();
+    const projectRoot = app.isPackaged ? path.join(appRoot, '..') : path.join(appRoot, '..', '..');
 
     const dbPath = this.config.sqliteDbPath;
     return path.isAbsolute(dbPath) ? dbPath : path.join(projectRoot, dbPath);

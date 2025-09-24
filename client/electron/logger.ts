@@ -19,9 +19,10 @@ class Logger {
       let logsDir: string;
 
       if (app.isPackaged === false) {
-        // 开发模式：从 client/dist-electron 向上两级到项目根目录
-        logsDir = path.join(process.env.APP_ROOT, 'logs');
-        console.log('Logger: Development mode, APP_ROOT:', process.env.APP_ROOT);
+        // 开发模式：基于 app.getAppPath()，避免依赖未初始化的环境变量
+        const appRoot = app.getAppPath();
+        logsDir = path.join(appRoot || process.cwd(), 'logs');
+        console.log('Logger: Development mode, appRoot:', appRoot);
       } else {
         // 生产模式：使用用户数据目录，因为 Program Files 通常是只读的
         // const userDataPath = app.getPath('userData');
@@ -43,6 +44,9 @@ class Logger {
       this.initialized = true;
     } catch (error) {
       console.error('Failed to initialize logger:', error);
+      // Fallback: disable file logging to avoid repeated failures
+      this.logFilePath = '';
+      this.initialized = true;
     }
   }
 
@@ -59,9 +63,12 @@ class Logger {
 
     if (this.logFilePath) {
       try {
-        fs.appendFileSync(this.logFilePath, message);
+        // Use non-blocking append to avoid sync I/O on main thread
+        void fs.promises.appendFile(this.logFilePath, message, { encoding: 'utf-8' }).catch((error) => {
+          console.error('Failed to write to log file:', error);
+        });
       } catch (error) {
-        console.error('Failed to write to log file:', error);
+        console.error('Failed to schedule log file write:', error);
       }
     }
   }

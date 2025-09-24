@@ -9,7 +9,7 @@ import {app} from "electron";
 const config = configManager.loadConfig();
 const dbPath = path.isAbsolute(config.sqliteDbPath)
   ? config.sqliteDbPath
-  : path.join(path.dirname(app.getPath("exe")), config.sqliteDbPath);
+  : path.join(configManager.getAppRoot(), config.sqliteDbPath);
 
 // Ensure directory exists (best-effort) without blocking
 try {
