@@ -7,7 +7,7 @@ import fs from "fs";
 import { promises as fsp } from "fs";
 import { MAX_TEXT_PREVIEW_BYTES, getMimeByExt, isImageExt, decodeTextBuffer, CATEGORY_EXTENSIONS, toNumber, isNonEmptyString, parseTags } from "./utils/fileHelpers";
 import { ensureTxtFile, chunkText } from "./utils/fileConversion";
-import { embedWithOllama, generateStructuredJsonWithOllama } from "./utils/ollama";
+import { embedWithOllama, generateStructuredJsonWithOllama, describeImageWithOllama } from "./utils/ollama";
 import { app } from "electron";
 import { randomUUID } from "crypto";
 import ChunkModel from "./models/chunk";
@@ -532,9 +532,36 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
       return;
     }
 
-    // 1) ensure .txt
-    const txtPath = await ensureTxtFile(filePath);
-    const content = await fsp.readFile(txtPath, "utf8");
+    // Detect file type
+    const ext = path.extname(filePath).replace(/^\./, "").toLowerCase();
+    const isImage = isImageExt(ext);
+
+    let txtPath: string;
+    let content: string;
+    if (isImage) {
+      // Read image and send to vision model
+      const buf = await fsp.readFile(filePath);
+      const base64 = buf.toString("base64");
+      let description = "";
+      try {
+        description = await describeImageWithOllama(base64, {
+          prompt: "Describe this image in Chinese, include key objects, text, scenes, and potential tags.",
+        });
+      } catch (e) {
+        logger.warn("Image description via Ollama failed, continuing with empty description", e as unknown);
+        description = "";
+      }
+      // Save a temp txt containing the description for chunking/embedding
+      const tempDir = path.join(app.getAppPath(), "temp");
+      await fsp.mkdir(tempDir, { recursive: true });
+      txtPath = path.join(tempDir, `${Date.now()}_${path.basename(filePath, path.extname(filePath))}_vision.txt`);
+      content = description || `Image file ${path.basename(filePath)}.`;
+      await fsp.writeFile(txtPath, content, "utf8");
+    } else {
+      // 1) ensure .txt for non-image
+      txtPath = await ensureTxtFile(filePath);
+      content = await fsp.readFile(txtPath, "utf8");
+    }
     // 2) chunk
     const chunks = chunkText(content, chunkSize, overlap);
     // 3) embed via Ollama
@@ -543,7 +570,7 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
       throw new Error("Embeddings count does not match chunks count");
     }
 
-    // 4) Persist chunks to DB (replace existing for file_id)
+  // 4) Persist chunks to DB (replace existing for file_id)
   const nowIso = new Date().toISOString();
     // Capture previous chunk row ids to remove stale vectors from FAISS
     const prevChunkRows = (await ChunkModel.findAll({ where: { file_id: fileId }, attributes: ["id"], raw: true }).catch(() => [])) as Array<{ id: number }>;
@@ -571,6 +598,15 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
   // Re-query to get actual chunk IDs in correct order
   const savedChunks = await ChunkModel.findAll({ where: { file_id: fileId }, order: [["chunk_index", "ASC"]], raw: true }) as Array<{ id: number; chunk_index: number; }>;
   const chunkIds = savedChunks.map((r) => r.id);
+
+    // If this was an image, also update file summary with the description for quick preview
+    if (isImage) {
+      try {
+        await FileModel.update({ summary: content, updated_at: nowIso, processed: true }, { where: { file_id: fileId } });
+      } catch (e) {
+        logger.warn("Failed to update file summary after image description", e as unknown);
+      }
+    }
 
     // 5) Update global FAISS index using chunk IDs as vector IDs
     try {

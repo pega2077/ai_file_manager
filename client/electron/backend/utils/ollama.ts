@@ -2,7 +2,6 @@ import { configManager } from "../../configManager";
 import { httpPostJson } from "./httpClient";
 import { logger } from "../../logger";
 import type { SupportedLang } from "./promptHelper";
-import { json } from "sequelize";
 
 export interface OllamaEmbedRequest {
   input: string[];
@@ -82,6 +81,11 @@ export interface OllamaGenerateResponseBody {
   load_duration?: number;
   prompt_eval_count?: number;
   eval_count?: number;
+}
+
+// ---- Vision (images) generate payload ----
+export interface OllamaVisionGeneratePayload extends OllamaGeneratePayload {
+  images: string[]; // base64-encoded images
 }
 
 function messagesToPrompt(
@@ -207,4 +211,46 @@ export async function generateStructuredJsonWithOllama(
     });
     throw new Error("Invalid JSON returned by model");
   }
+}
+
+/**
+ * Describe image(s) using a vision-capable Ollama model via /api/generate.
+ * images: one or more base64 strings (no data: prefix required, raw base64 recommended).
+ * Returns the textual response from the model.
+ */
+export async function describeImageWithOllama(
+  images: string | string[],
+  options?: { prompt?: string; overrideModel?: string; timeoutMs?: number }
+): Promise<string> {
+  const imgs = Array.isArray(images) ? images : [images];
+  if (imgs.length === 0) return "";
+
+  const cfg = configManager.getConfig();
+  const endpoint = (cfg.ollamaEndpoint || "").replace(/\/$/, "");
+  const model = options?.overrideModel || cfg.ollamaVisionModel || cfg.ollamaModel;
+  if (!endpoint) throw new Error("Ollama endpoint not configured");
+  if (!model) throw new Error("Ollama vision model not configured");
+
+  const url = `${endpoint}/api/generate`;
+  const payload: OllamaVisionGeneratePayload = {
+    model,
+    prompt: options?.prompt || "What is in this picture? Describe it in detail.",
+    stream: false,
+    think: false,
+    images: imgs,
+  };
+
+  const resp = await httpPostJson<OllamaGenerateResponseBody>(
+    url,
+    payload,
+    { Accept: "application/json" },
+    Math.max(30000, options?.timeoutMs ?? 60000)
+  );
+  if (!resp.ok || !resp.data) {
+    const msg = resp.error?.message || `Failed vision generate via Ollama: HTTP ${resp.status}`;
+    logger.error("describeImageWithOllama failed", msg);
+    throw new Error(msg);
+  }
+  const text = resp.data.response ?? "";
+  return typeof text === "string" ? text : String(text);
 }

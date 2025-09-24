@@ -10,6 +10,7 @@ export interface AppConfig {
   ollamaEndpoint?: string;
   ollamaModel?: string;
   ollamaEmbedModel?: string;
+  ollamaVisionModel?: string;
   /** Optional HTTP endpoint for third-party file conversion service */
   fileConvertEndpoint?: string;
   /** Relative or absolute path to the local SQLite database file */
@@ -23,6 +24,7 @@ const DEFAULT_CONFIG: AppConfig = {
   ollamaEndpoint: "http://127.0.0.1:11434",
   ollamaModel: "qwen3:8b",
   ollamaEmbedModel: "bge-m3",
+  ollamaVisionModel: "qwen2.5vl:7b",
   fileConvertEndpoint: "",
   // Default to repository-standard SQLite location; can be overridden in config.json
   sqliteDbPath: "database/files.db"
