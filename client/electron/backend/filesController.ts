@@ -1314,7 +1314,7 @@ export async function getFileDetailsHandler(req: Request, res: Response): Promis
         tags,
         size: row.size,
         chunks_count: chunksCount,
-        added_at: row.created_at,
+  created_at: row.created_at,
         updated_at: row.updated_at,
         metadata: {
           author: "",

@@ -66,7 +66,7 @@ interface FileDetail {
   tags: string[];
   size: number;
   chunks_count: number;
-  added_at: string;
+  created_at: string;
   updated_at: string;
   metadata: {
     author?: string;

@@ -16,7 +16,7 @@ interface SearchResult {
   file_type: string;
   category: string;
   size: number;
-  added_at: string;
+  created_at: string;
   tags: string[];
 }
 
@@ -109,7 +109,7 @@ const SearchPage = () => {
                 type: string;
                 category: string;
                 size: number;
-                added_at: string;
+                created_at: string;
                 tags?: string[];
               };
               
@@ -126,7 +126,7 @@ const SearchPage = () => {
                 file_type: fileData.type,
                 category: fileData.category,
                 size: fileData.size,
-                added_at: fileData.added_at,
+                created_at: fileData.created_at,
                 tags: fileData.tags || []
               });
             }

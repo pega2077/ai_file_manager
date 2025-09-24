@@ -254,8 +254,8 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
     },
     {
       title: t('files.table.columns.addedAt'),
-      dataIndex: 'added_at',
-      key: 'added_at',
+      dataIndex: 'created_at',
+      key: 'created_at',
       width: 150,
       sorter: true,
       render: (date: string) => new Date(date).toLocaleString(),

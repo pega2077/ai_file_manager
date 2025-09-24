@@ -64,7 +64,7 @@ export interface ImportFileResponse {
   category: string;
   summary: string;
   tags: string[];
-  added_at: string;
+  created_at: string;
   processed: boolean;
 }
 
@@ -77,7 +77,7 @@ export interface ImportedFileItem {
   summary: string;
   tags: string[];
   size: number;
-  added_at: string;
+  created_at: string;
   updated_at: string;
   processed: boolean;
 }
