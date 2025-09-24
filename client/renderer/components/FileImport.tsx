@@ -179,6 +179,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
     let contentForAnalysis: string | undefined = undefined;
     try {
       if (isImagePath(filePath)) {
+        message.info(t('files.messages.describingImage'));
         const dataUrl = await fileToBase64(filePath);
         if (dataUrl) {
           const settings = (await window.electronStore.get('settings')) as Settings;

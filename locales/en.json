@@ -309,7 +309,8 @@
       "fileImportFailed": "File import failed",
       "importingRag": "Importing to RAG library...",
       "importedRagSuccess": "File successfully imported to RAG library",
-      "saveSuccessRagFailed": "File saved successfully, but importing to RAG library failed"
+      "saveSuccessRagFailed": "File saved successfully, but importing to RAG library failed",
+      "describingImage": "Describing image content for analysis..."
     },
     "import": {
       "modalTitle": "Select Save Directory",

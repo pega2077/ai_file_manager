@@ -306,7 +306,8 @@
       "fileImportFailed": "文件导入失败",
       "importingRag": "正在导入RAG库...",
       "importedRagSuccess": "文件已成功导入RAG库",
-      "saveSuccessRagFailed": "文件保存成功，但导入RAG库失败"
+      "saveSuccessRagFailed": "文件保存成功，但导入RAG库失败",
+      "describingImage": "正在描述图片内容以便分析..."
     },
     "import": {
       "modalTitle": "选择保存目录",
