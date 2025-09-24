@@ -145,6 +145,25 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
     [buildDirectoryOptions, buildDirectoryTreeData],
   );
 
+  const isImagePath = (p: string) => /\.(jpg|jpeg|png|gif|bmp|webp|svg|ico)$/i.test(p);
+
+  const fileToBase64 = async (path: string): Promise<string> => {
+    // Rely on preview endpoint to get data URL for images to avoid Node fs in renderer.
+    try {
+      const preview = await apiService.previewFile(path);
+      if (preview.success) {
+        const data = preview.data as { content?: string; file_type?: string } | undefined;
+        if (data && data.file_type === 'image' && typeof data.content === 'string') {
+          // content is a data URL; pass directly to backend which strips it if needed
+          return data.content;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    return '';
+  };
+
   const processFile = useCallback(async (filePath: string) => {
     const directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
     if (!directoryStructureResponse.success) {
@@ -156,8 +175,27 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
       directoryStructureResponse.data as DirectoryStructureResponse,
     );
 
+    // If image, get description first via /api/chat/describe-image
+    let contentForAnalysis: string | undefined = undefined;
+    try {
+      if (isImagePath(filePath)) {
+        const dataUrl = await fileToBase64(filePath);
+        if (dataUrl) {
+          const settings = (await window.electronStore.get('settings')) as Settings;
+          const lang = (settings?.language || 'en') as 'zh' | 'en';
+          const descResp = await apiService.describeImage(dataUrl, lang);
+          if (descResp.success && descResp.data && typeof descResp.data.description === 'string') {
+            contentForAnalysis = descResp.data.description;
+          }
+        }
+      }
+    } catch (e) {
+      // Non-blocking; continue without description
+      console.warn('describe-image failed, continuing without content override', e);
+    }
+
     const loadingKey = message.loading(t('files.messages.analyzingFile'), 0);
-    const recommendResponse = await apiService.recommendDirectory(filePath, directories);
+    const recommendResponse = await apiService.recommendDirectory(filePath, directories, contentForAnalysis);
     loadingKey();
     if (!recommendResponse.success) {
       message.error(t('files.messages.getRecommendationFailed'));
@@ -183,7 +221,24 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
         onImported?.();
         const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
         if (fileId) {
-          await handleRagImport(fileId, true);
+          // Pass content override if we obtained image description
+          try {
+            const settings = (await window.electronStore.get('settings')) as Settings;
+            const descForRag = contentForAnalysis && contentForAnalysis.trim() ? contentForAnalysis : undefined;
+            if (settings?.autoSaveRAG) {
+              const loadingKey2 = message.loading(t('files.messages.importingRag'), 0);
+              const ragResponse = await apiService.importToRag(fileId, true, descForRag);
+              loadingKey2();
+              if (ragResponse.success) {
+                message.success(t('files.messages.importedRagSuccess'));
+              } else {
+                message.warning(t('files.messages.saveSuccessRagFailed'));
+              }
+            }
+          } catch (e) {
+            message.warning(t('files.messages.saveSuccessRagFailed'));
+            console.error(e);
+          }
         }
       } else {
         message.error(saveResponse.message || t('files.messages.fileSaveFailed'));
@@ -196,7 +251,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
         directoryStructureResponse.data as DirectoryStructureResponse,
       );
     }
-  }, [workDirectory, t, extractDirectoriesFromStructure, showImportConfirmationDialog, handleRagImport, onImported]);
+  }, [workDirectory, t, extractDirectoriesFromStructure, showImportConfirmationDialog, onImported]);
 
   const handleStartImport = useCallback(async () => {
     try {
@@ -231,7 +286,40 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
         const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
         if (fileId) {
           // The file has been saved and recorded in DB; avoid duplicate DB insert in RAG import
-          await handleRagImport(fileId, true);
+          // If we had image description earlier in processFile, reuse it here by previewing if needed
+          let contentForAnalysis: string | undefined = undefined;
+          try {
+            if (isImagePath(importFilePath)) {
+              const dataUrl = await fileToBase64(importFilePath);
+              if (dataUrl) {
+                const settings = (await window.electronStore.get('settings')) as Settings;
+                const lang = (settings?.language || 'en') as 'zh' | 'en';
+                const descResp = await apiService.describeImage(dataUrl, lang);
+                if (descResp.success && descResp.data && typeof descResp.data.description === 'string') {
+                  contentForAnalysis = descResp.data.description;
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('describe-image (confirm) failed, continuing', e);
+          }
+          try {
+            const settings = (await window.electronStore.get('settings')) as Settings;
+            const descForRag = contentForAnalysis && contentForAnalysis.trim() ? contentForAnalysis : undefined;
+            if (settings?.autoSaveRAG) {
+              const loadingKey2 = message.loading(t('files.messages.importingRag'), 0);
+              const ragResponse = await apiService.importToRag(fileId, true, descForRag);
+              loadingKey2();
+              if (ragResponse.success) {
+                message.success(t('files.messages.importedRagSuccess'));
+              } else {
+                message.warning(t('files.messages.saveSuccessRagFailed'));
+              }
+            }
+          } catch (e) {
+            message.warning(t('files.messages.saveSuccessRagFailed'));
+            console.error(e);
+          }
         }
       } else {
         message.error(saveResponse.message || t('files.messages.fileSaveFailed'));

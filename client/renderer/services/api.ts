@@ -42,6 +42,12 @@ interface RecommendDirectoryResponse {
   alternatives: string[];
 }
 
+interface DescribeImageResponse {
+  description: string;
+  language: string;
+  model_used: string;
+}
+
 interface FileConversionFormats {
   input_formats: string[];
   output_formats: string[];
@@ -255,23 +261,38 @@ class ApiService {
   }
 
   // 推荐保存目录
-  async recommendDirectory(filePath: string, availableDirectories: string[]): Promise<ApiResponse<RecommendDirectoryResponse>> {
+  async recommendDirectory(filePath: string, availableDirectories: string[], content?: string): Promise<ApiResponse<RecommendDirectoryResponse>> {
     return this.request<RecommendDirectoryResponse>('/files/recommend-directory', {
       method: 'POST',
       body: JSON.stringify({
         file_path: filePath,
         available_directories: availableDirectories,
+        ...(content && content.trim() ? { content } : {}),
       }),
     });
   }
 
   // 导入到RAG库
-  async importToRag(fileId: string, noSaveDb: boolean = false) {
+  async importToRag(fileId: string, noSaveDb: boolean = false, content?: string) {
     return this.request('/files/import-to-rag', {
       method: 'POST',
       body: JSON.stringify({
         file_id: fileId,
         no_save_db: noSaveDb,
+        ...(content && content.trim() ? { content } : {}),
+      }),
+    });
+  }
+
+  // 图像描述（Ollama 视觉）
+  async describeImage(imageBase64: string, language?: 'zh' | 'en', promptHint?: string, timeoutMs?: number) {
+    return this.request<DescribeImageResponse>('/chat/describe-image', {
+      method: 'POST',
+      body: JSON.stringify({
+        image_base64: imageBase64,
+        language,
+        prompt_hint: promptHint,
+        timeout_ms: timeoutMs,
       }),
     });
   }

@@ -30,7 +30,7 @@ export const startServer = async (): Promise<void> => {
 
     const app = express();
     // Body parsers
-    app.use(express.json({ limit: "2mb" }));
+    app.use(express.json({ limit: "50mb" }));
     app.use(express.urlencoded({ extended: true }));
 
     // CORS: allow all origins and handle preflight
