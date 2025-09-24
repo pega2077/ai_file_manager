@@ -182,7 +182,7 @@ const Setup = () => {
         }
 
         message.success(t('setup.messages.createSuccess'));
-        navigate('/home');
+        navigate('/files');
       } else {
         message.error(t('setup.messages.createError'));
       }

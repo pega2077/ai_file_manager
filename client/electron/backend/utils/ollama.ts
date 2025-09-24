@@ -171,7 +171,7 @@ export async function generateStructuredJsonWithOllama(
   if (responseFormat?.json_schema?.schema) {
     payload.format = "json";
   }
-  logger.info("Ollama generate payload prepared", JSON.stringify(payload));
+  // logger.info("Ollama generate payload prepared", JSON.stringify(payload));
   const resp = await httpPostJson<OllamaGenerateResponseBody>(
     url,
     payload,
