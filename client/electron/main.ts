@@ -14,16 +14,13 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { promises as fs } from "node:fs";
-import Store from "electron-store";
 import { ImportService } from "./importService";
 import { logger } from "./logger";
 import { configManager, AppConfig } from "./configManager";
 import { startServer as startLocalExpressServer, stopServer as stopLocalExpressServer } from "./server";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Initialize electron-store
-
-const store = new Store();
+// Config is managed via ConfigManager (JSON file), electron-store removed
 
 const SUPPORTED_LOCALES = new Set<string>(["en", "zh"]);
 
@@ -42,15 +39,14 @@ const normalizeLocaleValue = (value: string | null | undefined): string => {
 };
 
 const syncWorkDirectoryConfig = async (): Promise<void> => {
-  const workDirectory = store.get("workDirectory") as string | undefined;
+  const cfg = configManager.getConfig();
+  const workDirectory = cfg.workDirectory;
 
   if (typeof workDirectory !== "string" || workDirectory.trim() === "") {
     return;
   }
 
-  const apiBaseUrl = (
-    store.get("apiBaseUrl", "http://localhost:8000") as string
-  ).replace(/\/$/, "");
+  const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
 
   const endpoint = `${apiBaseUrl}/api/system/config/update`;
 
@@ -73,11 +69,7 @@ const syncWorkDirectoryConfig = async (): Promise<void> => {
   }
 };
 
-store.onDidChange("workDirectory", (newValue) => {
-  if (typeof newValue === "string" && newValue.trim() !== "") {
-    void syncWorkDirectoryConfig();
-  }
-});
+// When config updates, caller should re-invoke syncWorkDirectoryConfig
 
 // The built directory structure
 process.env.APP_ROOT = app.getAppPath();
@@ -97,25 +89,8 @@ let importService: ImportService;
 let tray: Tray | null;
 
 function setupIpcHandlers() {
-  // IPC handlers for electron-store
-  ipcMain.handle("store:get", (_event, key) => {
-    return store.get(key);
-  });
-
-  ipcMain.handle("store:set", (_event, key, value) => {
-    store.set(key, value);
-  });
-
-  ipcMain.handle("store:delete", (_event, key) => {
-    store.delete(key);
-  });
-
-  ipcMain.handle("store:has", (_event, key) => {
-    return store.has(key);
-  });
-
   ipcMain.handle("locale:get-preferred", () => {
-    const storedLocale = store.get("preferredLocale") as string | undefined;
+    const storedLocale = configManager.getConfig().language;
     if (storedLocale) {
       return normalizeLocaleValue(storedLocale);
     }
@@ -125,7 +100,7 @@ function setupIpcHandlers() {
 
   ipcMain.handle("locale:set-preferred", (_event, locale: string) => {
     const normalized = normalizeLocaleValue(locale);
-    store.set("preferredLocale", normalized);
+    configManager.updateConfig({ language: normalized });
     return normalized;
   });
 
@@ -261,20 +236,20 @@ function setupIpcHandlers() {
   // IPC handler for updating app config
   ipcMain.handle("update-app-config", (_event, updates: Partial<AppConfig>) => {
     configManager.updateConfig(updates);
+    void syncWorkDirectoryConfig();
+    void syncLanguageConfig();
+    // Reinitialize import service with potentially new base URL
+    const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
+  importService = new ImportService(win ?? null, apiBaseUrl);
     return configManager.getConfig();
   });
 
   // IPC handler for setting API base URL
   ipcMain.handle("set-api-base-url", (_event, url: string) => {
-    store.set("apiBaseUrl", url);
-
-    // Reinitialize import service with new URL
-    const apiBaseUrl = store.get(
-      "apiBaseUrl",
-      "http://localhost:8000"
-    ) as string;
-
-    importService = new ImportService(store, win, apiBaseUrl);
+    const normalized = typeof url === 'string' ? url.replace(/\/$/, '') : 'http://localhost:8000';
+    configManager.updateConfig({ apiBaseUrl: normalized, useLocalService: false });
+    const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
+  importService = new ImportService(win ?? null, apiBaseUrl);
     void syncWorkDirectoryConfig();
     void syncLanguageConfig();
     return true;
@@ -282,10 +257,7 @@ function setupIpcHandlers() {
 
   // IPC handler for getting API base URL
   ipcMain.handle("get-api-base-url", () => {
-    const stored = store.get("apiBaseUrl", "http://localhost:8000") as string;
-    // Normalize: remove trailing slash for consistent concatenation in renderer
-    const normalized = typeof stored === "string" ? stored.replace(/\/$/, "") : "http://localhost:8000";
-    return normalized;
+    return configManager.getEffectiveApiBaseUrl();
   });
 
   // IPC handler for showing main window
@@ -312,15 +284,13 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle("sync-language-config", async () => {
-    const preferredLocale = store.get("preferredLocale") as string | undefined;
+    const preferredLocale = configManager.getConfig().language;
 
     if (!preferredLocale) {
       return;
     }
 
-    const apiBaseUrl = (
-      store.get("apiBaseUrl", "http://localhost:8000") as string
-    ).replace(/\/$/, "");
+    const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
 
     const endpoint = `${apiBaseUrl}/api/system/config/update`;
 
@@ -352,7 +322,7 @@ function setupBotWindowHandlers() {
 }
 
 function createWindow() {
-  const isInitialized = store.get("isInitialized", false) as boolean;
+  const isInitialized = Boolean(configManager.getConfig().isInitialized);
   win = new BrowserWindow({
     icon: path.join(__dirname, "../app-icon.png"),
     width: 1920,
@@ -384,8 +354,8 @@ function createWindow() {
   // Create application menu
   createMenu();
   // Initialize import service
-  const apiBaseUrl = store.get("apiBaseUrl", "http://localhost:8000") as string;
-  importService = new ImportService(store, win, apiBaseUrl);
+  const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
+  importService = new ImportService(win ?? null, apiBaseUrl);
   void syncWorkDirectoryConfig();
   void syncLanguageConfig();
 }
@@ -705,22 +675,16 @@ app.whenReady().then(async () => {
   logger.info('Application startup complete');
 });
 
-store.onDidChange("preferredLocale", (newValue) => {
-  if (typeof newValue === "string" && newValue.trim() !== "") {
-    void syncLanguageConfig();
-  }
-});
+// Config changes handled via update-app-config IPC handler
 
 const syncLanguageConfig = async (): Promise<void> => {
-  const preferredLocale = store.get("preferredLocale") as string | undefined;
+  const preferredLocale = configManager.getConfig().language;
 
   if (!preferredLocale) {
     return;
   }
 
-  const apiBaseUrl = (
-    store.get("apiBaseUrl", "http://localhost:8000") as string
-  ).replace(/\/$/, "");
+  const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
 
   const endpoint = `${apiBaseUrl}/api/system/config/update`;
 

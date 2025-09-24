@@ -4,7 +4,7 @@ import { ArrowUpOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, Dat
 import { apiService } from '../services/api';
 import Sidebar from '../components/Sidebar';
 import FilePreview from '../components/FilePreview';
-import {  Settings,  FileItem, DirectoryResponse } from '../shared/types';
+import {  FileItem, DirectoryResponse } from '../shared/types';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 import { useCallback } from 'react';
 
@@ -144,36 +144,28 @@ const Directories = () => {
   }, [t]);
 
   useEffect(() => {
-    // 从store读取工作目录和设置
     const loadInitialData = async () => {
-      if (window.electronStore) {
-        try {
-          const storedWorkDirectory = await window.electronStore.get('workDirectory') as string;
-          const settings = await window.electronStore.get('settings') as Settings;
-          
-          if (storedWorkDirectory) {
-            setWorkDirectory(storedWorkDirectory);
-            setCurrentDirectory(storedWorkDirectory);
-          } else {
-            setWorkDirectory('workdir');
-            setCurrentDirectory('workdir');
-          }
-          
-          if (settings && typeof settings.enablePreview === 'boolean') {
-            setEnablePreview(settings.enablePreview);
-          }
-        } catch (error) {
-          console.error('Failed to load initial data:', error);
+      try {
+  const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+        const storedWorkDirectory = cfg?.workDirectory as string | undefined;
+        if (storedWorkDirectory) {
+          setWorkDirectory(storedWorkDirectory);
+          setCurrentDirectory(storedWorkDirectory);
+        } else {
           setWorkDirectory('workdir');
           setCurrentDirectory('workdir');
         }
-      } else {
+        if (typeof cfg?.enablePreview === 'boolean') {
+          setEnablePreview(Boolean(cfg.enablePreview));
+        }
+      } catch (error) {
+        console.error('Failed to load initial data:', error);
         setWorkDirectory('workdir');
         setCurrentDirectory('workdir');
       }
     };
 
-    loadInitialData();
+    void loadInitialData();
   }, []);
 
   useEffect(() => {

@@ -15,16 +15,12 @@ const Landing = () => {
   useEffect(() => {
     const timer = setTimeout(async () => {
       try {
-        if (window.electronStore) {
-          const isInitialized = await window.electronStore.get('isInitialized');
-          console.log('isInitialized:', isInitialized);
-          if (isInitialized === true) {
-            navigate('/files');
-          } else {
-            navigate('/setup');
-          }
+  const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+        const isInitialized = Boolean(cfg?.isInitialized);
+        console.log('isInitialized:', isInitialized);
+        if (isInitialized) {
+          navigate('/files');
         } else {
-          // Fallback if electronStore is not available
           navigate('/setup');
         }
       } catch (error) {
@@ -53,10 +49,8 @@ const Landing = () => {
           <Button
             type="default"
             onClick={async () => {
-              if (window.electronStore) {
-                await window.electronStore.set('isInitialized', false);
-                message.success(t('landing.resetMessage'));
-              }
+              await window.electronAPI.updateAppConfig({ isInitialized: false });
+              message.success(t('landing.resetMessage'));
             }}
           >
             {t('landing.resetButton')}

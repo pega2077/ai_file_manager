@@ -47,7 +47,8 @@ const Bot: React.FC = () => {
       }
     } else if (key === 'openWorkdir') {
       try {
-        const workDir = (await window.electronStore.get('workDirectory')) as string | undefined;
+  const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+        const workDir = cfg?.workDirectory as string | undefined;
         if (!workDir) {
           message.error('工作目录未设置');
           return;

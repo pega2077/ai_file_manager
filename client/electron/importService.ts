@@ -1,6 +1,6 @@
 import { dialog, BrowserWindow } from 'electron'
 import path from 'node:path'
-import Store from 'electron-store'
+import { configManager } from './configManager'
 
 interface AppSettings {
   theme?: string
@@ -16,14 +16,12 @@ interface AppSettings {
 export class ImportService {
   private importQueue: string[] = []
   private isProcessing = false
-  private store: Store
   private win: BrowserWindow | null
   private apiBaseUrl: string
 
-  constructor(store: Store, win: BrowserWindow | null, apiBaseUrl: string = 'http://localhost:8000') {
-    this.store = store
+  constructor(win: BrowserWindow | null, apiBaseUrl?: string) {
     this.win = win
-    this.apiBaseUrl = apiBaseUrl
+    this.apiBaseUrl = apiBaseUrl ?? configManager.getEffectiveApiBaseUrl()
   }
 
   // Add file to import queue
@@ -91,8 +89,9 @@ export class ImportService {
 
   // Process a single file
   private async processSingleFile(filePath: string) {
-    // Get work directory from store
-    const workDirectory = this.store.get('workDirectory', 'workdir') as string
+    // Get work directory from config
+    const cfg = configManager.getConfig()
+    const workDirectory = (cfg.workDirectory && cfg.workDirectory.trim()) ? cfg.workDirectory : 'workdir'
 
     // Step 1: Get directory structure
     const directoryStructureResponse = await fetch(`${this.apiBaseUrl}/api/files/list-directory-recursive`, {
@@ -132,8 +131,8 @@ export class ImportService {
     const recommendedDirectory = recommendData.data.recommended_directory
 
     // Step 3: Get settings
-    const settings = this.store.get('settings', {}) as AppSettings
-    const autoClassifyWithoutConfirmation = settings?.autoClassifyWithoutConfirmation || false
+  const settings = cfg as AppSettings
+  const autoClassifyWithoutConfirmation = settings?.autoClassifyWithoutConfirmation || false
 
     let targetDirectory = recommendedDirectory
 

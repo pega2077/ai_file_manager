@@ -371,15 +371,12 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
   useEffect(() => {
     // 获取工作目录设置
     const loadWorkDirectory = async () => {
-      if (window.electronStore) {
-        try {
-          const storedWorkDirectory = await window.electronStore.get('workDirectory') as string;
-          if (storedWorkDirectory) {
-            setWorkDirectory(storedWorkDirectory);
-          }
-        } catch (error) {
-          console.error('Failed to load workDirectory:', error);
-        }
+      try {
+  const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+        const wd = cfg?.workDirectory as string | undefined;
+        if (wd) setWorkDirectory(wd);
+      } catch (error) {
+        console.error('Failed to load workDirectory:', error);
       }
     };
 

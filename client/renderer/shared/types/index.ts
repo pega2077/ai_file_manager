@@ -89,3 +89,26 @@ export interface FileConversionResult {
   size: number;
   message: string;
 }
+
+// Mirror of main process AppConfig for renderer typing convenience
+export interface AppConfig {
+  useLocalService: boolean;
+  localServicePort: number;
+  localServiceHost: string;
+  ollamaEndpoint?: string;
+  ollamaModel?: string;
+  ollamaEmbedModel?: string;
+  ollamaVisionModel?: string;
+  fileConvertEndpoint?: string;
+  sqliteDbPath: string;
+  language?: string;
+  theme?: 'light' | 'dark';
+  autoSave?: boolean;
+  showHiddenFiles?: boolean;
+  enablePreview?: boolean;
+  autoSaveRAG?: boolean;
+  autoClassifyWithoutConfirmation?: boolean;
+  workDirectory?: string;
+  isInitialized?: boolean;
+  apiBaseUrl?: string;
+}

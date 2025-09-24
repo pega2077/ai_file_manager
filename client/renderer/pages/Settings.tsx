@@ -56,40 +56,36 @@ const Settings = () => {
     const loadSettings = async () => {
       let nextState: SettingsState = { ...DEFAULT_SETTINGS, language: locale };
 
-      if (window.electronStore) {
-        try {
-          const savedSettings = (await window.electronStore.get('settings')) as Partial<SettingsState> | undefined;
-          const workDirectory = (await window.electronStore.get('workDirectory')) as string | undefined;
+      try {
+  const appConfig = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+        if (appConfig) {
+          const normalizedLanguage = normalizeLocale(appConfig.language ?? defaultLocale);
+          nextState = {
+            ...nextState,
+            theme: appConfig.theme ?? DEFAULT_SETTINGS.theme,
+            language: normalizedLanguage,
+            autoSave: Boolean(appConfig.autoSave ?? DEFAULT_SETTINGS.autoSave),
+            showHiddenFiles: Boolean(appConfig.showHiddenFiles ?? DEFAULT_SETTINGS.showHiddenFiles),
+            enablePreview: Boolean(appConfig.enablePreview ?? DEFAULT_SETTINGS.enablePreview),
+            autoSaveRAG: Boolean(appConfig.autoSaveRAG ?? DEFAULT_SETTINGS.autoSaveRAG),
+            autoClassifyWithoutConfirmation: Boolean(appConfig.autoClassifyWithoutConfirmation ?? DEFAULT_SETTINGS.autoClassifyWithoutConfirmation),
+            workDirectory: String(appConfig.workDirectory ?? DEFAULT_SETTINGS.workDirectory),
+            useLocalService: Boolean(appConfig.useLocalService ?? DEFAULT_SETTINGS.useLocalService),
+          };
 
-          if (savedSettings) {
-            console.log('Loaded settings from store:', savedSettings);
-            const normalizedLanguage = normalizeLocale(savedSettings.language ?? defaultLocale);
-            nextState = {
-              ...nextState,
-              ...savedSettings,
-              language: normalizedLanguage,
-            };
-
-            if (normalizedLanguage !== locale) {
-              setLocale(normalizedLanguage);
-            }
+          if (normalizedLanguage !== locale) {
+            setLocale(normalizedLanguage);
           }
-
-          if (typeof workDirectory === 'string') {
-            nextState.workDirectory = workDirectory;
-          }
-        } catch (error) {
-          console.error('Failed to load settings:', error);
         }
+      } catch (error) {
+        console.error('Failed to load app config:', error);
       }
 
-      if (window.electronAPI) {
-        try {
-          const url = await window.electronAPI.getApiBaseUrl();
-          setApiBaseUrl(url);
-        } catch (error) {
-          console.error('Failed to load API base URL:', error);
-        }
+      try {
+        const url = await window.electronAPI.getApiBaseUrl();
+        setApiBaseUrl(url);
+      } catch (error) {
+        console.error('Failed to load API base URL:', error);
       }
 
       setSettings(nextState);
@@ -118,14 +114,11 @@ const Settings = () => {
   const handleLocaleChange = async (value: SupportedLocale) => {
     console.log('Selected locale:', value);
     if (value !== locale) {
-      // First update the language value in electron store
       const newSettings = { ...settings, language: value };
-      if (window.electronStore) {
-        try {
-          await window.electronStore.set('settings', newSettings);
-        } catch (error) {
-          console.error('Failed to save language to store:', error);
-        }
+      try {
+        await window.electronAPI.updateAppConfig({ language: value });
+      } catch (error) {
+        console.error('Failed to save language:', error);
       }
       setLocale(value);
       setSettings(newSettings);
@@ -134,10 +127,17 @@ const Settings = () => {
 
   const handleSaveSettings = async () => {
     try {
-      if (window.electronStore) {
-        await window.electronStore.set('settings', settings);
-        message.success(t('settings.messages.saveSuccess'));
-      }
+      await window.electronAPI.updateAppConfig({
+        theme: settings.theme,
+        language: settings.language,
+        autoSave: settings.autoSave,
+        showHiddenFiles: settings.showHiddenFiles,
+        enablePreview: settings.enablePreview,
+        autoSaveRAG: settings.autoSaveRAG,
+        autoClassifyWithoutConfirmation: settings.autoClassifyWithoutConfirmation,
+        useLocalService: settings.useLocalService,
+      });
+      message.success(t('settings.messages.saveSuccess'));
     } catch (error) {
       message.error(t('settings.messages.saveError'));
       console.error(error);
@@ -180,10 +180,7 @@ const Settings = () => {
         try {
           const response = await apiService.clearAllData();
           if (response.success) {
-            if (window.electronStore) {
-              await window.electronStore.set('isInitialized', false);
-              await window.electronStore.set('workDirectory', '');
-            }
+            await window.electronAPI.updateAppConfig({ isInitialized: false, workDirectory: '' });
             setSettings((prev) => ({ ...prev, workDirectory: '' }));
             message.success(t('settings.messages.clearSuccess'));
           } else {

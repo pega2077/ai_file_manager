@@ -2,7 +2,7 @@ import React, { useEffect, useState, forwardRef, useImperativeHandle, useCallbac
 import { Button, Modal, Select, TreeSelect, message } from 'antd';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 import { apiService } from '../services/api';
-import type { DirectoryStructureResponse, RecommendDirectoryResponse, Settings, TreeNode } from '../shared/types';
+import type { DirectoryStructureResponse, RecommendDirectoryResponse, TreeNode } from '../shared/types';
 
 type FileImportProps = {
   onImported?: () => void;
@@ -27,18 +27,15 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
 
   useEffect(() => {
     const loadWorkDirectory = async () => {
-      if (window.electronStore) {
-        try {
-          const storedWorkDirectory = (await window.electronStore.get('workDirectory')) as string;
-          if (storedWorkDirectory) {
-            setWorkDirectory(storedWorkDirectory);
-          }
-        } catch (error) {
-          console.error('Failed to load workDirectory:', error);
-        }
+      try {
+  const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+        const wd = cfg?.workDirectory as string | undefined;
+        if (wd) setWorkDirectory(wd);
+      } catch (error) {
+        console.error('Failed to load workDirectory:', error);
       }
     };
-    loadWorkDirectory();
+    void loadWorkDirectory();
   }, []);
 
   const getPathSeparator = () => (navigator.userAgent.includes('Windows') ? '\\' : '/');
@@ -112,8 +109,8 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
 
   const handleRagImport = useCallback(async (fileId: string, noSaveDb: boolean = false) => {
     try {
-      const settings = (await window.electronStore.get('settings')) as Settings;
-      if (settings?.autoSaveRAG) {
+  const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+      if (cfg?.autoSaveRAG) {
         const loadingKey = message.loading(t('files.messages.importingRag'), 0);
         const ragResponse = await apiService.importToRag(fileId, noSaveDb);
         loadingKey();
@@ -182,8 +179,8 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
         message.info(t('files.messages.describingImage'));
         const dataUrl = await fileToBase64(filePath);
         if (dataUrl) {
-          const settings = (await window.electronStore.get('settings')) as Settings;
-          const lang = (settings?.language || 'en') as 'zh' | 'en';
+          const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+          const lang = ((cfg?.language || 'en') as 'zh' | 'en');
           const descResp = await apiService.describeImage(dataUrl, lang);
           if (descResp.success && descResp.data && typeof descResp.data.description === 'string') {
             contentForAnalysis = descResp.data.description;
@@ -207,8 +204,8 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
       ?.recommended_directory;
     const alternatives = (recommendResponse.data as RecommendDirectoryResponse)?.alternatives || [];
 
-    const settings = (await window.electronStore.get('settings')) as Settings;
-    const autoClassifyWithoutConfirmation = settings?.autoClassifyWithoutConfirmation || false;
+  const cfg2 = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+  const autoClassifyWithoutConfirmation = Boolean(cfg2?.autoClassifyWithoutConfirmation);
 
     if (autoClassifyWithoutConfirmation) {
       const separator = getPathSeparator();
@@ -224,9 +221,9 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
         if (fileId) {
           // Pass content override if we obtained image description
           try {
-            const settings = (await window.electronStore.get('settings')) as Settings;
+            const cfg3 = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
             const descForRag = contentForAnalysis && contentForAnalysis.trim() ? contentForAnalysis : undefined;
-            if (settings?.autoSaveRAG) {
+            if (cfg3?.autoSaveRAG) {
               const loadingKey2 = message.loading(t('files.messages.importingRag'), 0);
               const ragResponse = await apiService.importToRag(fileId, true, descForRag);
               loadingKey2();
@@ -293,8 +290,8 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
             if (isImagePath(importFilePath)) {
               const dataUrl = await fileToBase64(importFilePath);
               if (dataUrl) {
-                const settings = (await window.electronStore.get('settings')) as Settings;
-                const lang = (settings?.language || 'en') as 'zh' | 'en';
+                const cfg4 = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+                const lang = ((cfg4?.language || 'en') as 'zh' | 'en');
                 const descResp = await apiService.describeImage(dataUrl, lang);
                 if (descResp.success && descResp.data && typeof descResp.data.description === 'string') {
                   contentForAnalysis = descResp.data.description;
@@ -305,9 +302,9 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
             console.warn('describe-image (confirm) failed, continuing', e);
           }
           try {
-            const settings = (await window.electronStore.get('settings')) as Settings;
+            const cfg5 = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
             const descForRag = contentForAnalysis && contentForAnalysis.trim() ? contentForAnalysis : undefined;
-            if (settings?.autoSaveRAG) {
+            if (cfg5?.autoSaveRAG) {
               const loadingKey2 = message.loading(t('files.messages.importingRag'), 0);
               const ragResponse = await apiService.importToRag(fileId, true, descForRag);
               loadingKey2();

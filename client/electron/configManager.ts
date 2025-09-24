@@ -15,6 +15,26 @@ export interface AppConfig {
   fileConvertEndpoint?: string;
   /** Relative or absolute path to the local SQLite database file */
   sqliteDbPath: string;
+  /** UI language preference, e.g., 'en' | 'zh' */
+  language?: string;
+  /** UI theme preference */
+  theme?: 'light' | 'dark';
+  /** Whether to auto save general edits */
+  autoSave?: boolean;
+  /** Whether to show hidden files in UI */
+  showHiddenFiles?: boolean;
+  /** Enable file preview feature */
+  enablePreview?: boolean;
+  /** Auto-import to RAG after save */
+  autoSaveRAG?: boolean;
+  /** Auto classify without confirmation */
+  autoClassifyWithoutConfirmation?: boolean;
+  /** Current workspace directory path */
+  workDirectory?: string;
+  /** App initialization flag */
+  isInitialized?: boolean;
+  /** When not using local service, custom API base URL */
+  apiBaseUrl?: string;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -27,7 +47,18 @@ const DEFAULT_CONFIG: AppConfig = {
   ollamaVisionModel: "qwen2.5vl:7b",
   fileConvertEndpoint: "",
   // Default to repository-standard SQLite location; can be overridden in config.json
-  sqliteDbPath: "database/files.db"
+  sqliteDbPath: "database/files.db",
+  // App defaults (override in config.json)
+  language: 'zh',
+  theme: 'light',
+  autoSave: true,
+  showHiddenFiles: false,
+  enablePreview: true,
+  autoSaveRAG: true,
+  autoClassifyWithoutConfirmation: false,
+  workDirectory: '',
+  isInitialized: false,
+  apiBaseUrl: 'http://localhost:8000'
 };
 
 export class ConfigManager {
@@ -168,6 +199,21 @@ export class ConfigManager {
 
     const dbPath = this.config.sqliteDbPath;
     return path.isAbsolute(dbPath) ? dbPath : path.join(projectRoot, dbPath);
+  }
+
+  /**
+   * Derive the effective API base URL according to config.
+   * If useLocalService is true, build from host/port; otherwise, use apiBaseUrl.
+   */
+  getEffectiveApiBaseUrl(): string {
+    const cfg = this.getConfig();
+    if (cfg.useLocalService) {
+      const base = `http://${cfg.localServiceHost}:${cfg.localServicePort}`;
+      return base;
+    }
+    const custom = (cfg.apiBaseUrl || '').trim();
+    if (!custom) return 'http://localhost:8000';
+    return custom.replace(/\/$/, '');
   }
 }
 

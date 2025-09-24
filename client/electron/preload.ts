@@ -30,6 +30,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   importFile: () => ipcRenderer.invoke('import-file'),
   getApiBaseUrl: () => ipcRenderer.invoke('get-api-base-url'),
   setApiBaseUrl: (url: string) => ipcRenderer.invoke('set-api-base-url', url),
+  getAppConfig: () => ipcRenderer.invoke('get-app-config'),
+  updateAppConfig: (updates: unknown) => ipcRenderer.invoke('update-app-config', updates),
   showMainWindow: () => ipcRenderer.invoke('show-main-window'),
   hideBotWindow: () => ipcRenderer.invoke('hide-bot-window'),
   moveBotWindow: (deltaX: number, deltaY: number) => ipcRenderer.send('move-bot-window', deltaX, deltaY),
@@ -38,11 +40,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSystemLocale: () => ipcRenderer.invoke('locale:get-system'),
 })
 
-contextBridge.exposeInMainWorld('electronStore', {
-  get: (key: string) => ipcRenderer.invoke('store:get', key),
-  set: (key: string, value: unknown) => ipcRenderer.invoke('store:set', key, value),
-  delete: (key: string) => ipcRenderer.invoke('store:delete', key),
-  has: (key: string) => ipcRenderer.invoke('store:has', key),
-})
+// Legacy electronStore bridge removed in favor of ConfigManager via IPC
 
 contextBridge.exposeInMainWorld('webUtils', webUtils)

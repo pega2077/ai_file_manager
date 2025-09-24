@@ -167,11 +167,8 @@ const Setup = () => {
 
       const response = await apiService.createFolders(selectedFolder, structure);
 
-      if (response.success) {
-        if (window.electronStore) {
-          await window.electronStore.set('isInitialized', true);
-          await window.electronStore.set('workDirectory', selectedFolder);
-        }
+        if (response.success) {
+        await window.electronAPI.updateAppConfig({ isInitialized: true, workDirectory: selectedFolder });
 
         // 更新系统配置中的工作目录
         try {
