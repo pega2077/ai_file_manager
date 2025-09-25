@@ -1,0 +1,462 @@
+{
+  "common": {
+    "appTitle": "AI File Manager",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "select": "Select",
+    "loading": "Loading...",
+    "retry": "Try Again",
+    "success": "Success",
+    "error": "Error",
+    "optional": "Optional"
+  },
+  "setup": {
+    "stepOneTitle": "Profile Details",
+    "stepOneDescription": "Describe your profession and purpose.",
+    "stepTwoTitle": "Directory Selection",
+    "stepTwoDescription": "Choose a folder and confirm the recommended structure.",
+    "generalSettings": "General Settings",
+    "optionalSettings": "Advanced Options",
+    "form": {
+      "pageTitle": "File Management",
+      "pageDescription": "View and manage files imported into the system",
+      "professionLabel": "Profession",
+      "purposeLabel": "Purpose",
+      "keywordsLabel": "Keywords",
+          "path": "File Path",
+      "examplesLabel": "Examples",
+      "notesLabel": "Additional Notes",
+      "maxDepth": "Directory Depth",
+      "minDirectories": "Minimum Directories",
+      "maxDirectories": "Maximum Directories",
+      "temperature": "Temperature",
+      "directoryStyle": "Directory Style"
+    },
+    "actions": {
+      "fetchRecommendation": "Fetch Recommended Structure",
+      "regenerate": "Regenerate",
+      "continue": "Continue",
+      "selectTarget": "Select Target Folder",
+      "createStructure": "Create Structure And Complete Setup",
+      "pendingStructure": "Pending Directory Structure",
+      "selectedPath": "Selected: {path}"
+    },
+    "messages": {
+      "fetchSuccess": "Directory recommendation generated successfully",
+      "fetchError": "Failed to fetch the directory structure",
+      "selectFolderError": "Failed to select folder",
+      "missingTarget": "Please choose a destination folder",
+      "createSuccess": "Directory structure created successfully",
+      "createError": "Failed to generate directory structure"
+    },
+    "cards": {
+      "stepOne": "Step 1 - Describe Your Needs",
+      "recommendations": "Recommended Directory Structure",
+      "stepTwo": "Step 2 - Confirm Target Folder",
+      "pending": "Structure To Be Created"
+    },
+    "placeholders": {
+      "profession": "Select or enter your profession",
+      "purpose": "e.g. project documentation, research notes"
+    },
+    "validation": {
+      "professionRequired": "Please enter your profession",
+      "purposeRequired": "Please describe the purpose"
+    },
+    "options": {
+      "profession": {
+        "softwareEngineer": "Software Engineer",
+        "lawyer": "Lawyer",
+        "teacher": "Teacher",
+        "student": "Student",
+        "projectManager": "Project Manager",
+        "contentCreator": "Content Creator"
+      },
+      "style": {
+        "flat": "Flat",
+        "hierarchical": "Hierarchical"
+      }
+    }
+  },
+  "backend": {
+    "files": {
+      "create": {
+        "success": "Folder structure created successfully",
+        "invalidTarget": "Target folder path is required",
+        "emptyStructure": "Folder structure cannot be empty",
+        "failure": "Failed to create folder structure"
+      }
+    },
+    "common": {
+      "llmUnavailable": "LLM service is unavailable, please try again later",
+      "llmResponseError": "LLM response error: {reason}"
+    },
+    "chat": {
+      "directoryFailure": "Failed to generate directory structure"
+    }
+  },
+  "settings": {
+    "pageTitle": "Settings",
+    "sections": {
+      "general": "General",
+      "workDirectory": "Workspace",
+      "api": "API Configuration",
+      "actions": "Actions"
+    },
+    "labels": {
+      "theme": "Theme",
+      "language": "Language",
+      "autoSave": "Auto-save",
+      "showHiddenFiles": "Show hidden files",
+      "enablePreview": "File preview",
+      "autoSaveRAG": "Auto-save to RAG",
+      "autoClassify": "Auto classify without confirmation",
+      "useLocalService": "Use local service",
+      "workDirectory": "Current workspace",
+      "apiBaseUrl": "API base URL"
+    },
+    "descriptions": {
+      "enablePreview": "Double-click files to preview them before opening the default app.",
+      "autoSaveRAG": "Automatically add imported files to the RAG knowledge base.",
+      "autoClassify": "Skip confirmation dialogs when saving files to recommended directories.",
+      "useLocalService": "When enabled, use the local Python service (typically http://localhost:8000). When disabled, you can configure a remote API URL.",
+      "workDirectory": "The workspace folder is defined during setup. Re-run the setup wizard to change it.",
+      "apiBaseUrl": "Base URL of the Python backend, including protocol (e.g. http://localhost:8000)."
+    },
+    "placeholders": {
+      "apiBaseUrl": "http://localhost:8000"
+    },
+    "themeOptions": {
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "common": {
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "actions": {
+      "save": "Save settings",
+      "reset": "Reset to defaults",
+      "clear": "Clear all data",
+      "back": "Back to files",
+      "saveApiBaseUrl": "Save API URL"
+    },
+    "messages": {
+      "saveSuccess": "Settings saved",
+      "saveError": "Failed to save settings",
+      "apiSuccess": "API base URL saved",
+      "apiError": "Failed to update API base URL",
+      "resetSuccess": "Settings reset",
+      "clearConfirmTitle": "Clear all data?",
+      "clearConfirmContent": "This will delete imported files, database records, and chat history. This action cannot be undone.",
+      "clearConfirmOk": "Clear now",
+      "clearConfirmCancel": "Cancel",
+      "clearSuccess": "All data cleared",
+      "clearError": "Failed to clear data: {reason}",
+      "clearException": "An unexpected error occurred while clearing data.",
+      "unknownError": "Unknown error"
+    }
+  },
+  "bot": {
+    "messages": {
+      "importingToRag": "Importing to RAG library...",
+      "importedToRagSuccess": "File successfully imported to RAG library",
+      "saveSuccessRagFailed": "File saved successfully, but importing to RAG library failed",
+      "selectSaveDirectory": "Please select save directory",
+      "fileSavedTo": "File saved to: {path}",
+      "fileSaveFailed": "File save failed",
+      "getDirectoryStructureFailed": "Failed to get directory structure",
+      "analyzingFile": "Analyzing file and recommending save directory...",
+      "getRecommendationFailed": "Failed to get recommendation",
+      "fileAutoSavedTo": "File automatically saved to: {path}",
+      "fileImportFailed": "File import failed",
+      "errorProcessingFiles": "Error processing files"
+    }
+  },
+  "convert": {
+    "pageTitle": "File Format Conversion",
+    "description": "Select local files and convert to desired format with one click",
+    "actions": {
+      "refreshFormats": "Refresh Format List",
+      "selectFile": "Select File",
+      "selectDirectory": "Select Directory",
+      "startConversion": "Start Conversion",
+      "openFile": "Open File",
+      "openDirectory": "Open Directory"
+    },
+    "sections": {
+      "settings": "Conversion Settings",
+      "result": "Conversion Result"
+    },
+    "labels": {
+      "sourceFile": "Source File",
+      "targetFormat": "Target Format",
+      "outputDirectory": "Output Directory",
+      "overwrite": "Overwrite existing files",
+      "outputFileLabel": "Output File:",
+      "sourceFileLabel": "Source File:",
+      "targetFormatLabel": "Target Format:",
+      "fileSize": "File Size:",
+      "conversionInfo": "Conversion Info:"
+    },
+    "placeholders": {
+      "selectFile": "Please select the file to convert",
+      "selectFormat": "Please select target format",
+      "defaultDirectory": "Default uses system conversion directory"
+    },
+    "alerts": {
+      "noFormats": "Conversion formats not yet retrieved, please refresh and try again",
+      "pandocNotAvailable": "Pandoc not detected, only Markdown conversion is supported.",
+      "pandocDescription": "Please install Pandoc in the system and reopen the app to enable more conversion formats."
+    },
+    "messages": {
+      "fetchFormatsFailed": "Failed to fetch conversion formats",
+      "desktopNotAvailable": "Desktop environment not available",
+      "selectFileFailed": "Failed to select file",
+      "selectDirectoryFailed": "Failed to select directory",
+      "selectFileFirst": "Please select a file to convert first",
+      "selectTargetFormat": "Please select target format",
+      "pandocNotAvailable": "Pandoc not detected in current environment, only Markdown conversion is supported",
+      "conversionSuccess": "File conversion successful",
+      "conversionFailed": "File conversion failed",
+      "cannotOpenFile": "Cannot open file",
+      "cannotOpenDirectory": "Cannot open directory"
+    }
+  },
+  "files": {
+    "pageTitle": "File Management",
+    "pageDescription": "View and manage files imported into the system",
+    "table": {
+      "columns": {
+        "name": "Name",
+        "path": "File Path",
+        "type": "Type",
+        "category": "Category",
+        "size": "Size",
+        "tags": "Tags",
+        "addedAt": "Added Time",
+        "ragStatus": "RAG Status",
+        "actions": "Actions"
+      },
+      "ragStatus": {
+        "imported": "Imported",
+        "notImported": "Not Imported"
+      },
+      "category": {
+        "uncategorized": "Uncategorized"
+      }
+    },
+    "actions": {
+      "preview": "Preview",
+      "openDirectory": "Open Directory",
+      "openFile": "Open File",
+      "importToRag": "Import to Knowledge Base",
+      "askQuestion": "Ask Question"
+    },
+    "placeholders": {
+      "searchFileName": "Search file name",
+      "selectCategory": "Select category",
+      "selectType": "Select type"
+    },
+    "options": {
+      "categories": {
+        "document": "Document",
+        "sheet": "Sheet",
+        "image": "Image",
+        "video": "Video",
+        "audio": "Audio",
+        "archive": "Archive",
+        "other": "Other"
+      },
+      "types": {
+        "pdf": "PDF",
+        "docx": "Word",
+        "xlsx": "Excel",
+        "pptx": "PowerPoint",
+        "txt": "Text",
+        "jpg": "JPG",
+        "png": "PNG",
+        "mp4": "MP4",
+        "zip": "ZIP"
+      }
+    },
+    "buttons": {
+      "search": "Search",
+      "refresh": "Refresh",
+      "importFile": "Import File"
+    },
+    "pagination": {
+      "showTotal": "Items {start}-{end} of {total}"
+    },
+    "messages": {
+      "fetchFilesFailed": "Failed to fetch file list",
+      "openDirectoryFailed": "Failed to open directory",
+      "openDirectoryNotSupported": "Directory opening not supported",
+      "openFileFailed": "Failed to open file",
+      "openFileNotSupported": "File opening not supported",
+      "importingToRag": "Importing file \"{name}\" to knowledge base...",
+      "importedToRagSuccess": "File \"{name}\" successfully imported to knowledge base",
+      "importToRagFailed": "Failed to import file \"{name}\"",
+      "getDirectoryStructureFailed": "Failed to get directory structure",
+      "analyzingFile": "Analyzing file and recommending save directory...",
+      "getRecommendationFailed": "Failed to get recommendation",
+      "fileAutoSavedTo": "File automatically saved to: {path}",
+      "fileSaveFailed": "File save failed",
+      "fileImportFailed": "File import failed",
+      "importingRag": "Importing to RAG library...",
+      "importedRagSuccess": "File successfully imported to RAG library",
+      "saveSuccessRagFailed": "File saved successfully, but importing to RAG library failed",
+      "describingImage": "Describing image content for analysis..."
+    }
+  },
+  "home": {
+    "pageTitle": "File Management",
+    "currentDirectory": "Current Directory: {path}",
+    "table": {
+      "columns": {
+        "name": "Name",
+        "type": "Type",
+        "size": "Size",
+        "createdAt": "Created Time",
+        "modifiedAt": "Modified Time",
+        "actions": "Actions"
+      },
+      "type": {
+        "folder": "Folder",
+        "file": "File"
+      }
+    },
+    "actions": {
+      "preview": "Preview",
+      "importToRag": "Import to Knowledge Base",
+      "openFolder": "Open Folder",
+      "openFile": "Open File"
+    },
+    "buttons": {
+      "goUp": "Go Up",
+      "importFile": "Import File"
+    },
+    "buttonTitles": {
+      "goUp": "Go to Parent Directory",
+      "importFile": "Import File to Workspace"
+    },
+    "import": {
+      "modalTitle": "Select Save Directory",
+      "manualModalTitle": "Manually Select Save Directory",
+      "confirmSave": "Confirm Save",
+      "confirmSelect": "Confirm Selection",
+      "manualSelectButton": "Manual Directory Selection",
+      "recommendText": "System recommends saving to: {path}",
+      "selectTargetPrompt": "Please choose the target directory to save the file:",
+      "selectPlaceholder": "Please select a directory",
+      "selectSaveDirectory": "Please select save directory",
+      "fileSavedTo": "File saved to: {path}",
+      "fileSaveFailed": "File save failed",
+      "fileImportFailed": "File import failed"
+    },
+    "messages": {
+      "loadDirectoryFailed": "Failed to load directory",
+      "getDirectoryStructureFailed": "Failed to get directory structure",
+      "importingToRag": "Importing to knowledge base...",
+      "importedToRagSuccess": "File successfully imported to knowledge base",
+      "importToRagFailed": "Failed to import to knowledge base",
+      "analyzingFile": "Analyzing file and recommending save directory...",
+      "getRecommendationFailed": "Failed to get recommendation",
+      "fileAutoSavedTo": "File automatically saved to: {path}",
+      "cannotOpenFolder": "Cannot open folder",
+      "openFolderFailed": "Failed to open folder",
+      "cannotOpenFile": "Cannot open file",
+      "openFileFailed": "Failed to open file",
+      "saveSuccessRagFailed": "File saved successfully, but importing to knowledge base failed",
+      "importingRag": "Importing to RAG library...",
+      "importedRagSuccess": "File successfully imported to RAG library"
+    }
+  },
+  "landing": {
+    "title": "AI File Manager",
+    "version": "Version {version}",
+    "description": "An intelligent file management system powered by AI. Organize, search, and manage your files with advanced features.",
+    "resetButton": "Reset Initialization (Test)",
+    "resetMessage": "Initialization status has been reset"
+  },
+  "sidebar": {
+    "fileList": "File List",
+    "search": "Search",
+    "fileManagement": "File Management",
+    "fileConvert": "File Convert",
+    "settings": "Settings"
+  },
+  "search": {
+    "tabs": {
+      "filenameSearch": "Filename Search",
+      "qa": "Smart Q&A"
+    },
+    "placeholders": {
+      "filenameSearch": "Enter filename keywords to search",
+      "qa": "Enter a question for smart Q&A"
+    },
+    "buttons": {
+      "search": "Search",
+      "ask": "Ask"
+    },
+    "loading": {
+      "searching": "Searching...",
+      "thinking": "Thinking..."
+    },
+    "results": {
+      "found": "Found {count} results"
+    },
+    "modal": {
+      "previewTitle": "Chunk Content Preview",
+      "close": "Close",
+      "openFile": "Open File",
+      "loading": "Loading chunk content..."
+    },
+    "qa": {
+      "resultTitle": "Smart Q&A Result",
+      "confidence": "Confidence:",
+      "sources": "Reference Sources:",
+      "path": "Path:",
+      "chunk": "Chunk {index}",
+      "preview": "Preview Content",
+      "openFile": "Open File",
+      "similarityThreshold": "Similarity Threshold",
+      "contextLimit": "Context Limit",
+      "maxTokens": "Max Tokens",
+      "temperature": "Temperature",
+      "referencedFiles": "Referenced Files"
+    },
+    "preview": {
+      "contentType": "Content Type:",
+      "charCount": "Character Count:",
+      "tokenCount": "Token Count:"
+    }
+  },
+  "filePreview": {
+    "modalTitle": "Preview - {fileName}",
+    "buttons": {
+      "openInFolder": "Open in Folder",
+      "openWithDefault": "Open with Default App",
+      "close": "Close"
+    },
+    "messages": {
+      "loadFailed": "Failed to load preview",
+      "unsupportedFileType": "Unsupported file type",
+      "truncatedMessage": "... File content is too long, truncated display (first 10KB)...",
+      "openFolderFailed": "Failed to open folder",
+      "openFileFailed": "Failed to open file"
+    },
+    "loading": {
+      "loadingPreview": "Loading preview..."
+    },
+    "info": {
+      "contentType": "Content Type:",
+      "charCount": "Character Count:",
+      "tokenCount": "Token Count:"
+    }
+  }
+}

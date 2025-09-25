@@ -1,0 +1,459 @@
+{
+  "common": {
+    "appTitle": "AI 文件管家",
+    "confirm": "确认",
+    "cancel": "取消",
+    "save": "保存",
+    "close": "关闭",
+    "back": "返回",
+    "next": "下一步",
+    "select": "选择",
+    "loading": "加载中...",
+    "retry": "重试",
+    "success": "操作成功",
+    "error": "发生错误",
+    "optional": "选填"
+  },
+  "setup": {
+    "stepOneTitle": "基础信息",
+    "stepOneDescription": "描述你的职业与目标用途。",
+    "stepTwoTitle": "目录配置",
+    "stepTwoDescription": "选择目标文件夹并确认推荐结构。",
+    "generalSettings": "基础设置",
+    "optionalSettings": "高级选项",
+    "form": {
+      "professionLabel": "职业",
+      "purposeLabel": "用途",
+      "keywordsLabel": "关键词",
+      "examplesLabel": "示例",
+      "notesLabel": "补充说明",
+      "maxDepth": "目录层级",
+      "minDirectories": "最少目录数量",
+      "maxDirectories": "最多目录数量",
+      "temperature": "温度",
+      "directoryStyle": "目录风格"
+    },
+    "actions": {
+      "fetchRecommendation": "获取推荐目录结构",
+      "regenerate": "重新生成",
+      "continue": "继续",
+      "selectTarget": "选择目标文件夹",
+      "createStructure": "创建目录结构并完成初始化",
+      "pendingStructure": "待创建目录结构",
+      "selectedPath": "已选择：{path}"
+    },
+    "messages": {
+      "fetchSuccess": "已生成目录结构推荐",
+      "fetchError": "获取目录结构失败",
+      "selectFolderError": "选择文件夹失败",
+      "missingTarget": "请先选择目标文件夹",
+      "createSuccess": "目录结构已生成并初始化完成",
+      "createError": "生成目录结构时出现错误"
+    },
+    "cards": {
+      "stepOne": "步骤 1 - 描述您的需求",
+      "recommendations": "推荐目录结构",
+      "stepTwo": "步骤 2 - 确认目标文件夹",
+      "pending": "待创建结构"
+    },
+    "placeholders": {
+      "profession": "选择或输入您的职业",
+      "purpose": "例如：项目文档、研究笔记"
+    },
+    "validation": {
+      "professionRequired": "请输入您的职业",
+      "purposeRequired": "请描述用途"
+    },
+    "options": {
+      "profession": {
+        "softwareEngineer": "软件工程师",
+        "lawyer": "律师",
+        "teacher": "教师",
+        "student": "学生",
+        "projectManager": "项目经理",
+        "contentCreator": "内容创作者"
+      },
+      "style": {
+        "flat": "扁平风格",
+        "hierarchical": "多层级风格"
+      }
+    }
+  },
+  "backend": {
+    "files": {
+      "create": {
+        "success": "文件夹结构创建成功",
+        "invalidTarget": "目标文件夹路径是必需的",
+        "emptyStructure": "文件夹结构不能为空",
+        "failure": "创建文件夹结构失败"
+      }
+    },
+    "common": {
+      "llmUnavailable": "LLM 服务不可用，请稍后重试",
+      "llmResponseError": "LLM 响应错误：{reason}"
+    },
+    "chat": {
+      "directoryFailure": "生成目录结构失败"
+    }
+  },
+  "settings": {
+    "pageTitle": "设置",
+    "sections": {
+      "general": "通用",
+      "workDirectory": "工作区",
+      "api": "API 配置",
+      "actions": "操作"
+    },
+    "labels": {
+      "theme": "主题",
+      "language": "语言",
+      "autoSave": "自动保存",
+      "showHiddenFiles": "显示隐藏文件",
+      "enablePreview": "文件预览",
+      "autoSaveRAG": "自动保存到 RAG",
+      "autoClassify": "自动分类无需确认",
+      "useLocalService": "使用本地服务",
+      "workDirectory": "当前工作区",
+      "apiBaseUrl": "API 基础 URL"
+    },
+    "descriptions": {
+      "enablePreview": "双击文件以在打开默认应用前预览。",
+      "autoSaveRAG": "自动将导入的文件添加到 RAG 知识库。",
+      "autoClassify": "保存文件到推荐目录时跳过确认对话框。",
+      "useLocalService": "启用后使用本地 Python 服务（通常为 http://localhost:8000 ）。关闭后可手动配置远程 API 地址。",
+      "workDirectory": "工作区文件夹在设置期间定义。重新运行设置向导以更改。",
+      "apiBaseUrl": "Python 后端的基准 URL，包括协议（例如 http://localhost:8000）。"
+    },
+    "placeholders": {
+      "apiBaseUrl": "http://localhost:8000"
+    },
+    "themeOptions": {
+      "light": "浅色",
+      "dark": "深色"
+    },
+    "common": {
+      "enabled": "启用",
+      "disabled": "禁用"
+    },
+    "actions": {
+      "save": "保存设置",
+      "reset": "重置为默认",
+      "clear": "清除所有数据",
+      "back": "返回文件",
+      "saveApiBaseUrl": "保存 API URL"
+    },
+    "messages": {
+      "saveSuccess": "设置已保存",
+      "saveError": "保存设置失败",
+      "apiSuccess": "API 基础 URL 已保存",
+      "apiError": "更新 API 基础 URL 失败",
+      "resetSuccess": "设置已重置",
+      "clearConfirmTitle": "清除所有数据？",
+      "clearConfirmContent": "这将删除导入的文件、数据库记录和聊天历史。此操作无法撤销。",
+      "clearConfirmOk": "立即清除",
+      "clearConfirmCancel": "取消",
+      "clearSuccess": "所有数据已清除",
+      "clearError": "清除数据失败：{reason}",
+      "clearException": "清除数据时发生意外错误。",
+      "unknownError": "未知错误"
+    }
+  },
+  "bot": {
+    "messages": {
+      "importingToRag": "正在导入RAG库...",
+      "importedToRagSuccess": "文件已成功导入RAG库",
+      "saveSuccessRagFailed": "文件保存成功，但导入RAG库失败",
+      "selectSaveDirectory": "请选择保存目录",
+      "fileSavedTo": "文件已保存到: {path}",
+      "fileSaveFailed": "文件保存失败",
+      "getDirectoryStructureFailed": "获取目录结构失败",
+      "analyzingFile": "正在分析文件并推荐保存目录...",
+      "getRecommendationFailed": "获取推荐目录失败",
+      "fileAutoSavedTo": "文件已自动保存到: {path}",
+      "fileImportFailed": "文件导入失败",
+      "errorProcessingFiles": "处理文件时出错"
+    }
+  },
+  "convert": {
+    "pageTitle": "文件格式转换",
+    "description": "选择本地文件并一键转换为所需格式",
+    "actions": {
+      "refreshFormats": "刷新格式列表",
+      "selectFile": "选择文件",
+      "selectDirectory": "选择目录",
+      "startConversion": "开始转换",
+      "openFile": "打开文件",
+      "openDirectory": "打开所在目录"
+    },
+    "sections": {
+      "settings": "转换设置",
+      "result": "转换结果"
+    },
+    "labels": {
+      "sourceFile": "源文件",
+      "targetFormat": "目标格式",
+      "outputDirectory": "输出目录",
+      "overwrite": "覆盖已存在的文件",
+      "outputFileLabel": "输出文件：",
+      "sourceFileLabel": "源文件：",
+      "targetFormatLabel": "目标格式：",
+      "fileSize": "文件大小：",
+      "conversionInfo": "转换信息："
+    },
+    "placeholders": {
+      "selectFile": "请选择要转换的文件",
+      "selectFormat": "请选择目标格式",
+      "defaultDirectory": "默认使用系统转换目录"
+    },
+    "alerts": {
+      "noFormats": "尚未获取到转换格式，请刷新后重试",
+      "pandocNotAvailable": "未检测到 Pandoc，仅支持转换为 Markdown。",
+      "pandocDescription": "请在系统中安装 Pandoc 后重新打开应用，以启用更多转换格式。"
+    },
+    "messages": {
+      "fetchFormatsFailed": "获取转换格式失败",
+      "desktopNotAvailable": "桌面环境不可用",
+      "selectFileFailed": "选择文件失败",
+      "selectDirectoryFailed": "选择目录失败",
+      "selectFileFirst": "请先选择要转换的文件",
+      "selectTargetFormat": "请选择目标格式",
+      "pandocNotAvailable": "当前环境未检测到 Pandoc，仅支持转换为 Markdown",
+      "conversionSuccess": "文件转换成功",
+      "conversionFailed": "文件转换失败",
+      "cannotOpenFile": "无法打开文件",
+      "cannotOpenDirectory": "无法打开所在目录"
+    }
+  },
+  "files": {
+    "pageTitle": "文件管理",
+    "pageDescription": "查看和管理已导入到系统的文件",
+    "table": {
+      "columns": {
+        "name": "名称",
+        "path": "文件路径",
+        "type": "类型",
+        "category": "分类",
+        "size": "大小",
+        "tags": "标签",
+        "addedAt": "添加时间",
+        "ragStatus": "知识库状态",
+        "actions": "操作"
+      },
+      "ragStatus": {
+        "imported": "已导入",
+        "notImported": "未导入"
+      },
+      "category": {
+        "uncategorized": "未分类"
+      }
+    },
+    "actions": {
+      "preview": "预览",
+      "openDirectory": "打开目录",
+      "openFile": "打开文件",
+      "importToRag": "导入知识库",
+      "askQuestion": "提问"
+    },
+    "placeholders": {
+      "searchFileName": "搜索文件名",
+      "selectCategory": "选择分类",
+      "selectType": "选择类型"
+    },
+    "options": {
+      "categories": {
+        "document": "文档",
+        "sheet": "表格",
+        "image": "图片",
+        "video": "视频",
+        "audio": "音频",
+        "archive": "压缩包",
+        "other": "其他"
+      },
+      "types": {
+        "pdf": "PDF",
+        "docx": "Word",
+        "xlsx": "Excel",
+        "pptx": "PowerPoint",
+        "txt": "文本",
+        "jpg": "JPG",
+        "png": "PNG",
+        "mp4": "MP4",
+        "zip": "ZIP"
+      }
+    },
+    "buttons": {
+      "search": "搜索",
+      "refresh": "刷新",
+      "importFile": "导入文件"
+    },
+    "pagination": {
+      "showTotal": "第 {start}-{end} 条，共 {total} 条"
+    },
+    "messages": {
+      "fetchFilesFailed": "获取文件列表失败",
+      "openDirectoryFailed": "打开目录失败",
+      "openDirectoryNotSupported": "不支持打开目录功能",
+      "openFileFailed": "打开文件失败",
+      "openFileNotSupported": "不支持打开文件功能",
+      "importingToRag": "正在导入文件 \"{name}\" 到知识库...",
+      "importedToRagSuccess": "文件 \"{name}\" 已成功导入知识库",
+      "importToRagFailed": "导入文件 \"{name}\" 失败",
+      "getDirectoryStructureFailed": "获取目录结构失败",
+      "analyzingFile": "正在分析文件并推荐保存目录...",
+      "getRecommendationFailed": "获取推荐目录失败",
+      "fileAutoSavedTo": "文件已自动保存到: {path}",
+      "fileSaveFailed": "文件保存失败",
+      "fileImportFailed": "文件导入失败",
+      "importingRag": "正在导入RAG库...",
+      "importedRagSuccess": "文件已成功导入RAG库",
+      "saveSuccessRagFailed": "文件保存成功，但导入RAG库失败",
+      "describingImage": "正在描述图片内容以便分析..."
+    }
+  },
+  "home": {
+    "pageTitle": "文件管理",
+    "currentDirectory": "当前目录: {path}",
+    "table": {
+      "columns": {
+        "name": "名称",
+        "type": "类型",
+        "size": "大小",
+        "createdAt": "创建时间",
+        "modifiedAt": "修改时间",
+        "actions": "操作"
+      },
+      "type": {
+        "folder": "文件夹",
+        "file": "文件"
+      }
+    },
+    "actions": {
+      "preview": "预览",
+      "importToRag": "导入知识库",
+      "openFolder": "打开文件夹",
+      "openFile": "直接打开"
+    },
+    "buttons": {
+      "goUp": "返回上级",
+      "importFile": "导入文件"
+    },
+    "buttonTitles": {
+      "goUp": "返回上级目录",
+      "importFile": "导入文件到工作区"
+    },
+    "import": {
+      "modalTitle": "选择保存目录",
+      "manualModalTitle": "手动选择保存目录",
+      "confirmSave": "确认保存",
+      "confirmSelect": "确认选择",
+      "manualSelectButton": "手动选择目录",
+      "recommendText": "系统推荐保存到: {path}",
+      "selectTargetPrompt": "请选择要保存文件的目标目录：",
+      "selectPlaceholder": "请选择目录",
+      "selectSaveDirectory": "请选择保存目录",
+      "fileSavedTo": "文件已保存到: {path}",
+      "fileSaveFailed": "文件保存失败",
+      "fileImportFailed": "文件导入失败"
+    },
+    "messages": {
+      "loadDirectoryFailed": "加载目录失败",
+      "getDirectoryStructureFailed": "获取目录结构失败",
+      "importingToRag": "正在导入知识库...",
+      "importedToRagSuccess": "文件已成功导入知识库",
+      "importToRagFailed": "导入知识库失败",
+      "analyzingFile": "正在分析文件并推荐保存目录...",
+      "getRecommendationFailed": "获取推荐目录失败",
+      "fileAutoSavedTo": "文件已自动保存到: {path}",
+      "cannotOpenFolder": "无法打开文件夹",
+      "openFolderFailed": "打开文件夹失败",
+      "cannotOpenFile": "无法打开文件",
+      "openFileFailed": "打开文件失败",
+      "saveSuccessRagFailed": "文件保存成功，但导入RAG库失败",
+      "importingRag": "正在导入RAG库...",
+      "importedRagSuccess": "文件已成功导入RAG库"
+    }
+  },
+  "landing": {
+    "title": "AI 文件管家",
+    "version": "版本 {version}",
+    "description": "由 AI 驱动的智能文件管理系统。使用高级功能组织、搜索和管理您的文件。",
+    "resetButton": "重置初始化 (测试)",
+    "resetMessage": "初始化状态已重置"
+  },
+  "sidebar": {
+    "fileList": "文件列表",
+    "search": "搜索",
+    "fileManagement": "文件管理",
+    "fileConvert": "文件转换",
+    "settings": "设置"
+  },
+  "search": {
+    "tabs": {
+      "filenameSearch": "文件名搜索",
+      "qa": "智能问答"
+    },
+    "placeholders": {
+      "filenameSearch": "输入文件名关键词进行搜索",
+      "qa": "输入问题进行智能问答"
+    },
+    "buttons": {
+      "search": "搜索",
+      "ask": "提问"
+    },
+    "loading": {
+      "searching": "正在搜索中...",
+      "thinking": "正在思考中..."
+    },
+    "results": {
+      "found": "找到 {count} 个结果"
+    },
+    "modal": {
+      "previewTitle": "分段内容预览",
+      "close": "关闭",
+      "openFile": "打开文件",
+      "loading": "正在加载分段内容..."
+    },
+    "qa": {
+      "resultTitle": "智能问答结果",
+      "confidence": "置信度:",
+      "sources": "参考来源:",
+      "path": "路径:",
+      "chunk": "分段 {index}",
+      "preview": "预览内容",
+      "openFile": "打开文件",
+      "similarityThreshold": "相关度阈值",
+      "contextLimit": "搜索条数",
+      "maxTokens": "最大Token数",
+      "temperature": "温度",
+      "referencedFiles": "引用文件"
+    },
+    "preview": {
+      "contentType": "内容类型:",
+      "charCount": "字符数:",
+      "tokenCount": "Token数:"
+    }
+  },
+  "filePreview": {
+    "modalTitle": "预览 - {fileName}",
+    "buttons": {
+      "openInFolder": "在文件夹中打开",
+      "openWithDefault": "用默认程序打开",
+      "close": "关闭"
+    },
+    "messages": {
+      "loadFailed": "加载预览失败",
+      "unsupportedFileType": "不支持的文件类型",
+      "truncatedMessage": "... 文件内容过长，已截断显示（前10KB）...",
+      "openFolderFailed": "打开文件夹失败",
+      "openFileFailed": "打开文件失败"
+    },
+    "loading": {
+      "loadingPreview": "正在加载预览..."
+    },
+    "info": {
+      "contentType": "内容类型:",
+      "charCount": "字符数:",
+      "tokenCount": "Token数:"
+    }
+  }
+}

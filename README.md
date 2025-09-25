@@ -65,5 +65,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Tagged with #ForTheLoveOfCode
 ## Internationalization
 
-The app now reads shared translations from the new `locales/` directory. React screens load the dictionaries through the `I18nProvider`, and the Python FastAPI backend can access the same JSON files via `python/i18n.py`. Add new languages by creating another JSON file in `locales/`, keeping the key structure in sync, and restart the desktop application.
+Shared translations now live in `client/locales/`. The React renderer imports JSON via the `@locales` alias, and the Python FastAPI backend (`python/i18n.py`) will look in `client/locales/` first and fall back to the legacy root `locales/` if needed. To add a language, create `<lang>.json` in `client/locales/` mirroring the existing structure, and restart the desktop application.
 

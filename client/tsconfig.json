@@ -23,7 +23,7 @@
 
     "baseUrl": ".",
     "paths": {
-      "@locales/*": ["../locales/*"]
+      "@locales/*": ["./locales/*"]
     }
   },
   "include": ["renderer", "electron", "scripts"],

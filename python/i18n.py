@@ -10,7 +10,11 @@ from fastapi import Header
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-LOCALES_DIR = PROJECT_ROOT / "locales"
+# Prefer client/locales (renderer source) and fall back to legacy root/locales for backward compatibility
+LOCALE_DIR_CANDIDATES = (
+    PROJECT_ROOT / "client" / "locales",
+    PROJECT_ROOT / "locales",
+)
 DEFAULT_LOCALE = "en"
 SUPPORTED_LOCALES: Iterable[str] = ("en", "zh")
 
@@ -46,16 +50,32 @@ class I18n:
     def load(self, locale: str) -> Dict[str, Any]:
         normalized = self._normalize_locale(locale)
         if normalized not in self._cache:
-            path = LOCALES_DIR / f"{normalized}.json"
-            try:
-                with path.open("r", encoding="utf-8") as handle:
-                    self._cache[normalized] = json.load(handle)
-            except FileNotFoundError:
-                logger.error("Locale file not found: %s", path)
+            data: Dict[str, Any] | None = None
+            last_error: Exception | None = None
+            for base_dir in LOCALE_DIR_CANDIDATES:
+                path = base_dir / f"{normalized}.json"
+                try:
+                    if path.exists():
+                        with path.open("r", encoding="utf-8") as handle:
+                            data = json.load(handle)
+                            break
+                except json.JSONDecodeError as exc:
+                    last_error = exc
+                    logger.error("Failed to parse locale file %s: %s", path, exc)
+                except Exception as exc:  # noqa: BLE001
+                    last_error = exc
+                    logger.error("Error reading locale file %s: %s", path, exc)
+
+            if data is None:
+                if last_error is None:
+                    logger.error(
+                        "Locale file not found for '%s' in: %s",
+                        normalized,
+                        ", ".join(str(p) for p in LOCALE_DIR_CANDIDATES),
+                    )
                 self._cache[normalized] = {}
-            except json.JSONDecodeError as exc:
-                logger.error("Failed to parse locale file %s: %s", path, exc)
-                self._cache[normalized] = {}
+            else:
+                self._cache[normalized] = data
         return self._cache[normalized]
 
     def _normalize_locale(self, locale: str | None) -> str:

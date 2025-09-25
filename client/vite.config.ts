@@ -46,7 +46,8 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@locales': path.resolve(__dirname, '../locales'),
+      // Locales now live inside client/locales
+      '@locales': path.resolve(__dirname, 'locales'),
     },
   },
   server: {

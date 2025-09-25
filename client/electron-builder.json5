@@ -15,6 +15,11 @@
     {
       "from": "app-icon.ico",
       "to": "app-icon.ico"
+    },
+    {
+      // Ensure locales JSON are available at runtime for any non-bundled consumers
+      "from": "locales",
+      "to": "locales"
     }
   ],
   "mac": {
