@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from "express";
-import { generateStructuredJsonWithOllama } from "./utils/ollama";
+import { generateStructuredJson } from "./utils/llm";
 import { logger } from "../logger";
 import { configManager } from "../configManager";
 import {
@@ -12,7 +12,7 @@ import {
   type SupportedLang,
 } from "./utils/promptHelper";
 import { buildVisionDescribePrompt } from "./utils/promptHelper";
-import { describeImageWithOllama } from "./utils/ollama";
+import { describeImage, getActiveModelName } from "./utils/llm";
 
 export function registerChatRoutes(app: Express) {
   // POST /api/chat/recommend-directory
@@ -102,7 +102,7 @@ export async function chatRecommendDirectoryHandler(
 
     let result: unknown;
     try {
-      result = await generateStructuredJsonWithOllama(
+      result = await generateStructuredJson(
         messages,
         responseFormat,
         temperature,
@@ -142,7 +142,6 @@ export async function chatRecommendDirectoryHandler(
           .map((v) => String(v))
       : [];
 
-    const cfg = configManager.getConfig();
     const responseTime = Date.now() - startTs;
 
     res.status(200).json({
@@ -154,7 +153,7 @@ export async function chatRecommendDirectoryHandler(
         reasoning,
         alternatives,
         metadata: {
-          model_used: cfg.ollamaModel || "",
+          model_used: getActiveModelName("chat"),
           tokens_used: 0,
           response_time_ms: responseTime,
           generation_time_ms: responseTime,
@@ -221,7 +220,7 @@ export async function chatDescribeImageHandler(
 
     let description = "";
     try {
-      description = await describeImageWithOllama(cleaned, { prompt, timeoutMs });
+      description = await describeImage(cleaned, { prompt, timeoutMs });
     } catch (e) {
       logger.error("/api/chat/describe-image vision generation failed", e as unknown);
       res.status(500).json({
@@ -235,14 +234,13 @@ export async function chatDescribeImageHandler(
       return;
     }
 
-    const cfg = configManager.getConfig();
     res.status(200).json({
       success: true,
       message: "ok",
       data: {
         description,
         language,
-        model_used: cfg.ollamaVisionModel || cfg.ollamaModel || "",
+        model_used: getActiveModelName("vision"),
       },
       error: null,
       timestamp: new Date().toISOString(),
@@ -617,7 +615,7 @@ export async function chatAskHandlerMode1(
     const tGen = Date.now();
     let genObj: Record<string, unknown> = {};
     try {
-      const result = await generateStructuredJsonWithOllama(
+      const result = await generateStructuredJson(
         messages,
         responseFormat,
         tempClamped,
@@ -1086,7 +1084,7 @@ export async function chatAskHandlerMode2(
     const tGen = Date.now();
     let genObj: Record<string, unknown> = {};
     try {
-      const result = await generateStructuredJsonWithOllama(
+      const result = await generateStructuredJson(
         messages,
         responseFormat,
         tempClamped,
@@ -1261,7 +1259,7 @@ export async function chatDirectoryStructureHandler(
 
     let result: unknown;
     try {
-      result = await generateStructuredJsonWithOllama(
+      result = await generateStructuredJson(
         messages,
         responseFormat,
         temperature,

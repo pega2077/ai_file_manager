@@ -11,6 +11,18 @@ export interface AppConfig {
   ollamaModel?: string;
   ollamaEmbedModel?: string;
   ollamaVisionModel?: string;
+  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' (future) */
+  llmProvider?: 'ollama' | 'openai' | 'azure-openai';
+  /** OpenAI compatible endpoint (e.g., https://api.openai.com/v1 or custom) */
+  openaiEndpoint?: string;
+  /** OpenAI API key (read from env OPENAI_API_KEY if not set in config) */
+  openaiApiKey?: string;
+  /** Default chat/completion model for OpenAI */
+  openaiModel?: string;
+  /** Default embedding model for OpenAI */
+  openaiEmbedModel?: string;
+  /** Default vision-capable model for OpenAI (e.g., gpt-4o-mini) */
+  openaiVisionModel?: string;
   /** Optional HTTP endpoint for third-party file conversion service */
   fileConvertEndpoint?: string;
   /** Relative or absolute path to the local SQLite database file */
@@ -45,6 +57,14 @@ const DEFAULT_CONFIG: AppConfig = {
   ollamaModel: "qwen3:8b",
   ollamaEmbedModel: "bge-m3",
   ollamaVisionModel: "qwen2.5vl:7b",
+  // Default to local Ollama as primary LLM provider; can be changed to 'openai'
+  llmProvider: 'ollama',
+  // OpenAI defaults (endpoint only). For security, API key must be provided via config.json or env OPENAI_API_KEY.
+  openaiEndpoint: "https://api.openai.com/v1",
+  openaiApiKey: undefined,
+  openaiModel: "gpt-4o-mini",
+  openaiEmbedModel: "text-embedding-3-large",
+  openaiVisionModel: "gpt-4o-mini",
   fileConvertEndpoint: "",
   // Default to repository-standard SQLite location; can be overridden in config.json
   sqliteDbPath: "database/files.db",
@@ -110,6 +130,13 @@ export class ConfigManager {
 
         // 合并用户配置和默认配置
         this.config = { ...DEFAULT_CONFIG, ...userConfig };
+        // Prefer env OPENAI_API_KEY when not explicitly set in config
+        if (!this.config.openaiApiKey) {
+          const envKey = process.env.OPENAI_API_KEY || process.env.OPENAIKEY || process.env.OPENAI_TOKEN;
+          if (envKey) {
+            this.config.openaiApiKey = envKey;
+          }
+        }
         logger.info('Config loaded from:', this.configPath);
       } else {
         logger.warn('Config file not found, using defaults. Path:', this.configPath);
@@ -120,6 +147,11 @@ export class ConfigManager {
       logger.error('Failed to load config:', error);
       // 出错时使用默认配置
       this.config = { ...DEFAULT_CONFIG };
+      // Apply env OPENAI_API_KEY if available
+      const envKey = process.env.OPENAI_API_KEY || process.env.OPENAIKEY || process.env.OPENAI_TOKEN;
+      if (envKey) {
+        this.config.openaiApiKey = envKey;
+      }
     }
 
     return this.config;

@@ -7,7 +7,7 @@ import fs from "fs";
 import { promises as fsp } from "fs";
 import { MAX_TEXT_PREVIEW_BYTES, getMimeByExt, isImageExt, decodeTextBuffer, CATEGORY_EXTENSIONS, toNumber, isNonEmptyString, parseTags } from "./utils/fileHelpers";
 import { ensureTxtFile, chunkText } from "./utils/fileConversion";
-import { embedWithOllama, generateStructuredJsonWithOllama, describeImageWithOllama } from "./utils/ollama";
+import { embedText, generateStructuredJson, describeImage } from "./utils/llm";
 import { app } from "electron";
 import { randomUUID } from "crypto";
 import ChunkModel from "./models/chunk";
@@ -548,7 +548,7 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
       const base64 = buf.toString("base64");
       let description = "";
       try {
-        description = await describeImageWithOllama(base64, {
+        description = await describeImage(base64, {
           prompt: "Describe this image in Chinese, include key objects, text, scenes, and potential tags.",
         });
       } catch (e) {
@@ -568,8 +568,8 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
     }
     // 2) chunk
     const chunks = chunkText(content, chunkSize, overlap);
-    // 3) embed via Ollama
-    const embeddings = await embedWithOllama(chunks, model);
+  // 3) embed via active provider
+  const embeddings = await embedText(chunks, model);
     if (embeddings.length !== chunks.length) {
       throw new Error("Embeddings count does not match chunks count");
     }
@@ -1014,7 +1014,7 @@ export async function recommendDirectoryHandler(req: Request, res: Response): Pr
 
     let result: unknown;
     try {
-      result = await generateStructuredJsonWithOllama(messages, responseFormat, 0.7, 1000);
+  result = await generateStructuredJson(messages, responseFormat, 0.7, 1000);
     } catch (err) {
       logger.error("LLM recommend-directory call failed", err as unknown);
       res.status(500).json({
