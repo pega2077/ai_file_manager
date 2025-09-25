@@ -82,6 +82,7 @@ interface AskQuestionPayload {
   temperature: number;
   max_tokens: number;
   stream: boolean;
+  provider?: string;
   file_filters?: {
     file_ids: string[];
   };
@@ -100,6 +101,23 @@ interface SystemConfigUpdate {
 
 class ApiService {
   private locale = 'en';
+  private provider: string | null = null;
+
+  private async ensureProvider(): Promise<string> {
+    // Load once from app config via IPC and cache locally
+    if (this.provider !== null) return this.provider;
+    try {
+      const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig | undefined;
+      const p = cfg?.llmProvider ?? 'ollama';
+      this.provider = p;
+      return p;
+    } catch (err) {
+      console.warn('Failed to load provider from app config:', err);
+      // Fallback to default used by main process config defaults
+      this.provider = 'ollama';
+      return 'ollama';
+    }
+  }
 
   setLocale(locale: string) {
     this.locale = locale;
@@ -166,9 +184,11 @@ class ApiService {
     language?: string; // pass to backend for prompt localization
     style?: 'flat' | 'hierarchical';
   }) {
+    const provider = await this.ensureProvider();
     return this.request('/chat/directory-structure', {
       method: 'POST',
       body: JSON.stringify({
+        provider,
         profession: params.profession,
         purpose: params.purpose,
         // backend expects folder_depth; prefer explicit folder_depth, fallback to max_depth, then default 2
@@ -226,9 +246,11 @@ class ApiService {
 
   // 导入文件
   async importFile(filePath: string, category?: string, tags?: string[], autoProcess: boolean = true) {
+    const provider = await this.ensureProvider();
     return this.request('/files/import', {
       method: 'POST',
       body: JSON.stringify({
+        provider,
         file_path: filePath,
         category,
         tags,
@@ -251,9 +273,11 @@ class ApiService {
 
   // 获取分类建议
   async suggestCategory(filePath: string, directoryStructure?: Array<{ name: string; type: string }>) {
+    const provider = await this.ensureProvider();
     return this.request('/files/suggest-category', {
       method: 'POST',
       body: JSON.stringify({
+        provider,
         file_path: filePath,
         directory_structure: directoryStructure,
       }),
@@ -262,9 +286,11 @@ class ApiService {
 
   // 推荐保存目录
   async recommendDirectory(filePath: string, availableDirectories: string[], content?: string): Promise<ApiResponse<RecommendDirectoryResponse>> {
+    const provider = await this.ensureProvider();
     return this.request<RecommendDirectoryResponse>('/files/recommend-directory', {
       method: 'POST',
       body: JSON.stringify({
+        provider,
         file_path: filePath,
         available_directories: availableDirectories,
         ...(content && content.trim() ? { content } : {}),
@@ -274,9 +300,11 @@ class ApiService {
 
   // 导入到RAG库
   async importToRag(fileId: string, noSaveDb: boolean = false, content?: string) {
+    const provider = await this.ensureProvider();
     return this.request('/files/import-to-rag', {
       method: 'POST',
       body: JSON.stringify({
+        provider,
         file_id: fileId,
         no_save_db: noSaveDb,
         ...(content && content.trim() ? { content } : {}),
@@ -286,9 +314,11 @@ class ApiService {
 
   // 图像描述（Ollama 视觉）
   async describeImage(imageBase64: string, language?: 'zh' | 'en', promptHint?: string, timeoutMs?: number) {
+    const provider = await this.ensureProvider();
     return this.request<DescribeImageResponse>('/chat/describe-image', {
       method: 'POST',
       body: JSON.stringify({
+        provider,
         image_base64: imageBase64,
         language,
         prompt_hint: promptHint,
@@ -387,6 +417,7 @@ class ApiService {
     file_ids?: string[];
   }) {
     console.log('askQuestion:', options);
+    const provider = await this.ensureProvider();
     const payload: AskQuestionPayload = {
       question,
       context_limit: options?.context_limit || 5,
@@ -394,6 +425,7 @@ class ApiService {
       temperature: options?.temperature || 0.7,
       max_tokens: options?.max_tokens || 2000,
       stream: options?.stream || false,
+      provider,
     };
 
     if (options?.file_ids && options.file_ids.length > 0) {
