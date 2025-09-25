@@ -15,7 +15,7 @@ export interface AppConfig {
     ollamaVisionModel?: string;
   };
   /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' (future) */
-  llmProvider?: 'ollama' | 'openai' | 'azure-openai';
+  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter';
   openai?: {
     /** OpenAI compatible endpoint (e.g., https://api.openai.com/v1 or custom) */
     openaiEndpoint?: string;
@@ -28,6 +28,18 @@ export interface AppConfig {
     /** Default vision-capable model for OpenAI (e.g., gpt-4o-mini) */
     openaiVisionModel?: string;
   };
+  openrouter?: {
+    /** OpenRouter API base URL (OpenAI-compatible) */
+    openrouterEndpoint?: string;
+    /** OpenRouter API key (read from env OPENROUTER_API_KEY if not set) */
+    openrouterApiKey?: string;
+    /** Default chat/completion model for OpenRouter */
+    openrouterModel?: string;
+    /** Default embedding model for OpenRouter */
+    openrouterEmbedModel?: string;
+    /** Default vision-capable model for OpenRouter */
+    openrouterVisionModel?: string;
+  };
   /** Legacy flat fields (deprecated; kept for backward compatibility) */
   ollamaEndpoint?: string;
   ollamaModel?: string;
@@ -38,6 +50,7 @@ export interface AppConfig {
   openaiModel?: string;
   openaiEmbedModel?: string;
   openaiVisionModel?: string;
+  // Potential legacy OpenRouter flat fields (none defined yet, reserved)
   /** Optional HTTP endpoint for third-party file conversion service */
   fileConvertEndpoint?: string;
   /** Relative or absolute path to the local SQLite database file */
@@ -83,6 +96,13 @@ const DEFAULT_CONFIG: AppConfig = {
     openaiModel: "gpt-4o-mini",
     openaiEmbedModel: "text-embedding-3-large",
     openaiVisionModel: "gpt-4o-mini",
+  },
+  openrouter: {
+    openrouterEndpoint: "https://openrouter.ai/api/v1",
+    openrouterApiKey: undefined,
+    openrouterModel: "openai/gpt-oss-20b:free",
+    openrouterEmbedModel: "text-embedding-3-large",
+    openrouterVisionModel: "google/gemma-3-12b-it:free",
   },
   fileConvertEndpoint: "",
   // Default to repository-standard SQLite location; can be overridden in config.json
@@ -153,6 +173,7 @@ export class ConfigManager {
           ...userConfig,
           ollama: { ...(DEFAULT_CONFIG.ollama || {}), ...(userConfig.ollama || {}) },
           openai: { ...(DEFAULT_CONFIG.openai || {}), ...(userConfig.openai || {}) },
+          openrouter: { ...(DEFAULT_CONFIG.openrouter || {}), ...(userConfig.openrouter || {}) },
         };
 
         // Backward compatibility: map legacy flat fields into grouped blocks
@@ -185,6 +206,14 @@ export class ConfigManager {
             openaiEmbedModel: userConfig.openaiEmbedModel ?? merged.openai?.openaiEmbedModel,
             openaiVisionModel: userConfig.openaiVisionModel ?? merged.openai?.openaiVisionModel,
           };
+        }
+
+        // Env injection for OpenRouter API key if not set
+        if (!merged.openrouter?.openrouterApiKey) {
+          const envKey = process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_TOKEN;
+          if (envKey) {
+            merged.openrouter = { ...(merged.openrouter || {}), openrouterApiKey: envKey };
+          }
         }
 
         // Prefer env OPENAI_API_KEY when not explicitly set in config
