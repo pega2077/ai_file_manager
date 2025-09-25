@@ -203,6 +203,33 @@
 **响应数据**:
 ```json
 {
+
+### 1.x 获取支持的文件转换格式
+
+接口: `GET /api/files/convert/formats`
+
+说明：调用本地 Pandoc 获取支持的输入/输出格式列表。优先使用项目内置 `bin/pandoc(.exe)`，也可通过环境变量 `PANDOC_PATH` 指定；若均不存在则返回 503 并给出错误信息。
+
+响应数据:
+
+```json
+{
+  "inputs": ["string"],
+  "outputs": ["string"],
+  "combined": ["string"],
+  "pandocPath": "string|null"
+}
+```
+
+字段说明：
+- `inputs`: Pandoc 支持的所有输入格式（--list-input-formats）
+- `outputs`: Pandoc 支持的所有输出格式（--list-output-formats）
+- `combined`: `inputs ∪ outputs` 的去重并排序集合
+- `pandocPath`: 实际使用到的 Pandoc 可执行文件路径，若通过 PATH 调用则为命令名；未找到则为 null
+
+错误：
+- 当未找到 Pandoc 时，HTTP 503，`error.code = "PANDOC_NOT_FOUND"`
+
   "deleted_file_id": "string",
   "deleted_chunks_count": "number"
 }

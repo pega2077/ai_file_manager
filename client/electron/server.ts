@@ -8,6 +8,7 @@ import { registerFilesOpRoutes } from "./backend/filesOpController";
 import { authenticateDB, initializeDB } from "./backend/db";
 import {getGlobalIndexPath} from "./backend/utils/vectorStore";
 import { registerChatRoutes } from "./backend/chatController";
+import { registerConversionRoutes } from "./backend/convertController";
 
 let server: Server | null = null;
 
@@ -60,6 +61,7 @@ export const startServer = async (): Promise<void> => {
   registerFilesRoutes(app);
   registerFilesOpRoutes(app);
   registerChatRoutes(app);
+  registerConversionRoutes(app);
 
     // Generic error handler (last middleware)
     app.use(

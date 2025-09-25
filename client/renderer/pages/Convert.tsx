@@ -26,6 +26,20 @@ interface ConversionResult {
 
 const markdownFormats = new Set(['md', 'markdown']);
 
+// Backend may return new shape (inputs/outputs) or legacy (input_formats/output_formats)
+type BackendFormatsResponse = {
+  inputs?: string[];
+  outputs?: string[];
+  combined?: string[];
+  pandocPath?: string | null;
+  default_output_directory?: string;
+  pandoc_available?: boolean;
+  markitdown_available?: boolean;
+  // legacy fields for backward compatibility
+  input_formats?: string[];
+  output_formats?: string[];
+};
+
 const FileConversion: React.FC = () => {
   const { t } = useTranslation();
   const selectedMenu = 'convert';
@@ -43,18 +57,48 @@ const FileConversion: React.FC = () => {
     try {
       const response = await apiService.getConversionFormats();
       if (response.success) {
-        setFormats(response.data);
-        const defaultFormat = response.data.output_formats.find((fmt) => markdownFormats.has(fmt.toLowerCase()))
-          ?? response.data.output_formats[0];
-        setTargetFormat(defaultFormat);
-        if (response.data.default_output_directory) {
-          setOutputDirectory(response.data.default_output_directory);
+        const raw: BackendFormatsResponse = response.data as unknown as BackendFormatsResponse;
+        // Normalize backend response to component's expected shape
+        const inputs: string[] = Array.isArray(raw?.inputs)
+          ? raw.inputs
+          : Array.isArray(raw?.input_formats)
+            ? raw.input_formats
+            : [];
+        const outputs: string[] = Array.isArray(raw?.outputs)
+          ? raw.outputs
+          : Array.isArray(raw?.output_formats)
+            ? raw.output_formats
+            : [];
+        const normalized: ConversionFormats = {
+          input_formats: inputs,
+          output_formats: outputs,
+          default_output_directory: typeof raw?.default_output_directory === 'string' ? raw.default_output_directory : '',
+          pandoc_available: Boolean(raw?.pandocPath) || Boolean(raw?.pandoc_available),
+          markitdown_available: Boolean(raw?.markitdown_available),
+        };
+
+        setFormats(normalized);
+        const defaultFormat = normalized.output_formats.find((fmt) => markdownFormats.has(fmt.toLowerCase()))
+          ?? normalized.output_formats[0];
+        if (defaultFormat) setTargetFormat(defaultFormat);
+        if (normalized.default_output_directory) {
+          setOutputDirectory(normalized.default_output_directory);
         }
       } else {
         message.error(response.message || t('convert.messages.fetchFormatsFailed'));
       }
     } catch (error) {
       console.error(error);
+      // Fallback to minimal formats so the page remains usable when Pandoc listing fails
+      const fallback: ConversionFormats = {
+        input_formats: [],
+        output_formats: ['md', 'markdown'],
+        default_output_directory: '',
+        pandoc_available: false,
+        markitdown_available: true,
+      };
+      setFormats(fallback);
+      setTargetFormat('md');
       message.error(t('convert.messages.fetchFormatsFailed'));
     } finally {
       setLoadingFormats(false);
