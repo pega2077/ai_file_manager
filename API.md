@@ -628,13 +628,15 @@
 ```json
 {
   "file_path": "string",
-  "available_directories": ["string"]
+  "available_directories": ["string"],
+  "provider": "string"
 }
 ```
 
 **请求参数说明**:
 - `file_path`: 要分析的文件路径
 - `available_directories`: 项目中可用的目录路径列表
+- `provider`: 可选，指定使用的LLM提供方，允许值：`ollama` | `openai` | `azure-openai` | `openrouter`
 
 **处理逻辑**:
 1. 检查文件是否存在
@@ -672,7 +674,8 @@
     "Documents/Personal",
     "Images",
     "Projects"
-  ]
+  ],
+  "provider": "openai"
 }
 ```
 
@@ -1218,7 +1221,8 @@
   "min_directories": "number",  // 最少目录数量，默认 6
   "max_directories": "number",  // 最多目录数量，默认 20
   "temperature": "number",      // LLM 温度参数，默认 0.7
-  "max_tokens": "number"        // 最大生成token数，默认 1000
+  "max_tokens": "number",       // 最大生成token数，默认 1000
+  "provider": "string"          // 可选，ollama|openai|azure-openai|openrouter
 }
 ```
 
@@ -1253,7 +1257,8 @@
     "string"
   ],
   "temperature": "number",      // LLM 温度参数，默认 0.7
-  "max_tokens": "number"        // 最大生成token数，默认 500
+  "max_tokens": "number",       // 最大生成token数，默认 500
+  "provider": "string"          // 可选，ollama|openai|azure-openai|openrouter
 }
 ```
 

@@ -8,6 +8,7 @@ import { promises as fsp } from "fs";
 import { MAX_TEXT_PREVIEW_BYTES, getMimeByExt, isImageExt, decodeTextBuffer, CATEGORY_EXTENSIONS, toNumber, isNonEmptyString, parseTags } from "./utils/fileHelpers";
 import { ensureTxtFile, chunkText } from "./utils/fileConversion";
 import { embedText, generateStructuredJson, describeImage } from "./utils/llm";
+import type { ProviderName } from "./utils/llm";
 import { app } from "electron";
 import { randomUUID } from "crypto";
 import ChunkModel from "./models/chunk";
@@ -923,12 +924,23 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
 // -------- Recommend Directory --------
 export async function recommendDirectoryHandler(req: Request, res: Response): Promise<void> {
   try {
-    const body = req.body as { file_path?: unknown; available_directories?: unknown; content?: unknown } | undefined;
+    const body = req.body as { file_path?: unknown; available_directories?: unknown; content?: unknown; provider?: unknown } | undefined;
     const filePath = typeof body?.file_path === "string" ? body.file_path : undefined;
     const availableDirs = Array.isArray(body?.available_directories)
       ? (body!.available_directories as unknown[]).filter((v) => typeof v === "string").map((v) => String(v))
       : [];
     const overrideContent = typeof body?.content === "string" ? body.content : undefined;
+    // Optional provider override
+    const providerRaw = typeof body?.provider === "string" ? body.provider.trim().toLowerCase() : undefined;
+    const provider: ProviderName | undefined = providerRaw === "openai"
+      ? "openai"
+      : providerRaw === "azure-openai" || providerRaw === "azure" || providerRaw === "azure_openai"
+      ? "azure-openai"
+      : providerRaw === "openrouter"
+      ? "openrouter"
+      : providerRaw === "ollama"
+      ? "ollama"
+      : undefined;
 
     if (!filePath) {
       res.status(400).json({
@@ -1014,7 +1026,7 @@ export async function recommendDirectoryHandler(req: Request, res: Response): Pr
 
     let result: unknown;
     try {
-  result = await generateStructuredJson(messages, responseFormat, 0.7, 1000);
+  result = await generateStructuredJson(messages, responseFormat, 0.7, 1000, "", undefined, provider);
     } catch (err) {
       logger.error("LLM recommend-directory call failed", err as unknown);
       res.status(500).json({

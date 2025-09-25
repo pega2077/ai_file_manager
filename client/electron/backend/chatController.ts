@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { generateStructuredJson } from "./utils/llm";
+import type { ProviderName } from "./utils/llm";
 import { logger } from "../logger";
 import { configManager } from "../configManager";
 import {
@@ -32,6 +33,7 @@ type ChatRecommendBody = {
   current_structure?: unknown;
   temperature?: unknown;
   max_tokens?: unknown;
+  provider?: unknown;
 };
 
 export async function chatRecommendDirectoryHandler(
@@ -71,6 +73,16 @@ export async function chatRecommendDirectoryHandler(
     }
 
     const language: SupportedLang = normalizeLanguage(body?.language);
+    const providerRaw = typeof body?.provider === "string" ? body.provider.trim().toLowerCase() : undefined;
+    const provider: ProviderName | undefined = providerRaw === "openai"
+      ? "openai"
+      : providerRaw === "azure-openai" || providerRaw === "azure" || providerRaw === "azure_openai"
+      ? "azure-openai"
+      : providerRaw === "openrouter"
+      ? "openrouter"
+      : providerRaw === "ollama"
+      ? "ollama"
+      : undefined;
     const messages = buildRecommendDirectoryMessages({
       language,
       fileName,
@@ -108,7 +120,8 @@ export async function chatRecommendDirectoryHandler(
         temperature,
         maxTokens,
         undefined,
-        language
+        language,
+        provider
       );
     } catch (err) {
       logger.error("/api/chat/recommend-directory LLM failed", err as unknown);
@@ -153,7 +166,7 @@ export async function chatRecommendDirectoryHandler(
         reasoning,
         alternatives,
         metadata: {
-          model_used: getActiveModelName("chat"),
+          model_used: getActiveModelName("chat", provider),
           tokens_used: 0,
           response_time_ms: responseTime,
           generation_time_ms: responseTime,
@@ -1173,6 +1186,7 @@ type ChatDirectoryStructureBody = {
   temperature?: unknown; // default 0.7
   max_tokens?: unknown; // default 1000
   style?: unknown; // "flat" | "hierarchical" (default flat)
+  provider?: unknown;
 };
 
 export async function chatDirectoryStructureHandler(
@@ -1220,6 +1234,16 @@ export async function chatDirectoryStructureHandler(
       Math.min(100, Math.floor(maxDirsRaw))
     );
     const language: SupportedLang = normalizeLanguage(body?.language);
+    const providerRaw = typeof body?.provider === "string" ? body.provider.trim().toLowerCase() : undefined;
+    const provider: ProviderName | undefined = providerRaw === "openai"
+      ? "openai"
+      : providerRaw === "azure-openai" || providerRaw === "azure" || providerRaw === "azure_openai"
+      ? "azure-openai"
+      : providerRaw === "openrouter"
+      ? "openrouter"
+      : providerRaw === "ollama"
+      ? "ollama"
+      : undefined;
     const messages = buildDirectoryStructureMessages({
       language,
       profession,
@@ -1265,7 +1289,8 @@ export async function chatDirectoryStructureHandler(
         temperature,
         maxTokens,
         undefined,
-        language
+        language,
+        provider
       );
     } catch (err) {
       logger.error("/api/chat/directory-structure LLM failed", err as unknown);
@@ -1305,7 +1330,7 @@ export async function chatDirectoryStructureHandler(
       data: {
         directories,
         metadata: {
-          model_used: cfg.ollamaModel || "",
+          model_used: getActiveModelName("chat", provider) || cfg.ollamaModel || "",
           tokens_used: 0,
           response_time_ms: responseTime,
           generation_time_ms: responseTime,

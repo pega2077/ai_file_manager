@@ -22,15 +22,17 @@ export type LlmMessage = OllamaMessage; // role + string content
 
 export type LlmTask = "chat" | "embed" | "vision";
 
-export function getActiveProvider(): "ollama" | "openai" | "azure-openai" | "openrouter" {
+export type ProviderName = "ollama" | "openai" | "azure-openai" | "openrouter";
+
+export function getActiveProvider(): ProviderName {
   const cfg = configManager.getConfig();
   const p = cfg.llmProvider || "ollama";
   return p === "openai" || p === "azure-openai" || p === "openrouter" ? p : "ollama";
 }
 
-export function getActiveModelName(task: LlmTask): string {
+export function getActiveModelName(task: LlmTask, providerOverride?: ProviderName): string {
   const cfg = configManager.getConfig();
-  const provider = getActiveProvider();
+  const provider = providerOverride || getActiveProvider();
   if (provider === "openai" || provider === "azure-openai") {
     const oc = cfg.openai || {};
     if (task === "embed") return oc.openaiEmbedModel || cfg.openaiEmbedModel || "";
@@ -67,9 +69,10 @@ export async function generateStructuredJson(
   temperature = 0.7,
   maxTokens = 3000,
   overrideModel = "",
-  lang?: SupportedLang
+  lang?: SupportedLang,
+  providerOverride?: ProviderName
 ): Promise<unknown> {
-  const provider = getActiveProvider();
+  const provider = providerOverride || getActiveProvider();
   if (provider === "openai" || provider === "azure-openai") {
     // Map to OpenAI message format (string content only)
     const oaMessages = messages.map((m) => ({ role: m.role, content: m.content }));
