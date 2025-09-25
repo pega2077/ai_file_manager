@@ -24,8 +24,9 @@ export async function embedWithOllama(
     return [];
   }
   const cfg = configManager.getConfig();
-  const endpoint = (cfg.ollamaEndpoint || "").replace(/\/$/, "");
-  const model = overrideModel || cfg.ollamaEmbedModel || "bge-m3";
+  const oc = cfg.ollama || {};
+  const endpoint = ((oc.ollamaEndpoint || cfg.ollamaEndpoint) || "").replace(/\/$/, "");
+  const model = overrideModel || oc.ollamaEmbedModel || cfg.ollamaEmbedModel || "bge-m3";
   if (!endpoint) {
     throw new Error("Ollama endpoint not configured");
   }
@@ -147,8 +148,9 @@ export async function generateStructuredJsonWithOllama(
     throw new Error("messages are required");
   }
   const cfg = configManager.getConfig();
-  const endpoint = (cfg.ollamaEndpoint || "").replace(/\/$/, "");
-  const model = overrideModel || cfg.ollamaModel ;
+  const oc = cfg.ollama || {};
+  const endpoint = ((oc.ollamaEndpoint || cfg.ollamaEndpoint) || "").replace(/\/$/, "");
+  const model = overrideModel || oc.ollamaModel || cfg.ollamaModel ;
   if (!endpoint) {
     throw new Error("Ollama endpoint not configured");
   }
@@ -226,8 +228,9 @@ export async function describeImageWithOllama(
   if (imgs.length === 0) return "";
 
   const cfg = configManager.getConfig();
-  const endpoint = (cfg.ollamaEndpoint || "").replace(/\/$/, "");
-  const model = options?.overrideModel || cfg.ollamaVisionModel || cfg.ollamaModel;
+  const oc2 = cfg.ollama || {};
+  const endpoint = ((oc2.ollamaEndpoint || cfg.ollamaEndpoint) || "").replace(/\/$/, "");
+  const model = options?.overrideModel || oc2.ollamaVisionModel || oc2.ollamaModel || cfg.ollamaVisionModel || cfg.ollamaModel;
   if (!endpoint) throw new Error("Ollama endpoint not configured");
   if (!model) throw new Error("Ollama vision model not configured");
 

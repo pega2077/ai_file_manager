@@ -13,8 +13,9 @@ import type {
 
 function getClient() {
   const cfg = configManager.getConfig();
-  const apiKey = (cfg.openaiApiKey || process.env.OPENAI_API_KEY || "").trim();
-  const baseURL = (cfg.openaiEndpoint || "https://api.openai.com/v1").replace(/\/$/, "");
+  const oc = cfg.openai || {};
+  const apiKey = ((oc.openaiApiKey || cfg.openaiApiKey) || process.env.OPENAI_API_KEY || "").trim();
+  const baseURL = ((oc.openaiEndpoint || cfg.openaiEndpoint) || "https://api.openai.com/v1").replace(/\/$/, "");
   if (!apiKey) {
     throw new Error("OpenAI API key is not configured. Set in config.json or OPENAI_API_KEY env.");
   }
@@ -24,7 +25,8 @@ function getClient() {
 export async function embedWithOpenAI(inputs: string[], overrideModel?: string): Promise<number[][]> {
   if (!Array.isArray(inputs) || inputs.length === 0) return [];
   const cfg = configManager.getConfig();
-  const model = overrideModel || cfg.openaiEmbedModel || "text-embedding-3-large";
+  const oc = cfg.openai || {};
+  const model = overrideModel || oc.openaiEmbedModel || cfg.openaiEmbedModel || "text-embedding-3-large";
   const client = getClient();
   try {
     const resp = await client.embeddings.create({ model, input: inputs });
@@ -46,7 +48,8 @@ export async function generateStructuredJsonWithOpenAI(
     throw new Error("messages are required");
   }
   const cfg = configManager.getConfig();
-  const model = overrideModel || cfg.openaiModel || "gpt-4o-mini";
+  const oc = cfg.openai || {};
+  const model = overrideModel || oc.openaiModel || cfg.openaiModel || "gpt-4o-mini";
   const client = getClient();
   try {
     const resp = await client.chat.completions.create({
@@ -78,7 +81,8 @@ export async function describeImageWithOpenAI(
   overrideModel?: string
 ): Promise<string> {
   const cfg = configManager.getConfig();
-  const model = overrideModel || cfg.openaiVisionModel || cfg.openaiModel || "gpt-4o-mini";
+  const oc = cfg.openai || {};
+  const model = overrideModel || oc.openaiVisionModel || oc.openaiModel || cfg.openaiVisionModel || cfg.openaiModel || "gpt-4o-mini";
   const client = getClient();
   try {
     const content: ChatCompletionContentPart[] = [

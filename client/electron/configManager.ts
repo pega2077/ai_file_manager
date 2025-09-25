@@ -7,21 +7,36 @@ export interface AppConfig {
   useLocalService: boolean;
   localServicePort: number;
   localServiceHost: string;
+  // Grouped LLM configs (preferred)
+  ollama?: {
+    ollamaEndpoint?: string;
+    ollamaModel?: string;
+    ollamaEmbedModel?: string;
+    ollamaVisionModel?: string;
+  };
+  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' (future) */
+  llmProvider?: 'ollama' | 'openai' | 'azure-openai';
+  openai?: {
+    /** OpenAI compatible endpoint (e.g., https://api.openai.com/v1 or custom) */
+    openaiEndpoint?: string;
+    /** OpenAI API key (read from env OPENAI_API_KEY if not set in config) */
+    openaiApiKey?: string;
+    /** Default chat/completion model for OpenAI */
+    openaiModel?: string;
+    /** Default embedding model for OpenAI */
+    openaiEmbedModel?: string;
+    /** Default vision-capable model for OpenAI (e.g., gpt-4o-mini) */
+    openaiVisionModel?: string;
+  };
+  /** Legacy flat fields (deprecated; kept for backward compatibility) */
   ollamaEndpoint?: string;
   ollamaModel?: string;
   ollamaEmbedModel?: string;
   ollamaVisionModel?: string;
-  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' (future) */
-  llmProvider?: 'ollama' | 'openai' | 'azure-openai';
-  /** OpenAI compatible endpoint (e.g., https://api.openai.com/v1 or custom) */
   openaiEndpoint?: string;
-  /** OpenAI API key (read from env OPENAI_API_KEY if not set in config) */
   openaiApiKey?: string;
-  /** Default chat/completion model for OpenAI */
   openaiModel?: string;
-  /** Default embedding model for OpenAI */
   openaiEmbedModel?: string;
-  /** Default vision-capable model for OpenAI (e.g., gpt-4o-mini) */
   openaiVisionModel?: string;
   /** Optional HTTP endpoint for third-party file conversion service */
   fileConvertEndpoint?: string;
@@ -53,18 +68,22 @@ const DEFAULT_CONFIG: AppConfig = {
   useLocalService: true,
   localServicePort: 8000,
   localServiceHost: "127.0.0.1",
-  ollamaEndpoint: "http://127.0.0.1:11434",
-  ollamaModel: "qwen3:8b",
-  ollamaEmbedModel: "bge-m3",
-  ollamaVisionModel: "qwen2.5vl:7b",
   // Default to local Ollama as primary LLM provider; can be changed to 'openai'
   llmProvider: 'ollama',
-  // OpenAI defaults (endpoint only). For security, API key must be provided via config.json or env OPENAI_API_KEY.
-  openaiEndpoint: "https://api.openai.com/v1",
-  openaiApiKey: undefined,
-  openaiModel: "gpt-4o-mini",
-  openaiEmbedModel: "text-embedding-3-large",
-  openaiVisionModel: "gpt-4o-mini",
+  // Grouped configs (preferred in saved config.json)
+  ollama: {
+    ollamaEndpoint: "http://127.0.0.1:11434",
+    ollamaModel: "qwen3:8b",
+    ollamaEmbedModel: "bge-m3",
+    ollamaVisionModel: "qwen2.5vl:7b",
+  },
+  openai: {
+    openaiEndpoint: "https://api.openai.com/v1",
+    openaiApiKey: undefined,
+    openaiModel: "gpt-4o-mini",
+    openaiEmbedModel: "text-embedding-3-large",
+    openaiVisionModel: "gpt-4o-mini",
+  },
   fileConvertEndpoint: "",
   // Default to repository-standard SQLite location; can be overridden in config.json
   sqliteDbPath: "database/files.db",
@@ -128,15 +147,55 @@ export class ConfigManager {
         const configData = fs.readFileSync(this.configPath, 'utf-8');
         const userConfig = JSON.parse(configData) as Partial<AppConfig>;
 
-        // 合并用户配置和默认配置
-        this.config = { ...DEFAULT_CONFIG, ...userConfig };
+        // Deep merge top-level + grouped sections
+        const merged: AppConfig = {
+          ...DEFAULT_CONFIG,
+          ...userConfig,
+          ollama: { ...(DEFAULT_CONFIG.ollama || {}), ...(userConfig.ollama || {}) },
+          openai: { ...(DEFAULT_CONFIG.openai || {}), ...(userConfig.openai || {}) },
+        };
+
+        // Backward compatibility: map legacy flat fields into grouped blocks
+        if (
+          userConfig.ollamaEndpoint ||
+          userConfig.ollamaModel ||
+          userConfig.ollamaEmbedModel ||
+          userConfig.ollamaVisionModel
+        ) {
+          merged.ollama = {
+            ...(merged.ollama || {}),
+            ollamaEndpoint: userConfig.ollamaEndpoint ?? merged.ollama?.ollamaEndpoint,
+            ollamaModel: userConfig.ollamaModel ?? merged.ollama?.ollamaModel,
+            ollamaEmbedModel: userConfig.ollamaEmbedModel ?? merged.ollama?.ollamaEmbedModel,
+            ollamaVisionModel: userConfig.ollamaVisionModel ?? merged.ollama?.ollamaVisionModel,
+          };
+        }
+        if (
+          userConfig.openaiEndpoint ||
+          userConfig.openaiApiKey ||
+          userConfig.openaiModel ||
+          userConfig.openaiEmbedModel ||
+          userConfig.openaiVisionModel
+        ) {
+          merged.openai = {
+            ...(merged.openai || {}),
+            openaiEndpoint: userConfig.openaiEndpoint ?? merged.openai?.openaiEndpoint,
+            openaiApiKey: userConfig.openaiApiKey ?? merged.openai?.openaiApiKey,
+            openaiModel: userConfig.openaiModel ?? merged.openai?.openaiModel,
+            openaiEmbedModel: userConfig.openaiEmbedModel ?? merged.openai?.openaiEmbedModel,
+            openaiVisionModel: userConfig.openaiVisionModel ?? merged.openai?.openaiVisionModel,
+          };
+        }
+
         // Prefer env OPENAI_API_KEY when not explicitly set in config
-        if (!this.config.openaiApiKey) {
+        if (!merged.openai?.openaiApiKey) {
           const envKey = process.env.OPENAI_API_KEY || process.env.OPENAIKEY || process.env.OPENAI_TOKEN;
           if (envKey) {
-            this.config.openaiApiKey = envKey;
+            merged.openai = { ...(merged.openai || {}), openaiApiKey: envKey };
           }
         }
+
+        this.config = merged;
         logger.info('Config loaded from:', this.configPath);
       } else {
         logger.warn('Config file not found, using defaults. Path:', this.configPath);
@@ -145,13 +204,13 @@ export class ConfigManager {
       }
     } catch (error) {
       logger.error('Failed to load config:', error);
-      // 出错时使用默认配置
-      this.config = { ...DEFAULT_CONFIG };
-      // Apply env OPENAI_API_KEY if available
+      // 出错时使用默认配置，并尝试注入环境变量中的 OpenAI Key
+      const merged: AppConfig = { ...DEFAULT_CONFIG };
       const envKey = process.env.OPENAI_API_KEY || process.env.OPENAIKEY || process.env.OPENAI_TOKEN;
       if (envKey) {
-        this.config.openaiApiKey = envKey;
+        merged.openai = { ...(merged.openai || {}), openaiApiKey: envKey };
       }
+      this.config = merged;
     }
 
     return this.config;

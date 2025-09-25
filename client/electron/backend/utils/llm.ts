@@ -27,14 +27,16 @@ export function getActiveModelName(task: LlmTask): string {
   const cfg = configManager.getConfig();
   const provider = getActiveProvider();
   if (provider === "openai" || provider === "azure-openai") {
-    if (task === "embed") return cfg.openaiEmbedModel || "";
-    if (task === "vision") return cfg.openaiVisionModel || cfg.openaiModel || "";
-    return cfg.openaiModel || "";
+    const oc = cfg.openai || {};
+    if (task === "embed") return oc.openaiEmbedModel || cfg.openaiEmbedModel || "";
+    if (task === "vision") return oc.openaiVisionModel || oc.openaiModel || cfg.openaiVisionModel || cfg.openaiModel || "";
+    return oc.openaiModel || cfg.openaiModel || "";
   }
   // default to ollama
-  if (task === "embed") return cfg.ollamaEmbedModel || "";
-  if (task === "vision") return cfg.ollamaVisionModel || cfg.ollamaModel || "";
-  return cfg.ollamaModel || "";
+  const oc = cfg.ollama || {};
+  if (task === "embed") return oc.ollamaEmbedModel || cfg.ollamaEmbedModel || "";
+  if (task === "vision") return oc.ollamaVisionModel || oc.ollamaModel || cfg.ollamaVisionModel || cfg.ollamaModel || "";
+  return oc.ollamaModel || cfg.ollamaModel || "";
 }
 
 export async function embedText(inputs: string[], overrideModel?: string): Promise<number[][]> {
