@@ -1,7 +1,0 @@
-{
-  "chat_qa": "基于以下文档内容回答用户的问题。如果文档中没有相关信息，请说明无法回答。\n\n文档内容：\n{context}\n\n用户问题：{question}\n\n请提供准确、简洁的回答，并说明答案的来源。",
-  "chat_summary": "请根据以下文档内容生成一个简洁的摘要。\n\n文档内容：\n{content}\n\n摘要：",
-  "chat_translate": "请将以下文本翻译成{target_language}。\n\n原文：\n{text}\n\n翻译：",
-  "directory_structure": "请为{profession}推荐一个适合{purpose}的目录结构。\n\n请提供一个清晰的分层目录结构，使用以下格式：\n- 主要目录\n- 主要目录/子目录\n- 主要目录/子目录/子子目录\n\n请确保目录结构合理、实用，并简要说明推荐理由。",
-  "recommend_directory": "请根据文件名称和内容，推荐最合适的存放目录。\n\n文件名称：{file_name}\n文件内容：{file_content}\n\n当前目录结构：\n{current_structure}\n\n请以以下格式回复：\n推荐目录: [目录路径]\n置信度: [0-1之间的数值]\n理由: [推荐理由]\n备选: [备选目录1,备选目录2,...]"
-}
