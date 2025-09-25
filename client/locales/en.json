@@ -311,6 +311,20 @@
       "importedRagSuccess": "File successfully imported to RAG library",
       "saveSuccessRagFailed": "File saved successfully, but importing to RAG library failed",
       "describingImage": "Describing image content for analysis..."
+    },
+    "import": {
+      "modalTitle": "Select Save Directory",
+      "manualModalTitle": "Manually Select Save Directory",
+      "confirmSave": "Confirm Save",
+      "confirmSelect": "Confirm Selection",
+      "manualSelectButton": "Manual Directory Selection",
+      "recommendText": "System recommends saving to: {path}",
+      "selectTargetPrompt": "Please choose the target directory to save the file:",
+      "selectPlaceholder": "Please select a directory",
+      "suffixRecommended": "(Recommended)",
+      "suffixAlternative": "(Alternative)",
+      "selectSaveDirectory": "Please select save directory",
+      "fileSavedTo": "File saved to: {path}"
     }
   },
   "home": {

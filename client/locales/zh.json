@@ -308,6 +308,20 @@
       "importedRagSuccess": "文件已成功导入RAG库",
       "saveSuccessRagFailed": "文件保存成功，但导入RAG库失败",
       "describingImage": "正在描述图片内容以便分析..."
+    },
+    "import": {
+      "modalTitle": "选择保存目录",
+      "manualModalTitle": "手动选择保存目录",
+      "confirmSave": "确认保存",
+      "confirmSelect": "确认选择",
+      "manualSelectButton": "手动选择目录",
+      "recommendText": "系统推荐保存到: {path}",
+      "selectTargetPrompt": "请选择要保存文件的目标目录：",
+      "selectPlaceholder": "请选择目录",
+      "suffixRecommended": "(推荐)",
+      "suffixAlternative": "(备选)",
+      "selectSaveDirectory": "请选择保存目录",
+      "fileSavedTo": "文件已保存到: {path}"
     }
   },
   "home": {
