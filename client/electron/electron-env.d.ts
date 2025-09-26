@@ -6,17 +6,17 @@ declare namespace NodeJS {
      * The built directory structure
      *
      * ```tree
-     * ├─┬─┬ dist
+  * ├─┬─┬ builds/renderer
      * │ │ └── index.html
      * │ │
-     * │ ├─┬ dist-electron
+  * │ ├─┬ builds/electron
      * │ │ ├── main.js
      * │ │ └── preload.js
      * │
      * ```
      */
     APP_ROOT: string
-    /** /dist/ or /public/ */
+  /** /builds/renderer/ or /public/ */
     VITE_PUBLIC: string
   }
 }

@@ -5,11 +5,11 @@
   "asar": true,
   "productName": "AiFileManager",
   "directories": {
-    "output": "release/${version}"
+    "output": "builds/${version}"
   },
   "files": [
-    "dist",
-    "dist-electron"
+    "builds/renderer",
+    "builds/electron"
   ],
   "extraResources": [
     {
