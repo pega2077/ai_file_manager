@@ -210,7 +210,7 @@ export async function chatDescribeImageHandler(
     const base64 = typeof body?.image_base64 === "string" ? body.image_base64.trim() : "";
     const language: SupportedLang = normalizeLanguage(body?.language);
     const hint = typeof body?.prompt_hint === "string" ? body.prompt_hint : undefined;
-    const timeoutMs = typeof body?.timeout_ms === "number" ? Math.max(10000, Math.floor(body.timeout_ms)) : 60000;
+  const timeoutMs = typeof body?.timeout_ms === "number" ? Math.max(10000, Math.floor(body.timeout_ms)) : 300000;
 
     if (!base64) {
       res.status(400).json({

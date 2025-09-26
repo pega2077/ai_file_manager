@@ -2,6 +2,7 @@ import { configManager } from "../../configManager";
 import { httpPostJson } from "./httpClient";
 import { logger } from "../../logger";
 import type { SupportedLang } from "./promptHelper";
+import { normalizeLanguage } from "./promptHelper";
 
 export interface OllamaEmbedRequest {
   input: string[];
@@ -160,13 +161,15 @@ export async function generateStructuredJsonWithOllama(
   }
 
   const url = `${endpoint}/api/generate`;
-  console.log(
+  // Fallback to system-configured language when not explicitly provided
+  const usedLang = normalizeLanguage(lang ?? cfg.language ?? "en", "en");
+  logger.info(
     "Ollama generateStructuredJsonWithOllama, lang:",
-    lang,
+    usedLang,
     "model:",
     model
   );
-  const prompt = messagesToPrompt(messages, responseFormat?.json_schema, lang);
+  const prompt = messagesToPrompt(messages, responseFormat?.json_schema, usedLang);
   const payload: OllamaGeneratePayload = {
     model,
     prompt,
@@ -251,7 +254,7 @@ export async function describeImageWithOllama(
     url,
     payload,
     { Accept: "application/json" },
-    Math.max(30000, options?.timeoutMs ?? 60000),
+    Math.max(30000, options?.timeoutMs ?? 300000),
     apiKey
   );
   if (!resp.ok || !resp.data) {
