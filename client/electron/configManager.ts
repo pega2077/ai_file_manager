@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { logger } from "./logger";
 import {app} from "electron";
+import { getBaseDir, resolveProjectRoot, resolveDatabaseAbsolutePath } from "./backend/utils/pathHelper";
 
 export interface AppConfig {
   useLocalService: boolean;
@@ -133,15 +134,7 @@ export class ConfigManager {
    * Falls back to `process.cwd()` if Electron APIs are unavailable.
    */
   public getAppRoot(): string {
-    try {
-      const base = app.isPackaged
-        ? path.dirname(app.getPath('exe'))
-        : app.getAppPath();
-      return base || process.cwd();
-    } catch (err) {
-      logger.error('ConfigManager: Failed to resolve app root, using CWD', err);
-      return process.cwd();
-    }
+    return getBaseDir();
   }
 
   constructor() {
@@ -311,10 +304,7 @@ export class ConfigManager {
    * project layout and current platform. This replaces config-driven paths.
    */
   private resolveLocalServicePaths(): { servicePath: string; exePath: string; projectRoot: string } {
-    const appRoot = this.getAppRoot();
-    // In development, appRoot usually points to client/dist-electron, so go up two levels to repo root.
-    // In production, appRoot points to the installation directory; go up one level to bundle root.
-    const projectRoot = app.isPackaged ? path.join(appRoot, '..') : path.join(appRoot, '..', '..');
+  const projectRoot = resolveProjectRoot();
 
     const servicePath = path.join(projectRoot, 'python', 'server.py');
     // Windows uses Scripts\python.exe, POSIX uses bin/python
@@ -330,11 +320,8 @@ export class ConfigManager {
    * If the path in config is relative, it will be resolved against the project root.
    */
   getDatabaseAbsolutePath(): string {
-    const appRoot = this.getAppRoot();
-    const projectRoot = app.isPackaged ? path.join(appRoot, '..') : path.join(appRoot, '..', '..');
-
-    const dbPath = this.config.sqliteDbPath;
-    return path.isAbsolute(dbPath) ? dbPath : path.join(projectRoot, dbPath);
+  const dbPath = this.config.sqliteDbPath;
+  return resolveDatabaseAbsolutePath(dbPath);
   }
 
   /**

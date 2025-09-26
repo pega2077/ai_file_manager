@@ -1,6 +1,6 @@
-import { app } from "electron";
 import fs from "fs";
 import path from "path";
+import { ensureLogsDirSync } from "./backend/utils/pathHelper";
 
 class Logger {
   private logFilePath: string;
@@ -15,31 +15,13 @@ class Logger {
     if (this.initialized) return;
 
     try {
-      // 使用程序所在目录的 logs 文件夹
-      let logsDir: string;
-
-      if (app.isPackaged === false) {
-        // 开发模式：基于 app.getAppPath()，避免依赖未初始化的环境变量
-        const appRoot = app.getAppPath();
-        logsDir = path.join(appRoot || process.cwd(), 'logs');
-        console.log('Logger: Development mode, appRoot:', appRoot);
-      } else {
-        // 生产模式：使用用户数据目录，因为 Program Files 通常是只读的
-        // const userDataPath = app.getPath('userData');
-        // logsDir = path.join(userDataPath, 'logs');
-        logsDir = path.join(path.dirname(app.getPath('exe')), 'logs');
-        console.log('Logger: Production mode, userData:', logsDir);
-      }
+      // Resolve and ensure logs directory using helper
+  const logsDir = ensureLogsDirSync();
       console.log('Logger: Logs directory:', logsDir);
-      
-      // 确保日志目录存在
-      if (!fs.existsSync(logsDir)) {
-        fs.mkdirSync(logsDir, { recursive: true });
-      }
 
       // 日志文件路径：logs/electron-YYYY-MM-DD.log
       const today = new Date().toISOString().split('T')[0];
-      this.logFilePath = path.join(logsDir, `electron-${today}.log`);
+  this.logFilePath = path.join(logsDir, `electron-${today}.log`);
 
       this.initialized = true;
     } catch (error) {
