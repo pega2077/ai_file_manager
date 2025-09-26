@@ -45,9 +45,7 @@ interface TaskStatusResponse {
 // ---- Helpers ----
 function resolveServiceBase(): string {
   const cfg = configManager.getConfig();
-  const fromConfig = (cfg.fileConvertEndpoint || "").trim();
-  const fromEnv = (process.env.FILE_CONVERT_BASE_URL || "").trim();
-  const base = fromConfig || fromEnv;
+  const base = (cfg.fileConvertEndpoint ||"").trim();
   if (!base) {
     throw new Error("File converter service base URL not configured. Set fileConvertEndpoint in config.json or FILE_CONVERT_BASE_URL env.");
   }
