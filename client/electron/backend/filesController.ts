@@ -7,6 +7,7 @@ import fs from "fs";
 import { promises as fsp } from "fs";
 import { MAX_TEXT_PREVIEW_BYTES, getMimeByExt, isImageExt, decodeTextBuffer, CATEGORY_EXTENSIONS, toNumber, isNonEmptyString, parseTags } from "./utils/fileHelpers";
 import { ensureTxtFile, chunkText } from "./utils/fileConversion";
+import { ensureTempDir } from "./utils/pathHelper";
 import { embedText, generateStructuredJson, describeImage } from "./utils/llm";
 import type { ProviderName } from "./utils/llm";
 import { app } from "electron";
@@ -557,8 +558,7 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
         description = "";
       }
       // Save a temp txt containing the description for chunking/embedding
-      const tempDir = path.join(app.getAppPath(), "temp");
-      await fsp.mkdir(tempDir, { recursive: true });
+  const tempDir = await ensureTempDir();
       txtPath = path.join(tempDir, `${Date.now()}_${path.basename(filePath, path.extname(filePath))}_vision.txt`);
       content = description || `Image file ${path.basename(filePath)}.`;
       await fsp.writeFile(txtPath, content, "utf8");

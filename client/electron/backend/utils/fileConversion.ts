@@ -1,9 +1,9 @@
 import { promises as fsp } from "fs";
 import path from "path";
-import { app } from "electron";
 import { configManager } from "../../configManager";
 import { httpGetJson, httpPostForm, httpPostJson } from "./httpClient";
 import { logger } from "../../logger";
+import { ensureTempDir } from "./pathHelper";
 
 // ---- Types aligned with File Converter Service API ----
 interface UploadResponse {
@@ -160,8 +160,7 @@ export async function convertFileViaService(filePath: string, sourceFormat: stri
 
   // 4) Download
   const downloadUrl = final.downloadUrl || `${base}/download/${encodeURIComponent(final.id)}`;
-  const tempDir = path.join(app.getAppPath(), "temp");
-  await fsp.mkdir(tempDir, { recursive: true });
+  const tempDir = await ensureTempDir();
   const destName = `${Date.now()}_${path.basename(fileName, path.extname(fileName))}.${outFmt === "markdown" ? "md" : outFmt}`;
   const dest = path.join(tempDir, destName);
   logger.info("Converter: downloading result", { taskId: final.id, downloadUrl, dest });
@@ -177,8 +176,7 @@ export async function convertFileViaService(filePath: string, sourceFormat: stri
  */
 export async function ensureTxtFile(localFilePath: string): Promise<string> {
   const ext = path.extname(localFilePath).toLowerCase().replace(/^\./, "");
-  const tempDir = path.join(app.getAppPath(), "temp");
-  await fsp.mkdir(tempDir, { recursive: true });
+  const tempDir = await ensureTempDir();
 
   // quick pass-through extensions
   const pass = new Set(["txt", "md", "csv", "json", "html", "htm"]);

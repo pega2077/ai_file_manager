@@ -162,9 +162,17 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
   };
 
   const processFile = useCallback(async (filePath: string) => {
-    const directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
-    if (!directoryStructureResponse.success) {
+    // 1) Load directory structure with error handling
+    let directoryStructureResponse: Awaited<ReturnType<typeof apiService.listDirectoryRecursive>>;
+    try {
+      directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
+    } catch (err) {
       message.error(t('files.messages.getDirectoryStructureFailed'));
+      window.electronAPI?.logError?.('listDirectoryRecursive failed', { err: String(err) });
+      return;
+    }
+    if (!directoryStructureResponse.success) {
+      message.error(directoryStructureResponse.message || t('files.messages.getDirectoryStructureFailed'));
       return;
     }
 
@@ -189,14 +197,23 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
       }
     } catch (e) {
       // Non-blocking; continue without description
-      console.warn('describe-image failed, continuing without content override', e);
+      window.electronAPI?.logError?.('describe-image failed, continuing without content override', { err: String(e) });
     }
 
+    // 2) Recommend directory with error handling
     const loadingKey = message.loading(t('files.messages.analyzingFile'), 0);
-    const recommendResponse = await apiService.recommendDirectory(filePath, directories, contentForAnalysis);
+    let recommendResponse: Awaited<ReturnType<typeof apiService.recommendDirectory>>;
+    try {
+      recommendResponse = await apiService.recommendDirectory(filePath, directories, contentForAnalysis);
+    } catch (err) {
+      loadingKey();
+      message.error(t('files.messages.getRecommendationFailed'));
+      window.electronAPI?.logError?.('recommendDirectory HTTP error', { err: String(err) });
+      return;
+    }
     loadingKey();
     if (!recommendResponse.success) {
-      message.error(t('files.messages.getRecommendationFailed'));
+      message.error(recommendResponse.message || t('files.messages.getRecommendationFailed'));
       return;
     }
 
@@ -235,7 +252,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
             }
           } catch (e) {
             message.warning(t('files.messages.saveSuccessRagFailed'));
-            console.error(e);
+            window.electronAPI?.logError?.('importToRag (auto classify) failed', { err: String(e) });
           }
         }
       } else {
@@ -258,7 +275,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
       await processFile(filePath);
     } catch (error) {
       message.error(t('files.messages.fileImportFailed'));
-      console.error(error);
+      window.electronAPI?.logError?.('handleStartImport failed', { err: String(error) });
     }
   }, [processFile, t]);
 
@@ -299,7 +316,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
               }
             }
           } catch (e) {
-            console.warn('describe-image (confirm) failed, continuing', e);
+            window.electronAPI?.logError?.('describe-image (confirm) failed, continuing', { err: String(e) });
           }
           try {
             const cfg5 = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
@@ -316,7 +333,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
             }
           } catch (e) {
             message.warning(t('files.messages.saveSuccessRagFailed'));
-            console.error(e);
+            window.electronAPI?.logError?.('importToRag (confirm) failed', { err: String(e) });
           }
         }
       } else {
@@ -324,7 +341,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
       }
     } catch (error) {
       message.error(t('files.messages.fileSaveFailed'));
-      console.error(error);
+      window.electronAPI?.logError?.('handleImportConfirm saveFile failed', { err: String(error) });
     }
   };
 
@@ -365,7 +382,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
       }
     } catch (error) {
       message.error(t('files.messages.fileSaveFailed'));
-      console.error(error);
+      window.electronAPI?.logError?.('handleManualSelectConfirm saveFile failed', { err: String(error) });
     }
   };
 

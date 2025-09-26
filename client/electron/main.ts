@@ -199,6 +199,21 @@ function setupIpcHandlers() {
     }
   });
 
+  // IPC handler for renderer error logging
+  ipcMain.handle("log:error", (_event, message: string, meta?: unknown) => {
+    try {
+      if (meta !== undefined) {
+        logger.error(message, meta);
+      } else {
+        logger.error(message);
+      }
+      return true;
+    } catch (error) {
+      console.error("Failed to log error from renderer:", error);
+      return false;
+    }
+  });
+
   // IPC handler for getting app config
   ipcMain.handle("get-app-config", () => {
     return configManager.getConfig();
