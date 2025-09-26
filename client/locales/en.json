@@ -352,7 +352,8 @@
       "importingRag": "Importing to RAG library...",
       "importedRagSuccess": "File successfully imported to RAG library",
       "saveSuccessRagFailed": "File saved successfully, but importing to RAG library failed",
-      "describingImage": "Describing image content for analysis..."
+      "describingImage": "Describing image content for analysis...",
+      "imageDescription": "Image description: {text}"
     },
     "createFolder": {
       "modalTitle": "Create Folder",

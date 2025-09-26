@@ -205,6 +205,12 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
           const descResp = await apiService.describeImage(dataUrl, lang);
           if (descResp.success && descResp.data && typeof descResp.data.description === 'string') {
             contentForAnalysis = descResp.data.description;
+            try {
+              // Show the description to the user
+              message.info(t('files.messages.imageDescription', { text: contentForAnalysis }), 6);
+            } catch {
+              // best-effort UI feedback
+            }
           }
         }
       }
@@ -330,6 +336,11 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
                 const descResp = await apiService.describeImage(dataUrl, lang);
                 if (descResp.success && descResp.data && typeof descResp.data.description === 'string') {
                   contentForAnalysis = descResp.data.description;
+                  try {
+                    message.info(t('files.messages.imageDescription', { text: contentForAnalysis }), 6);
+                  } catch {
+                    // ignore message rendering failures
+                  }
                 }
               }
             }

@@ -349,7 +349,8 @@
       "importingRag": "正在导入RAG库...",
       "importedRagSuccess": "文件已成功导入RAG库",
       "saveSuccessRagFailed": "文件保存成功，但导入RAG库失败",
-      "describingImage": "正在描述图片内容以便分析..."
+      "describingImage": "正在描述图片内容以便分析...",
+      "imageDescription": "图片描述：{text}"
     },
     "createFolder": {
       "modalTitle": "创建文件夹",
