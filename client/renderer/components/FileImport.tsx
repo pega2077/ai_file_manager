@@ -110,19 +110,23 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
   const handleRagImport = useCallback(async (fileId: string, noSaveDb: boolean = false) => {
     try {
   const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
-      if (cfg?.autoSaveRAG) {
-        const loadingKey = message.loading(t('files.messages.importingRag'), 0);
-        const ragResponse = await apiService.importToRag(fileId, noSaveDb);
-        loadingKey();
-        if (ragResponse.success) {
-          message.success(t('files.messages.importedRagSuccess'));
-        } else {
-          message.warning(t('files.messages.saveSuccessRagFailed'));
+      let hideLoading: undefined | (() => void);
+      try {
+        if (cfg?.autoSaveRAG) {
+          hideLoading = message.loading(t('files.messages.importingRag'), 0);
+          const ragResponse = await apiService.importToRag(fileId, noSaveDb);
+          if (ragResponse.success) {
+            message.success(t('files.messages.importedRagSuccess'));
+          } else {
+            message.warning(t('files.messages.saveSuccessRagFailed'));
+          }
         }
+      } finally {
+        if (hideLoading) hideLoading();
       }
     } catch (error) {
       message.warning(t('files.messages.saveSuccessRagFailed'));
-      console.error(error);
+      window.electronAPI?.logError?.('importToRag (handleRagImport) failed', { err: String(error) });
     }
   }, [t]);
 
@@ -259,15 +263,19 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
           try {
             const cfg3 = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
             const descForRag = contentForAnalysis && contentForAnalysis.trim() ? contentForAnalysis : undefined;
-            if (cfg3?.autoSaveRAG) {
-              const loadingKey2 = message.loading(t('files.messages.importingRag'), 0);
-              const ragResponse = await apiService.importToRag(fileId, true, descForRag);
-              loadingKey2();
-              if (ragResponse.success) {
-                message.success(t('files.messages.importedRagSuccess'));
-              } else {
-                message.warning(t('files.messages.saveSuccessRagFailed'));
+            let hideLoading: undefined | (() => void);
+            try {
+              if (cfg3?.autoSaveRAG) {
+                hideLoading = message.loading(t('files.messages.importingRag'), 0);
+                const ragResponse = await apiService.importToRag(fileId, true, descForRag);
+                if (ragResponse.success) {
+                  message.success(t('files.messages.importedRagSuccess'));
+                } else {
+                  message.warning(t('files.messages.saveSuccessRagFailed'));
+                }
               }
+            } finally {
+              if (hideLoading) hideLoading();
             }
           } catch (e) {
             message.warning(t('files.messages.saveSuccessRagFailed'));
@@ -350,15 +358,19 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
           try {
             const cfg5 = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
             const descForRag = contentForAnalysis && contentForAnalysis.trim() ? contentForAnalysis : undefined;
-            if (cfg5?.autoSaveRAG) {
-              const loadingKey2 = message.loading(t('files.messages.importingRag'), 0);
-              const ragResponse = await apiService.importToRag(fileId, true, descForRag);
-              loadingKey2();
-              if (ragResponse.success) {
-                message.success(t('files.messages.importedRagSuccess'));
-              } else {
-                message.warning(t('files.messages.saveSuccessRagFailed'));
+            let hideLoading: undefined | (() => void);
+            try {
+              if (cfg5?.autoSaveRAG) {
+                hideLoading = message.loading(t('files.messages.importingRag'), 0);
+                const ragResponse = await apiService.importToRag(fileId, true, descForRag);
+                if (ragResponse.success) {
+                  message.success(t('files.messages.importedRagSuccess'));
+                } else {
+                  message.warning(t('files.messages.saveSuccessRagFailed'));
+                }
               }
+            } finally {
+              if (hideLoading) hideLoading();
             }
           } catch (e) {
             message.warning(t('files.messages.saveSuccessRagFailed'));

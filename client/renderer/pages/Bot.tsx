@@ -82,6 +82,8 @@ const Bot: React.FC = () => {
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Prevent default to avoid image selection/focus ring while enabling custom dragging
+    e.preventDefault();
     isDragging.current = true;
     startPos.current = { x: e.clientX, y: e.clientY };
   };
@@ -194,7 +196,9 @@ const Bot: React.FC = () => {
       alignItems: 'center',
       height: '100vh',
       width: '100vw',
-      position: 'relative'
+      position: 'relative',
+      // Avoid any selection highlight on the whole surface
+      userSelect: 'none' as const,
     }}>
       <img
         id="bot-image"
@@ -210,7 +214,13 @@ const Bot: React.FC = () => {
         style={{
           width: '200px',
           height: '200px',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          // Ensure the image never shows selection highlight or drag ghost
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          // Note: avoid unsupported vendor props to satisfy typings
+          outline: 'none',
+          WebkitTapHighlightColor: 'transparent',
         }}
       />
       {/* <div>{debugMessage}</div> */}
