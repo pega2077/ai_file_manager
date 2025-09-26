@@ -18,6 +18,7 @@ import { ImportService } from "./importService";
 import { logger } from "./logger";
 import { configManager, AppConfig } from "./configManager";
 import { startServer as startLocalExpressServer, stopServer as stopLocalExpressServer } from "./server";
+import { ensureTempDir, getBaseDir, resolveProjectRoot } from "./backend/utils/pathHelper";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Config is managed via ConfigManager (JSON file), electron-store removed
@@ -58,6 +59,136 @@ let win: BrowserWindow | null;
 let botWin: BrowserWindow | null;
 let importService: ImportService;
 let tray: Tray | null;
+
+/**
+ * Clear all app data (database file, vectors directory, temp directory) and relaunch the app.
+ * - Does NOT remove config.json or logs by design.
+ */
+async function handleClearAllData(): Promise<void> {
+  try {
+    logger.info("Starting clear-all-data operation");
+
+    // Resolve primary DB path from config
+  const dbPathFromConfig = configManager.getDatabaseAbsolutePath();
+  const baseDir = getBaseDir();
+  const projectRoot = resolveProjectRoot();
+
+    // Candidate DB paths to maximize compatibility in dev/prod
+    const candidateDbPaths = Array.from(
+      new Set([
+        dbPathFromConfig,
+        // Common development layout candidates
+        path.join(projectRoot, "database", "files.db"),
+        path.join(baseDir, "client", "database", "files.db"),
+        path.join(baseDir, "database", "files.db"),
+      ])
+    );
+
+    // Collect directories to remove: vectors alongside any detected DB and temp dir
+    const candidateVectorDirs = new Set<string>();
+    const candidateDbDirs = new Set<string>();
+    for (const p of candidateDbPaths) {
+      const dbDir = path.dirname(p);
+      candidateDbDirs.add(dbDir);
+      candidateVectorDirs.add(path.join(dbDir, "vectors"));
+    }
+
+    // Remove DB files if exist
+    for (const dbPath of candidateDbPaths) {
+      try {
+        await fs.rm(dbPath, { force: true });
+        logger.info(`Removed database file if existed: ${dbPath}`);
+      } catch (err) {
+        logger.warn(`Failed to remove database file: ${dbPath}`, err);
+      }
+    }
+
+    // Remove vectors directories and entire database directories (to clean WAL/SHM/extras)
+    for (const dir of candidateVectorDirs) {
+      try {
+        await fs.rm(dir, { recursive: true, force: true });
+        logger.info(`Removed vectors directory if existed: ${dir}`);
+      } catch (err) {
+        logger.warn(`Failed to remove vectors directory: ${dir}`, err);
+      }
+    }
+
+    for (const dbDir of candidateDbDirs) {
+      try {
+        await fs.rm(dbDir, { recursive: true, force: true });
+        logger.info(`Removed database directory if existed: ${dbDir}`);
+      } catch (err) {
+        logger.warn(`Failed to remove database directory: ${dbDir}`, err);
+      }
+    }
+
+    // Remove temp directory and recreate it
+    try {
+      const ensuredTemp = await ensureTempDir();
+      const tempCandidates = Array.from(
+        new Set([
+          ensuredTemp,
+          path.join(baseDir, "temp"),
+          path.join(projectRoot, "temp"),
+          path.join(path.join(baseDir, ".."), "temp"),
+          path.join(path.join(baseDir, "..", ".."), "temp"),
+          path.join(process.cwd(), "temp"),
+        ])
+      );
+      for (const t of tempCandidates) {
+        try {
+          await fs.rm(t, { recursive: true, force: true });
+          logger.info(`Cleared temp directory if existed: ${t}`);
+        } catch (e) {
+          logger.warn(`Failed to clear temp directory: ${t}`);
+        }
+      }
+    } catch (err) {
+      logger.warn("Failed to enumerate temp directories", err);
+    }
+
+    // Inform the user and relaunch
+    try {
+      const options = {
+        type: "info" as const,
+        buttons: ["OK"],
+        defaultId: 0,
+        title: "Data Cleared",
+        message: "All application data has been cleared. The app will now restart.",
+        noLink: true,
+      };
+      if (win && !win.isDestroyed()) {
+        await dialog.showMessageBox(win, options);
+      } else {
+        await dialog.showMessageBox(options);
+      }
+    } catch {
+      // Ignore dialog failures
+    }
+
+    logger.info("Relaunching application after data clear");
+    app.relaunch();
+    // Use exit to allow before-quit handlers to run; a small delay helps pending I/O
+    setTimeout(() => {
+      app.exit(0);
+    }, 150);
+  } catch (error) {
+    logger.error("Unexpected error during clear-all-data:", error);
+    const options = {
+      type: "error" as const,
+      buttons: ["OK"],
+      defaultId: 0,
+      title: "Clear Data Failed",
+      message: "Failed to clear all data. Please check logs for details.",
+      noLink: true,
+    };
+    if (win && !win.isDestroyed()) {
+      await dialog.showMessageBox(win, options);
+    } else {
+      await dialog.showMessageBox(options);
+    }
+  }
+}
 
 function setupIpcHandlers() {
   ipcMain.handle("locale:get-preferred", () => {
@@ -242,6 +373,18 @@ function setupIpcHandlers() {
     return configManager.getEffectiveApiBaseUrl();
   });
 
+  // IPC handler for clearing all data and relaunching the app
+  ipcMain.handle("clear-all-data", async () => {
+    await handleClearAllData();
+    return true;
+  });
+
+  // Backward/alias handler name as requested
+  ipcMain.handle("handleClearAllData", async () => {
+    await handleClearAllData();
+    return true;
+  });
+
   // IPC handler for showing main window
   ipcMain.handle("show-main-window", () => {
     if (!win || win.isDestroyed()) {
@@ -359,7 +502,6 @@ function createBotWindow() {
 }
 
 // Create application menu
-
 function createMenu() {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
@@ -406,6 +548,32 @@ function createMenu() {
               if (importService) {
                 importService.addFileToQueue();
               }
+            }
+          },
+        },
+
+        {
+          label: "Clear All Data...",
+          click: async () => {
+            try {
+              const options = {
+                type: "warning" as const,
+                buttons: ["Cancel", "Delete and Restart"],
+                defaultId: 1,
+                cancelId: 0,
+                title: "Confirm Clear All Data",
+                message:
+                  "This will permanently delete the database, vectors, and temp files. The app will then restart.",
+                noLink: true,
+              };
+              const { response } = win && !win.isDestroyed()
+                ? await dialog.showMessageBox(win, options)
+                : await dialog.showMessageBox(options);
+              if (response === 1) {
+                await handleClearAllData();
+              }
+            } catch (err) {
+              logger.error("Clear All Data menu action failed:", err);
             }
           },
         },

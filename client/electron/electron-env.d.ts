@@ -43,6 +43,7 @@ interface Window {
     getSystemLocale: () => Promise<string>
     logError: (message: string, meta?: unknown) => Promise<boolean>
     quitApp: () => Promise<boolean>
+    clearAllData: () => Promise<boolean>
   }
 }
 
