@@ -32,9 +32,10 @@ export async function embedWithOllama(
   }
   const url = `${endpoint}/api/embed`;
   const payload = { model, input: inputs } satisfies OllamaEmbedRequest;
+  const apiKey = oc.ollamaApiKey || cfg.ollamaApiKey;
   const resp = await httpPostJson<OllamaEmbedResponse>(url, payload, {
     Accept: "application/json",
-  });
+  }, undefined, apiKey);
   if (!resp.ok || !resp.data) {
     const msg =
       resp.error?.message || `Failed embedding via Ollama: HTTP ${resp.status}`;
@@ -178,11 +179,13 @@ export async function generateStructuredJsonWithOllama(
     payload.format = "json";
   }
   // logger.info("Ollama generate payload prepared", JSON.stringify(payload));
+  const apiKey = oc.ollamaApiKey || cfg.ollamaApiKey;
   const resp = await httpPostJson<OllamaGenerateResponseBody>(
     url,
     payload,
     { Accept: "application/json" },
-    60000
+    60000,
+    apiKey
   );
   if (!resp.ok || !resp.data) {
     const msg =
@@ -243,11 +246,13 @@ export async function describeImageWithOllama(
     images: imgs,
   };
 
+  const apiKey = oc2.ollamaApiKey || cfg.ollamaApiKey;
   const resp = await httpPostJson<OllamaGenerateResponseBody>(
     url,
     payload,
     { Accept: "application/json" },
-    Math.max(30000, options?.timeoutMs ?? 60000)
+    Math.max(30000, options?.timeoutMs ?? 60000),
+    apiKey
   );
   if (!resp.ok || !resp.data) {
     const msg = resp.error?.message || `Failed vision generate via Ollama: HTTP ${resp.status}`;

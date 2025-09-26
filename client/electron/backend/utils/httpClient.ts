@@ -7,11 +7,15 @@ export interface HttpJsonResponse<T> {
   error?: { message: string };
 }
 
-export async function httpGetJson<T>(url: string, headers?: Record<string, string>, timeoutMs = 15000): Promise<HttpJsonResponse<T>> {
+export async function httpGetJson<T>(url: string, headers?: Record<string, string>, timeoutMs = 15000, token?: string): Promise<HttpJsonResponse<T>> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let mergedHeaders: Record<string, string> = { ...(headers || {}) };
+  if (token) {
+    mergedHeaders = { ...mergedHeaders, Authorization: `Bearer ${token}` };
+  }
   try {
-    const resp = await fetch(url, { headers, signal: controller.signal });
+    const resp = await fetch(url, { headers: mergedHeaders, signal: controller.signal });
     const status = resp.status;
     const ok = resp.ok;
     const text = await resp.text();
@@ -28,13 +32,17 @@ export async function httpGetJson<T>(url: string, headers?: Record<string, strin
   }
 }
 
-export async function httpPostJson<T>(url: string, body: unknown, headers?: Record<string, string>, timeoutMs = 30000): Promise<HttpJsonResponse<T>> {
+export async function httpPostJson<T>(url: string, body: unknown, headers?: Record<string, string>, timeoutMs = 30000, token?: string): Promise<HttpJsonResponse<T>> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let mergedHeaders: Record<string, string> = { "Content-Type": "application/json", ...(headers || {}) };
+  if (token) {
+    mergedHeaders = { ...mergedHeaders, Authorization: `Bearer ${token}` };
+  }
   try {
     const resp = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...(headers || {}) },
+      headers: mergedHeaders,
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -54,13 +62,17 @@ export async function httpPostJson<T>(url: string, body: unknown, headers?: Reco
   }
 }
 
-export async function httpPostForm<T>(url: string, form: FormData, headers?: Record<string, string>, timeoutMs = 600000): Promise<HttpJsonResponse<T>> {
+export async function httpPostForm<T>(url: string, form: FormData, headers?: Record<string, string>, timeoutMs = 600000, token?: string): Promise<HttpJsonResponse<T>> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let mergedHeaders: Record<string, string> = { ...(headers || {}) };
+  if (token) {
+    mergedHeaders = { ...mergedHeaders, Authorization: `Bearer ${token}` };
+  }
   try {
     const resp = await fetch(url, {
       method: "POST",
-      headers: { ...(headers || {}) },
+      headers: mergedHeaders,
       body: form,
       signal: controller.signal,
     });

@@ -13,6 +13,7 @@ export interface AppConfig {
     ollamaModel?: string;
     ollamaEmbedModel?: string;
     ollamaVisionModel?: string;
+    ollamaApiKey?: string;
   };
   /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' (future) */
   llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter';
@@ -45,6 +46,7 @@ export interface AppConfig {
   ollamaModel?: string;
   ollamaEmbedModel?: string;
   ollamaVisionModel?: string;
+  ollamaApiKey?: string;
   openaiEndpoint?: string;
   openaiApiKey?: string;
   openaiModel?: string;
@@ -89,6 +91,7 @@ const DEFAULT_CONFIG: AppConfig = {
     ollamaModel: "qwen3:8b",
     ollamaEmbedModel: "bge-m3",
     ollamaVisionModel: "qwen2.5vl:7b",
+    ollamaApiKey: undefined,
   },
   openai: {
     openaiEndpoint: "https://api.openai.com/v1",
@@ -181,7 +184,8 @@ export class ConfigManager {
           userConfig.ollamaEndpoint ||
           userConfig.ollamaModel ||
           userConfig.ollamaEmbedModel ||
-          userConfig.ollamaVisionModel
+          userConfig.ollamaVisionModel ||
+          userConfig.ollamaApiKey
         ) {
           merged.ollama = {
             ...(merged.ollama || {}),
@@ -189,6 +193,7 @@ export class ConfigManager {
             ollamaModel: userConfig.ollamaModel ?? merged.ollama?.ollamaModel,
             ollamaEmbedModel: userConfig.ollamaEmbedModel ?? merged.ollama?.ollamaEmbedModel,
             ollamaVisionModel: userConfig.ollamaVisionModel ?? merged.ollama?.ollamaVisionModel,
+            ollamaApiKey: userConfig.ollamaApiKey ?? merged.ollama?.ollamaApiKey,
           };
         }
         if (
