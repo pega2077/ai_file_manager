@@ -287,7 +287,8 @@
     "buttons": {
       "search": "Search",
       "refresh": "Refresh",
-      "importFile": "Import File"
+      "importFile": "Import File",
+      "createFolder": "Create Folder"
     },
     "pagination": {
       "showTotal": "Items {start}-{end} of {total}"
@@ -298,6 +299,10 @@
       "openDirectoryNotSupported": "Directory opening not supported",
       "openFileFailed": "Failed to open file",
       "openFileNotSupported": "File opening not supported",
+      "createFolderSuccess": "Folder created successfully",
+      "createFolderFailed": "Failed to create folder",
+      "createFolderInvalidName": "Please enter a valid folder name",
+      "createFolderInvalidChars": "Folder name contains invalid characters",
       "importingToRag": "Importing file \"{name}\" to knowledge base...",
       "importedToRagSuccess": "File \"{name}\" successfully imported to knowledge base",
       "importToRagFailed": "Failed to import file \"{name}\"",
@@ -311,6 +316,14 @@
       "importedRagSuccess": "File successfully imported to RAG library",
       "saveSuccessRagFailed": "File saved successfully, but importing to RAG library failed",
       "describingImage": "Describing image content for analysis..."
+    },
+    "createFolder": {
+      "modalTitle": "Create Folder",
+      "label": "Folder name",
+      "placeholder": "Enter folder name (relative to workspace)",
+      "help": "The folder will be created under the current workspace directory",
+      "okText": "Create",
+      "cancelText": "Cancel"
     },
     "import": {
       "modalTitle": "Select Save Directory",
@@ -352,7 +365,8 @@
     },
     "buttons": {
       "goUp": "Go Up",
-      "importFile": "Import File"
+      "importFile": "Import File",
+      "createFolder": "Create Folder"
     },
     "buttonTitles": {
       "goUp": "Go to Parent Directory",
@@ -387,7 +401,11 @@
       "openFileFailed": "Failed to open file",
       "saveSuccessRagFailed": "File saved successfully, but importing to knowledge base failed",
       "importingRag": "Importing to RAG library...",
-      "importedRagSuccess": "File successfully imported to RAG library"
+      "importedRagSuccess": "File successfully imported to RAG library",
+      "createFolderSuccess": "Folder created successfully",
+      "createFolderFailed": "Failed to create folder",
+      "createFolderInvalidName": "Please enter a valid folder name",
+      "createFolderInvalidChars": "Folder name contains invalid characters"
     }
   },
   "landing": {

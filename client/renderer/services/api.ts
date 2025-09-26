@@ -407,6 +407,16 @@ class ApiService {
     });
   }
 
+  // 创建单个目录
+  async createDirectory(directoryPath: string) {
+    return this.request('/files/create-directory', {
+      method: 'POST',
+      body: JSON.stringify({
+        directory_path: directoryPath,
+      }),
+    });
+  }
+
   // 智能问答
   async askQuestion(question: string, options?: {
     context_limit?: number;

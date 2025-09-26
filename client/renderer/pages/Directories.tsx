@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Layout, Table, Spin, message, Button } from 'antd';
-import { ArrowUpOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { Layout, Table, Spin, message, Button, Modal, Form, Input } from 'antd';
+import { ArrowUpOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, DatabaseOutlined, FolderAddOutlined } from '@ant-design/icons';
 import { apiService } from '../services/api';
 import Sidebar from '../components/Sidebar';
 import FilePreview from '../components/FilePreview';
@@ -20,6 +20,9 @@ const Directories = () => {
   const [enablePreview, setEnablePreview] = useState(true);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ path: string; name: string } | null>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form] = Form.useForm<{ folderName: string }>();
 
   const columns = [
     {
@@ -285,6 +288,42 @@ const Directories = () => {
     }
   };
 
+  const handleCreateFolder = async () => {
+    try {
+      const values = await form.validateFields();
+      const name = (values.folderName || '').trim();
+      if (!name) {
+        message.warning(t('home.messages.createFolderInvalidName'));
+        return;
+      }
+      const invalidPattern = /[<>:"/\\|?*]/;
+      if (invalidPattern.test(name)) {
+        message.error(t('home.messages.createFolderInvalidChars'));
+        return;
+      }
+      setCreating(true);
+      const base = currentDirectory.replace(/[\\/]+$/, '');
+      const sep = getPathSeparator();
+      const targetPath = `${base}${sep}${name}`;
+      const resp = await apiService.createDirectory(targetPath) as { success: boolean; message?: string };
+      if (resp.success) {
+        message.success(t('home.messages.createFolderSuccess'));
+        setCreateModalOpen(false);
+        form.resetFields();
+        void loadDirectory(currentDirectory);
+      } else {
+        const msg = resp.message || t('home.messages.createFolderFailed');
+        message.error(msg);
+      }
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'errorFields' in e) return;
+      console.error('Create folder failed:', e);
+      message.error(t('home.messages.createFolderFailed'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sidebar selectedMenu={selectedMenu} />
@@ -306,6 +345,12 @@ const Directories = () => {
               >
                 {t('home.buttons.goUp')}
               </Button>
+              <Button
+                icon={<FolderAddOutlined />}
+                onClick={() => setCreateModalOpen(true)}
+              >
+                {t('home.buttons.createFolder')}
+              </Button>
               <h2 style={{ margin: 0 }}>{t('home.currentDirectory', { path: currentDirectory })}</h2>
             </div>
             <Spin spinning={loading}>
@@ -321,6 +366,29 @@ const Directories = () => {
             </Spin>
           </Content>
         </Layout>
+        <Modal
+          open={createModalOpen}
+          title={t('files.createFolder.modalTitle')}
+          okText={t('files.createFolder.okText')}
+          cancelText={t('files.createFolder.cancelText')}
+          onOk={handleCreateFolder}
+          onCancel={() => { setCreateModalOpen(false); form.resetFields(); }}
+          confirmLoading={creating}
+          destroyOnClose
+        >
+          <Form form={form} layout="vertical" preserve={false}>
+            <Form.Item
+              label={t('files.createFolder.label')}
+              name="folderName"
+              rules={[{ required: true, message: t('home.messages.createFolderInvalidName') }]}
+            >
+              <Input placeholder={t('files.createFolder.placeholder')} allowClear />
+            </Form.Item>
+            <div style={{ color: '#888', fontSize: 12 }}>
+              {t('files.createFolder.help')}: {currentDirectory}
+            </div>
+          </Form>
+        </Modal>
         {previewFile && (
           <FilePreview
             filePath={previewFile.path}

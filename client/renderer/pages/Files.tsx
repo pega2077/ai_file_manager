@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Layout, Button, message, Select, Table, Input, Tag, Space, Pagination } from 'antd';
+import { Layout, Button, message, Select, Table, Input, Tag, Space, Pagination, Modal, Form } from 'antd';
 import type { TableProps } from 'antd';
-import { ReloadOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined, QuestionCircleOutlined, FileAddOutlined } from '@ant-design/icons';
+import { ReloadOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined, QuestionCircleOutlined, FileAddOutlined, FolderAddOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import FilePreview from "../components/FilePreview";
@@ -367,6 +367,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
     fetchFiles(1);
   };
 
+
   // 初始化加载
   useEffect(() => {
     // 获取工作目录设置
@@ -493,10 +494,69 @@ const FilesPage: React.FC = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const importRef = useRef<FileImportRef>(null);
 
+  // Work directory for creating folders under
+  const [workDirectory, setWorkDirectory] = useState<string>('workdir');
+  // Create folder modal state
+  const [createFolderVisible, setCreateFolderVisible] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form] = Form.useForm<{ folderName: string }>();
+
   // Import flow is encapsulated in FileImport component now.
 
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
+  };
+
+  // Load workDirectory from app config
+  useEffect(() => {
+    const loadWorkDirectory = async () => {
+      try {
+        const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+        const wd = cfg?.workDirectory as string | undefined;
+        if (wd) setWorkDirectory(wd);
+      } catch (error) {
+        console.error('Failed to load workDirectory:', error);
+      }
+    };
+    void loadWorkDirectory();
+  }, []);
+
+  // Validate and create folder
+  const handleCreateFolder = async () => {
+    try {
+      const values = await form.validateFields();
+      const name = (values.folderName || '').trim();
+      if (!name) {
+        message.warning(t('files.messages.createFolderInvalidName'));
+        return;
+      }
+      // Simple invalid chars check for Windows and general OS
+  const invalidPattern = /[<>:"/\\|?*]/;
+      if (invalidPattern.test(name)) {
+        message.error(t('files.messages.createFolderInvalidChars'));
+        return;
+      }
+      setCreating(true);
+      const base = workDirectory.replace(/[\\/]+$/, '');
+      const targetPath = `${base}/${name}`;
+      const resp = await apiService.createDirectory(targetPath);
+      if (resp.success) {
+        message.success(t('files.messages.createFolderSuccess'));
+        setCreateFolderVisible(false);
+        form.resetFields();
+        // trigger file list refresh
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        message.error(resp.message || t('files.messages.createFolderFailed'));
+      }
+    } catch (e: unknown) {
+      // Ignore validation errors
+      if (e && typeof e === 'object' && 'errorFields' in e) return;
+      console.error('Create folder failed:', e);
+      message.error(t('files.messages.createFolderFailed'));
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -525,6 +585,13 @@ const FilesPage: React.FC = () => {
                 {t('files.buttons.refresh')}
               </Button>
               <Button
+                icon={<FolderAddOutlined />}
+                onClick={() => setCreateFolderVisible(true)}
+                size="large"
+              >
+                {t('files.buttons.createFolder')}
+              </Button>
+              <Button
                 type="primary"
                 icon={<FileAddOutlined />}
                 onClick={() => importRef.current?.startImport()}
@@ -537,6 +604,30 @@ const FilesPage: React.FC = () => {
 
           <FileList refreshTrigger={refreshTrigger} />
           <FileImport ref={importRef} onImported={() => setRefreshTrigger(prev => prev + 1)} />
+
+          <Modal
+            open={createFolderVisible}
+            title={t('files.createFolder.modalTitle')}
+            okText={t('files.createFolder.okText')}
+            cancelText={t('files.createFolder.cancelText')}
+            onOk={handleCreateFolder}
+            onCancel={() => { setCreateFolderVisible(false); form.resetFields(); }}
+            confirmLoading={creating}
+            destroyOnClose
+          >
+            <Form form={form} layout="vertical" preserve={false}>
+              <Form.Item
+                label={t('files.createFolder.label')}
+                name="folderName"
+                rules={[{ required: true, message: t('files.messages.createFolderInvalidName') }]}
+              >
+                <Input placeholder={t('files.createFolder.placeholder')} allowClear />
+              </Form.Item>
+              <div style={{ color: '#888', fontSize: 12 }}>
+                {t('files.createFolder.help')}: {workDirectory}
+              </div>
+            </Form>
+          </Modal>
         </Content>
       </Layout>
     </Layout>
