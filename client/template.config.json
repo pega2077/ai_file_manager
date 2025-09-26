@@ -1,0 +1,39 @@
+{
+  "useLocalService": false,
+  "localServicePort": 8000,
+  "localServiceHost": "127.0.0.1",
+  "llmProvider": "ollama",
+  "ollama": {
+    "ollamaEndpoint": "https://ollama.pegamob.com",
+    "ollamaModel": "qwen3:8b",
+    "ollamaEmbedModel": "bge-m3",
+    "ollamaVisionModel": "qwen2.5vl:7b",
+    "ollamaApiKey": "your_api_key_here"
+  },
+  "openai": {
+    "openaiEndpoint": "https://api.openai.com/v1",
+    "openaiApiKey": "",
+    "openaiModel": "gpt-4o-mini",
+    "openaiEmbedModel": "text-embedding-3-large",
+    "openaiVisionModel": "gpt-4o-mini"
+  },
+  "openrouter": {
+    "openrouterEndpoint": "https://openrouter.ai/api/v1",
+    "openrouterApiKey": "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",
+    "openrouterModel": "openrouter/auto",
+    "openrouterEmbedModel": "text-embedding-3-large",
+    "openrouterVisionModel": "gpt-4o-mini"
+  },
+  "fileConvertEndpoint": "https://converter.pegamob.com",
+  "sqliteDbPath": "database\\files.db",
+  "language": "zh",
+  "theme": "light",
+  "autoSave": true,
+  "showHiddenFiles": false,
+  "enablePreview": true,
+  "autoSaveRAG": true,
+  "autoClassifyWithoutConfirmation": true,
+  "workDirectory": "",
+  "isInitialized": false,
+  "apiBaseUrl": "http://localhost:8000"
+}

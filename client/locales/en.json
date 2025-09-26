@@ -14,6 +14,43 @@
     "error": "Error",
     "optional": "Optional"
   },
+  "menu": {
+    "file": "File",
+    "importFile": "Import File",
+    "clearAllData": "Clear All Data...",
+    "quit": "Quit",
+    "window": "Window",
+    "minimize": "Minimize",
+    "close": "Close",
+    "openBotWindow": "Open Bot Window",
+    "view": "View",
+    "reload": "Reload",
+    "forceReload": "Force Reload",
+    "toggleDevTools": "Toggle Developer Tools",
+    "actualSize": "Actual Size",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "help": "Help",
+    "viewLogs": "View Logs",
+    "about": "About"
+  },
+  "tray": {
+    "showMain": "Show Main Window",
+    "showBot": "Show Bot Window",
+    "viewLogs": "View Logs",
+    "closeApp": "Close App",
+    "tooltip": "AI File Manager"
+  },
+  "dialogs": {
+    "clearConfirmTitle": "Confirm Clear All Data",
+    "clearConfirmMessage": "This will permanently delete the database, vectors, and temp files. The app will then restart.",
+    "clearConfirmCancel": "Cancel",
+    "clearConfirmOk": "Delete and Restart",
+    "clearDoneTitle": "Data Cleared",
+    "clearDoneMessage": "All application data has been cleared. The app will now restart.",
+    "clearFailedTitle": "Clear Data Failed",
+    "clearFailedMessage": "Failed to clear all data. Please check logs for details."
+  },
   "setup": {
     "stepOneTitle": "Profile Details",
     "stepOneDescription": "Describe your profession and purpose.",

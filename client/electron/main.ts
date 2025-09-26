@@ -19,6 +19,7 @@ import { logger } from "./logger";
 import { configManager, AppConfig } from "./configManager";
 import { startServer as startLocalExpressServer, stopServer as stopLocalExpressServer } from "./server";
 import { ensureTempDir, getBaseDir, resolveProjectRoot } from "./backend/utils/pathHelper";
+import { i18n } from "./languageHelper";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Config is managed via ConfigManager (JSON file), electron-store removed
@@ -153,8 +154,8 @@ async function handleClearAllData(): Promise<void> {
         type: "info" as const,
         buttons: ["OK"],
         defaultId: 0,
-        title: "Data Cleared",
-        message: "All application data has been cleared. The app will now restart.",
+        title: i18n.t('dialogs.clearDoneTitle', 'Data Cleared'),
+        message: i18n.t('dialogs.clearDoneMessage', 'All application data has been cleared. The app will now restart.'),
         noLink: true,
       };
       if (win && !win.isDestroyed()) {
@@ -178,8 +179,8 @@ async function handleClearAllData(): Promise<void> {
       type: "error" as const,
       buttons: ["OK"],
       defaultId: 0,
-      title: "Clear Data Failed",
-      message: "Failed to clear all data. Please check logs for details.",
+      title: i18n.t('dialogs.clearFailedTitle', 'Clear Data Failed'),
+      message: i18n.t('dialogs.clearFailedMessage', 'Failed to clear all data. Please check logs for details.'),
       noLink: true,
     };
     if (win && !win.isDestroyed()) {
@@ -203,6 +204,8 @@ function setupIpcHandlers() {
   ipcMain.handle("locale:set-preferred", (_event, locale: string) => {
     const normalized = normalizeLocaleValue(locale);
     configManager.updateConfig({ language: normalized });
+    // Reload translations on language change
+    void i18n.load(normalized);
     return normalized;
   });
 
@@ -505,10 +508,10 @@ function createBotWindow() {
 function createMenu() {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
-      label: "File",
+      label: i18n.t('menu.file', 'File'),
       submenu: [
         {
-          label: "Import File",
+          label: i18n.t('menu.importFile', 'Import File'),
           accelerator: "CmdOrCtrl+I",
           click: async () => {
             // Select file and add to queue
@@ -553,17 +556,19 @@ function createMenu() {
         },
 
         {
-          label: "Clear All Data...",
+          label: i18n.t('menu.clearAllData', 'Clear All Data...'),
           click: async () => {
             try {
               const options = {
                 type: "warning" as const,
-                buttons: ["Cancel", "Delete and Restart"],
+                buttons: [
+                  i18n.t('dialogs.clearConfirmCancel', 'Cancel'),
+                  i18n.t('dialogs.clearConfirmOk', 'Delete and Restart')
+                ],
                 defaultId: 1,
                 cancelId: 0,
-                title: "Confirm Clear All Data",
-                message:
-                  "This will permanently delete the database, vectors, and temp files. The app will then restart.",
+                title: i18n.t('dialogs.clearConfirmTitle', 'Confirm Clear All Data'),
+                message: i18n.t('dialogs.clearConfirmMessage', 'This will permanently delete the database, vectors, and temp files. The app will then restart.'),
                 noLink: true,
               };
               const { response } = win && !win.isDestroyed()
@@ -580,7 +585,7 @@ function createMenu() {
 
         { type: "separator" },
         {
-          label: "Quit",
+          label: i18n.t('menu.quit', 'Quit'),
           accelerator: process.platform === "darwin" ? "Cmd+Q" : "Ctrl+Q",
           click: () => {
             app.quit();
@@ -590,21 +595,21 @@ function createMenu() {
     },
 
     {
-      label: "Window",
+      label: i18n.t('menu.window', 'Window'),
       submenu: [
         {
-          label: "Minimize",
+          label: i18n.t('menu.minimize', 'Minimize'),
           accelerator: "CmdOrCtrl+M",
           role: "minimize",
         },
         {
-          label: "Close",
+          label: i18n.t('menu.close', 'Close'),
           accelerator: "CmdOrCtrl+W",
           role: "close",
         },
         { type: "separator" },
         {
-          label: "Open Bot Window",
+          label: i18n.t('menu.openBotWindow', 'Open Bot Window'),
           click: () => {
             createBotWindow();
           },
@@ -613,10 +618,10 @@ function createMenu() {
     },
 
     {
-      label: "View",
+      label: i18n.t('menu.view', 'View'),
       submenu: [
         {
-          label: "Reload",
+          label: i18n.t('menu.reload', 'Reload'),
           accelerator: "CmdOrCtrl+R",
           click: () => {
             if (win) {
@@ -625,7 +630,7 @@ function createMenu() {
           },
         },
         {
-          label: "Force Reload",
+          label: i18n.t('menu.forceReload', 'Force Reload'),
           accelerator: "CmdOrCtrl+Shift+R",
           click: () => {
             if (win) {
@@ -634,7 +639,7 @@ function createMenu() {
           },
         },
         {
-          label: "Toggle Developer Tools",
+          label: i18n.t('menu.toggleDevTools', 'Toggle Developer Tools'),
           accelerator: "F12",
           click: () => {
             if (win) {
@@ -645,7 +650,7 @@ function createMenu() {
 
         { type: "separator" },
         {
-          label: "Actual Size",
+          label: i18n.t('menu.actualSize', 'Actual Size'),
           accelerator: "CmdOrCtrl+0",
           click: () => {
             if (win) {
@@ -654,7 +659,7 @@ function createMenu() {
           },
         },
         {
-          label: "Zoom In",
+          label: i18n.t('menu.zoomIn', 'Zoom In'),
           accelerator: "CmdOrCtrl+Plus",
           click: () => {
             if (win) {
@@ -663,7 +668,7 @@ function createMenu() {
           },
         },
         {
-          label: "Zoom Out",
+          label: i18n.t('menu.zoomOut', 'Zoom Out'),
           accelerator: "CmdOrCtrl+-",
           click: () => {
             if (win) {
@@ -675,17 +680,17 @@ function createMenu() {
     },
 
     {
-      label: "Help",
+      label: i18n.t('menu.help', 'Help'),
       submenu: [
         {
-          label: "View Logs",
+          label: i18n.t('menu.viewLogs', 'View Logs'),
           click: () => {
             const logFilePath = logger.getLogFilePath();
             shell.openPath(logFilePath);
           },
         },
         {
-          label: "About",
+          label: i18n.t('menu.about', 'About'),
           click: () => {
             // Show about dialog
           },
@@ -709,7 +714,7 @@ function createTray() {
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: "Show Main Window",
+      label: i18n.t('tray.showMain', 'Show Main Window'),
       click: () => {
         if (!win || win.isDestroyed()) {
           createWindow();
@@ -723,7 +728,7 @@ function createTray() {
     },
 
     {
-      label: "Show Bot Window",
+      label: i18n.t('tray.showBot', 'Show Bot Window'),
       click: () => {
         if (!botWin || botWin.isDestroyed()) {
           createBotWindow();
@@ -736,7 +741,7 @@ function createTray() {
     },
     { type: "separator" },
     {
-      label: "View Logs",
+      label: i18n.t('tray.viewLogs', 'View Logs'),
       click: () => {
         const logFilePath = logger.getLogFilePath();
         shell.openPath(logFilePath);
@@ -745,7 +750,7 @@ function createTray() {
     // Removed Python backend control from tray menu
     { type: "separator" },
     {
-      label: "Close App",
+      label: i18n.t('tray.closeApp', 'Close App'),
       click: () => {
         win?.destroy();
         botWin?.destroy();
@@ -755,7 +760,7 @@ function createTray() {
   ]);
 
   tray.setContextMenu(contextMenu);
-  tray.setToolTip("AI File Manager");
+  tray.setToolTip(i18n.t('tray.tooltip', 'AI File Manager'));
 }
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -791,6 +796,9 @@ app.whenReady().then(async () => {
   // 读取配置文件
   const appConfig = configManager.loadConfig();
   logger.info('Loaded configuration:', appConfig);
+
+  // Load i18n dictionaries for main process
+  await i18n.load(appConfig.language);
 
   setupIpcHandlers();
   setupBotWindowHandlers();

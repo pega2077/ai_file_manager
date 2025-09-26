@@ -14,6 +14,43 @@
     "error": "发生错误",
     "optional": "选填"
   },
+  "menu": {
+    "file": "文件",
+    "importFile": "导入文件",
+    "clearAllData": "清除所有数据...",
+    "quit": "退出",
+    "window": "窗口",
+    "minimize": "最小化",
+    "close": "关闭",
+    "openBotWindow": "打开助手窗口",
+    "view": "视图",
+    "reload": "重新加载",
+    "forceReload": "强制重新加载",
+    "toggleDevTools": "切换开发者工具",
+    "actualSize": "实际大小",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "help": "帮助",
+    "viewLogs": "查看日志",
+    "about": "关于"
+  },
+  "tray": {
+    "showMain": "显示主窗口",
+    "showBot": "显示助手窗口",
+    "viewLogs": "查看日志",
+    "closeApp": "退出应用",
+    "tooltip": "AI 文件管家"
+  },
+  "dialogs": {
+    "clearConfirmTitle": "确认清除所有数据",
+    "clearConfirmMessage": "此操作将永久删除数据库、向量库和临时文件，应用将会重启。",
+    "clearConfirmCancel": "取消",
+    "clearConfirmOk": "删除并重启",
+    "clearDoneTitle": "数据已清除",
+    "clearDoneMessage": "应用数据已清除，程序将立即重启。",
+    "clearFailedTitle": "清除数据失败",
+    "clearFailedMessage": "清除数据失败，请查看日志以获取详情。"
+  },
   "setup": {
     "stepOneTitle": "基础信息",
     "stepOneDescription": "描述你的职业与目标用途。",
