@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setPreferredLocale: (locale: string) => ipcRenderer.invoke('locale:set-preferred', locale),
   getSystemLocale: () => ipcRenderer.invoke('locale:get-system'),
   logError: (message: string, meta?: unknown) => ipcRenderer.invoke('log:error', message, meta),
+  quitApp: () => ipcRenderer.invoke('quit-app'),
 })
 
 // Legacy electronStore bridge removed in favor of ConfigManager via IPC

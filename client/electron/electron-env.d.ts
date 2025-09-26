@@ -42,6 +42,7 @@ interface Window {
     setPreferredLocale: (locale: string) => Promise<string>
     getSystemLocale: () => Promise<string>
     logError: (message: string, meta?: unknown) => Promise<boolean>
+    quitApp: () => Promise<boolean>
   }
 }
 

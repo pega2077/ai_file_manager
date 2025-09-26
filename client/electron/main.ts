@@ -265,6 +265,13 @@ function setupIpcHandlers() {
     return true;
   });
 
+  // IPC handler to quit the application
+  ipcMain.handle("quit-app", () => {
+    logger.info('Quit requested via IPC');
+    app.quit();
+    return true;
+  });
+
   // Removed deprecated sync-language-config IPC handler
 }
 

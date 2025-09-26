@@ -33,7 +33,14 @@ const Bot: React.FC = () => {
 
   const handleMenuClick = async (key: string) => {
     setMenuVisible(false);
-    if (key === 'showMain') {
+    if (key === 'importFile') {
+      try {
+        await importRef.current?.startImport();
+      } catch (error) {
+        console.error('Failed to import file via menu:', error);
+        message.error(t('files.messages.fileImportFailed'));
+      }
+    } else if (key === 'showMain') {
       try {
         await window.electronAPI.showMainWindow();
       } catch (error) {
@@ -64,6 +71,12 @@ const Bot: React.FC = () => {
       } catch (error) {
         console.error('Failed to open work directory:', error);
         message.error('打开工作目录失败');
+      }
+    } else if (key === 'exitApp') {
+      try {
+        await window.electronAPI.quitApp();
+      } catch (error) {
+        console.error('Failed to quit application:', error);
       }
     }
   };
@@ -220,9 +233,12 @@ const Bot: React.FC = () => {
           onClick={() => setMenuVisible(false)}
         >
           <Menu onClick={({ key }) => handleMenuClick(key as string)}>
+            <Menu.Item key="importFile">导入文件</Menu.Item>
             <Menu.Item key="openWorkdir">打开工作目录</Menu.Item>
             <Menu.Item key="showMain">显示主窗口</Menu.Item>
             <Menu.Item key="hideBot">隐藏机器人</Menu.Item>
+            <Menu.Divider />
+            <Menu.Item danger key="exitApp">退出程序</Menu.Item>
           </Menu>
         </div>
       )}
