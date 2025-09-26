@@ -49,7 +49,8 @@ export function getBaseDir(): string {
  */
 export function resolveProjectRoot(): string {
   const base = getBaseDir();
-  return app.isPackaged ? path.join(base, "..") : path.join(base, "..", "..");
+  //console.log('Base dir for project root resolution:', base);
+  return app.isPackaged ? path.join(base, "..") : base;
 }
 
 /**
