@@ -162,10 +162,23 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
   };
 
   const processFile = useCallback(async (filePath: string) => {
+    // Always refresh latest config at the start of an import
+    let latestWorkDir = workDirectory;
+    try {
+      const cfg0 = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+      if (cfg0?.workDirectory && cfg0.workDirectory !== workDirectory) {
+        latestWorkDir = cfg0.workDirectory;
+        // keep state in sync for subsequent UI steps (confirm dialogs use state)
+        setWorkDirectory(cfg0.workDirectory);
+      }
+    } catch {
+      // If fetching config fails, proceed with existing state value
+    }
+
     // 1) Load directory structure with error handling
     let directoryStructureResponse: Awaited<ReturnType<typeof apiService.listDirectoryRecursive>>;
     try {
-      directoryStructureResponse = await apiService.listDirectoryRecursive(workDirectory);
+      directoryStructureResponse = await apiService.listDirectoryRecursive(latestWorkDir);
     } catch (err) {
       message.error(t('files.messages.getDirectoryStructureFailed'));
       window.electronAPI?.logError?.('listDirectoryRecursive failed', { err: String(err) });
@@ -226,9 +239,9 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
 
     if (autoClassifyWithoutConfirmation) {
       const separator = getPathSeparator();
-      const fullTargetDirectory = recommendedDirectory.startsWith(workDirectory)
+      const fullTargetDirectory = recommendedDirectory.startsWith(latestWorkDir)
         ? recommendedDirectory
-        : `${workDirectory}${separator}${recommendedDirectory.replace(/\//g, separator)}`;
+        : `${latestWorkDir}${separator}${recommendedDirectory.replace(/\//g, separator)}`;
 
       const saveResponse = await apiService.saveFile(filePath, fullTargetDirectory, false);
       if (saveResponse.success) {
@@ -270,6 +283,11 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
 
   const handleStartImport = useCallback(async () => {
     try {
+      // Refresh latest config before importing
+      const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+      if (cfg?.workDirectory && cfg.workDirectory !== workDirectory) {
+        setWorkDirectory(cfg.workDirectory);
+      }
       const filePath = await window.electronAPI.selectFile();
       if (!filePath) return;
       await processFile(filePath);
@@ -277,7 +295,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
       message.error(t('files.messages.fileImportFailed'));
       window.electronAPI?.logError?.('handleStartImport failed', { err: String(error) });
     }
-  }, [processFile, t]);
+  }, [processFile, t, workDirectory]);
 
   // Expose imperative API
   useImperativeHandle(ref, () => ({ startImport: handleStartImport, importFile: processFile }), [handleStartImport, processFile]);
