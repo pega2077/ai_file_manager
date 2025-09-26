@@ -1,4 +1,5 @@
 import { configManager } from "../../configManager";
+import { logger } from "../../logger";
 import type { SupportedLang } from "./promptHelper";
 import {
   generateStructuredJsonWithOllama,
@@ -13,7 +14,6 @@ import {
   describeImageWithOpenAI,
 } from "./openai";
 import {
-  embedWithOpenRouter,
   generateStructuredJsonWithOpenRouter,
   describeImageWithOpenRouter,
 } from "./openrouter";
@@ -58,7 +58,9 @@ export async function embedText(inputs: string[], overrideModel?: string): Promi
     return embedWithOpenAI(inputs, overrideModel);
   }
   if (provider === "openrouter") {
-    return embedWithOpenRouter(inputs, overrideModel);
+    // OpenRouter does not currently support embeddings reliably; fall back to Ollama embeddings
+    // logger.warn("OpenRouter embeddings not supported; falling back to Ollama embedding model");
+    return embedWithOllama(inputs, overrideModel);
   }
   return embedWithOllama(inputs, overrideModel);
 }

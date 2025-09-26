@@ -148,6 +148,37 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
 
   const isImagePath = (p: string) => /\.(jpg|jpeg|png|gif|bmp|webp|svg|ico)$/i.test(p);
 
+  // Show long descriptions in segmented messages: split by Chinese/English period or newline
+  const showSegmentedInfo = useCallback((text: string) => {
+    try {
+      const normalized = String(text ?? '').replace(/\r\n/g, '\n');
+      const segments = normalized
+        .split(/[。.\n]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      segments.forEach((seg, idx) => {
+        setTimeout(() => {
+          try {
+            if (idx === 0) {
+              message.info(t('files.messages.imageDescription', { text: seg }), 2);
+            } else {
+              message.info(seg, 2);
+            }
+
+            if(idx >= 10) {
+              // stop after 10 segments to avoid flooding
+              return;
+            }
+          } catch {
+            // ignore message rendering failures
+          }
+        }, idx * 2000);
+      });
+    } catch {
+      // ignore
+    }
+  }, [t]);
+
   const fileToBase64 = async (path: string): Promise<string> => {
     // Rely on preview endpoint to get data URL for images to avoid Node fs in renderer.
     try {
@@ -210,8 +241,8 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
           if (descResp.success && descResp.data && typeof descResp.data.description === 'string') {
             contentForAnalysis = descResp.data.description;
             try {
-              // Show the description to the user
-              message.info(t('files.messages.imageDescription', { text: contentForAnalysis }), 6);
+              // Show the description segmented for readability
+              showSegmentedInfo(contentForAnalysis);
             } catch {
               // best-effort UI feedback
             }
@@ -293,7 +324,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
         directoryStructureResponse.data as DirectoryStructureResponse,
       );
     }
-  }, [workDirectory, t, extractDirectoriesFromStructure, showImportConfirmationDialog, onImported]);
+  }, [workDirectory, t, extractDirectoriesFromStructure, showImportConfirmationDialog, onImported, showSegmentedInfo]);
 
   const handleStartImport = useCallback(async () => {
     try {
@@ -345,7 +376,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
                 if (descResp.success && descResp.data && typeof descResp.data.description === 'string') {
                   contentForAnalysis = descResp.data.description;
                   try {
-                    message.info(t('files.messages.imageDescription', { text: contentForAnalysis }), 6);
+                    showSegmentedInfo(contentForAnalysis);
                   } catch {
                     // ignore message rendering failures
                   }

@@ -554,7 +554,7 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
           prompt: "Describe this image in Chinese, include key objects, text, scenes, and potential tags.",
         });
       } catch (e) {
-        logger.warn("Image description via Ollama failed, continuing with empty description", e as unknown);
+        logger.warn("Image description via vision provider failed, continuing with empty description", e as unknown);
         description = "";
       }
       // Save a temp txt containing the description for chunking/embedding
