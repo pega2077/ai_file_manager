@@ -170,13 +170,13 @@ const Setup = () => {
         if (response.success) {
         await window.electronAPI.updateAppConfig({ isInitialized: true, workDirectory: selectedFolder });
 
-        // 更新系统配置中的工作目录
-        try {
-          await apiService.updateSystemConfig({ workdir_path: selectedFolder });
-        } catch (configError) {
-          console.warn('Failed to update system config:', configError);
-          // 不阻止初始化流程
-        }
+        // // 更新系统配置中的工作目录
+        // try {
+        //   await apiService.updateSystemConfig({ workdir_path: selectedFolder });
+        // } catch (configError) {
+        //   console.warn('Failed to update system config:', configError);
+        //   // 不阻止初始化流程
+        // }
 
         message.success(t('setup.messages.createSuccess'));
         navigate('/files');

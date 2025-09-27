@@ -2,7 +2,7 @@
 import { Layout, Card, Typography, Switch, Input, Button, message, Modal, Select } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiService, updateApiBaseUrl } from '../services/api';
+import { updateApiBaseUrl } from '../services/api';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 import { defaultLocale, normalizeLocale, type SupportedLocale } from '../shared/i18n';
 
@@ -178,18 +178,11 @@ const Settings = () => {
       okType: 'danger',
       onOk: async () => {
         try {
-          const response = await apiService.clearAllData();
-          if (response.success) {
-            await window.electronAPI.updateAppConfig({ isInitialized: false, workDirectory: '' });
-            setSettings((prev) => ({ ...prev, workDirectory: '' }));
-            message.success(t('settings.messages.clearSuccess'));
-          } else {
-            message.error(
-              t('settings.messages.clearError', {
-                reason: response.message ?? t('settings.messages.unknownError'),
-              }),
-            );
-          }
+          // Mark app as uninitialized before restarting
+          await window.electronAPI.updateAppConfig({ isInitialized: false, workDirectory: '' });
+          setSettings((prev) => ({ ...prev, workDirectory: '' }));
+          // Use Electron main process to clear data and relaunch the app
+          await window.electronAPI.clearAllData();
         } catch (error) {
           message.error(t('settings.messages.clearException'));
           console.error('Clear data error:', error);
