@@ -81,13 +81,13 @@ export async function listFilesHandler(req: Request, res: Response): Promise<voi
     const totalCount = await FileModel.count({ where });
 
     const offset = (page - 1) * limit;
-    const rows = await FileModel.findAll({
+    const rows = (await FileModel.findAll({
       where,
-  order: [["created_at", "DESC"]],
+      order: [["created_at", "DESC"]],
       limit,
       offset,
       raw: true,
-    });
+    })) as unknown as RawFileRow[];
 
     type RawFileRow = {
       file_id: string;
@@ -98,10 +98,11 @@ export async function listFilesHandler(req: Request, res: Response): Promise<voi
       summary: string | null;
       tags: string | null;
       size: number;
+      processed: boolean | number | null;
       created_at: string;
       updated_at: string | null;
     };
-    const files = rows.map((row: RawFileRow) => {
+    const files = (rows as RawFileRow[]).map((row) => {
       const tagsArr = (() => {
         try {
           return row.tags ? (JSON.parse(row.tags) as unknown as string[]) : [];
@@ -118,6 +119,7 @@ export async function listFilesHandler(req: Request, res: Response): Promise<voi
         summary: row.summary ?? "",
         tags: tagsArr,
         size: row.size,
+        processed: Boolean(row.processed ?? false),
         created_at: row.created_at,
         updated_at: row.updated_at,
       };
