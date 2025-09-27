@@ -1,5 +1,4 @@
 import { configManager } from "../../configManager";
-import { logger } from "../../logger";
 import type { SupportedLang } from "./promptHelper";
 import {
   generateStructuredJsonWithOllama,
@@ -16,6 +15,7 @@ import {
 import {
   generateStructuredJsonWithOpenRouter,
   describeImageWithOpenRouter,
+  embedWithOpenRouter,
 } from "./openrouter";
 
 export type LlmMessage = OllamaMessage; // role + string content
@@ -41,7 +41,8 @@ export function getActiveModelName(task: LlmTask, providerOverride?: ProviderNam
   }
   if (provider === "openrouter") {
     const oc = cfg.openrouter || {};
-    if (task === "embed") return oc.openrouterEmbedModel || oc.openrouterModel || "";
+    // Embedding for OpenRouter uses separate endpoint; still expose model for UI/readouts
+    if (task === "embed") return oc.openrouterEmbedModel || "";
     if (task === "vision") return oc.openrouterVisionModel || oc.openrouterModel || "";
     return oc.openrouterModel || "";
   }
@@ -58,9 +59,7 @@ export async function embedText(inputs: string[], overrideModel?: string): Promi
     return embedWithOpenAI(inputs, overrideModel);
   }
   if (provider === "openrouter") {
-    // OpenRouter does not currently support embeddings reliably; fall back to Ollama embeddings
-    // logger.warn("OpenRouter embeddings not supported; falling back to Ollama embedding model");
-    return embedWithOllama(inputs, overrideModel);
+    return embedWithOpenRouter(inputs, overrideModel);
   }
   return embedWithOllama(inputs, overrideModel);
 }

@@ -1,12 +1,13 @@
-// OpenRouter utility wrapper (OpenAI-compatible)
+// OpenRouter utility wrapper (OpenAI-compatible for chat; external endpoint for embeddings)
 // Configuration:
 // - Set `openrouter.openrouterApiKey` and optional `openrouter.openrouterEndpoint` in config.json,
 //   or provide env `OPENROUTER_API_KEY`.
-// - Default endpoint: https://openrouter.ai/api/v1
-// - Models are configurable via ConfigManager: `openrouterModel`, `openrouterEmbedModel`, `openrouterVisionModel`.
+// - Default chat base endpoint: https://openrouter.ai/api/v1
+// - Embeddings use a separate endpoint with Ollama-compatible format: see `openrouter.openrouterEmbedEndpoint`.
 import OpenAI from "openai";
 import { configManager } from "../../configManager";
 import { logger } from "../../logger";
+import { httpPostJson } from "./httpClient";
 import type {
   ChatCompletionMessageParam,
   ChatCompletionContentPart,
@@ -92,19 +93,37 @@ function getClient() {
   return new OpenAI({ apiKey, baseURL, defaultHeaders: { "HTTP-Referer": "https://github.com/pega2077/ai_file_manager", "X-Title": "AI File Manager" } });
 }
 
-export async function embedWithOpenRouter(inputs: string[], overrideModel?: string): Promise<number[][]> {
-  if (!Array.isArray(inputs) || inputs.length === 0) return [];
+// Embedding request/response types aligned with Ollama /api/embed
+export interface OpenRouterEmbedRequest { input: string | string[]; model?: string }
+export interface OpenRouterEmbedResponse { model?: string; embeddings: number[][] }
+
+export async function embedWithOpenRouter(inputs: string[] | string, overrideModel?: string): Promise<number[][]> {
+  const arr = Array.isArray(inputs) ? inputs : [inputs];
+  if (arr.length === 0) return [];
   const cfg = configManager.getConfig();
   const oc = cfg.openrouter || {};
-  const model = overrideModel || oc.openrouterEmbedModel || oc.openrouterModel || "text-embedding-3-large";
-  const client = getClient();
-  try {
-    const resp = await client.embeddings.create({ model, input: inputs });
-    return resp.data.map((d) => d.embedding as number[]);
-  } catch (e) {
-    logger.error("embedWithOpenRouter failed", e as unknown);
-    throw e;
+  const endpoint = (oc.openrouterEmbedEndpoint || "https://embed.pegamob.com").replace(/\/$/, "");
+  const url = `${endpoint}/api/embed`;
+  const model = overrideModel || oc.openrouterEmbedModel || "all-MiniLM-L6-v2";
+  const payload: OpenRouterEmbedRequest = { model, input: Array.isArray(inputs) ? inputs : inputs };
+  const token = (oc.openrouterEmbedKey || "").trim() || undefined;
+  const resp = await httpPostJson<OpenRouterEmbedResponse>(
+    url,
+    payload,
+    { Accept: "application/json" },
+    60000,
+    token
+  );
+  if (!resp.ok || !resp.data) {
+    const msg = resp.error?.message || `Failed embedding via OpenRouter embed endpoint: HTTP ${resp.status}`;
+    logger.error("embedWithOpenRouter failed", msg);
+    throw new Error(msg);
   }
+  const embeddings = resp.data.embeddings;
+  if (!embeddings || !Array.isArray(embeddings)) {
+    throw new Error("Invalid embedding response from OpenRouter embed endpoint");
+  }
+  return embeddings;
 }
 
 export async function generateStructuredJsonWithOpenRouter(

@@ -37,8 +37,12 @@ export interface AppConfig {
     openrouterApiKey?: string;
     /** Default chat/completion model for OpenRouter */
     openrouterModel?: string;
-    /** Default embedding model for OpenRouter */
+    /** Default embedding model name for external embed endpoint */
     openrouterEmbedModel?: string;
+    /** Embedding service endpoint (Ollama-compatible /api/embed) */
+    openrouterEmbedEndpoint?: string;
+    /** Embedding service API key (if required by gateway) */
+    openrouterEmbedKey?: string;
     /** Default vision-capable model for OpenRouter */
     openrouterVisionModel?: string;
   };
@@ -105,7 +109,9 @@ const DEFAULT_CONFIG: AppConfig = {
     openrouterEndpoint: "https://openrouter.ai/api/v1",
     openrouterApiKey: undefined,
     openrouterModel: "openai/gpt-oss-20b:free",
-    openrouterEmbedModel: "text-embedding-3-large",
+    openrouterEmbedModel: "all-MiniLM-L6-v2",
+    openrouterEmbedEndpoint: "https://embed.pegamob.com",
+    openrouterEmbedKey: undefined,
     openrouterVisionModel: "google/gemma-3-12b-it:free",
   },
   fileConvertEndpoint: "",
