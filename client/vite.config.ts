@@ -30,6 +30,10 @@ export default defineConfig({
                 'tedious',
                 'mariadb',
                 'faiss-node',
+                // Native image library - keep external to avoid bundling issues
+                'sharp',
+                '@img/sharp-win32-x64',
+                '@img/sharp-wasm32',
               ],
             },
           },

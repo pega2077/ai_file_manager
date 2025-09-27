@@ -234,13 +234,18 @@ class ApiService {
     });
   }
 
-  // 文件预览
-  async previewFile(filePath: string) {
+  // 文件预览（支持缩放图片）
+  async previewFile(
+    filePath: string,
+    opts?: { origin?: boolean; maxWidth?: number; maxHeight?: number }
+  ) {
+    const payload: Record<string, unknown> = { file_path: filePath };
+    if (typeof opts?.origin === 'boolean') payload.origin = opts.origin;
+    if (typeof opts?.maxWidth === 'number') payload.max_width = opts.maxWidth;
+    if (typeof opts?.maxHeight === 'number') payload.max_height = opts.maxHeight;
     return this.request('/files/preview', {
       method: 'POST',
-      body: JSON.stringify({
-        file_path: filePath,
-      }),
+      body: JSON.stringify(payload),
     });
   }
 

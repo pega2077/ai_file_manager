@@ -180,13 +180,12 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(({ onImported }, r
   }, [t]);
 
   const fileToBase64 = async (path: string): Promise<string> => {
-    // Rely on preview endpoint to get data URL for images to avoid Node fs in renderer.
+    // Use backend preview with downscaling to avoid large payloads.
     try {
-      const preview = await apiService.previewFile(path);
+      const preview = await apiService.previewFile(path, { origin: false, maxWidth: 500, maxHeight: 500 });
       if (preview.success) {
         const data = preview.data as { content?: string; file_type?: string } | undefined;
         if (data && data.file_type === 'image' && typeof data.content === 'string') {
-          // content is a data URL; pass directly to backend which strips it if needed
           return data.content;
         }
       }

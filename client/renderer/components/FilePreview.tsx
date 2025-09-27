@@ -29,7 +29,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
     const loadPreview = async () => {
       setLoading(true);
       try {
-        const response = await apiService.previewFile(filePath);
+  const response = await apiService.previewFile(filePath, { origin: true });
         if (response.success) {
           setPreviewData(response.data as PreviewData);
         } else {

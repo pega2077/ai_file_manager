@@ -184,8 +184,13 @@ export function registerFilesRoutes(app: Express) {
 // -------- Handlers --------
 export async function previewFileHandler(req: Request, res: Response): Promise<void> {
   try {
-    const body = req.body as { file_path?: unknown } | undefined;
+    const body = req.body as { file_path?: unknown; origin?: unknown; max_width?: unknown; max_height?: unknown } | undefined;
     const filePath = typeof body?.file_path === "string" ? body.file_path : undefined;
+  const origin = typeof body?.origin === "boolean" ? body.origin : true;
+  const mw = toNumber(body?.max_width, 0);
+  const mh = toNumber(body?.max_height, 0);
+  const maxWidth = mw > 0 ? Math.min(4096, mw) : 0;
+  const maxHeight = mh > 0 ? Math.min(4096, mh) : 0;
     if (!filePath) {
       res.status(400).json({
         success: false,
@@ -227,23 +232,76 @@ export async function previewFileHandler(req: Request, res: Response): Promise<v
     const size = stat.size;
 
     if (isImageExt(ext)) {
-      const data = await fsp.readFile(filePath);
-      const base64 = data.toString("base64");
-      res.status(200).json({
-        success: true,
-        message: "ok",
-        data: {
-          file_path: filePath,
-          file_type: "image",
-          mime_type: mime,
-          content: `data:${mime};base64,${base64}`,
-          size,
-        },
-        error: null,
-        timestamp: new Date().toISOString(),
-        request_id: "",
-      });
-      return;
+      try {
+        let data: Buffer;
+        if (!origin && (maxWidth > 0 || maxHeight > 0)) {
+          // Lazy load sharp to avoid dependency if not needed elsewhere
+          // Try requiring sharp normally; in packaged app also attempt to load from extraResources
+          // Use unknown to avoid any, cast at call site
+          let sharpMod: unknown;
+          try {
+            sharpMod = (await import('sharp')).default;
+          } catch (e) {
+            try {
+              const appRoot = app.getAppPath();
+              // When packaged with electron-builder, extra resources are placed alongside app.asar
+              const candidate = path.resolve(appRoot, '..', 'resources', 'sharp');
+              // eslint-disable-next-line @typescript-eslint/no-var-requires
+              sharpMod = require(path.join(candidate, 'lib', 'sharp')); // attempt common path
+            } catch {
+              throw e;
+            }
+          }
+          const image = (sharpMod as (fp: string, opts?: unknown) => { resize: (o: unknown) => { toBuffer: () => Promise<Buffer> } })(filePath, { failOn: 'none' });
+          const resized = image.resize({
+            width: maxWidth > 0 ? maxWidth : undefined,
+            height: maxHeight > 0 ? maxHeight : undefined,
+            fit: 'inside',
+            withoutEnlargement: true,
+          });
+          data = await resized.toBuffer();
+        } else {
+          data = await fsp.readFile(filePath);
+        }
+        const base64 = data.toString('base64');
+        res.status(200).json({
+          success: true,
+          message: 'ok',
+          data: {
+            file_path: filePath,
+            file_type: 'image',
+            mime_type: mime,
+            content: `data:${mime};base64,${base64}`,
+            size,
+            origin,
+            max_width: maxWidth > 0 ? maxWidth : null,
+            max_height: maxHeight > 0 ? maxHeight : null,
+          },
+          error: null,
+          timestamp: new Date().toISOString(),
+          request_id: '',
+        });
+        return;
+      } catch (e) {
+        logger.warn('Image resize/encode failed, falling back to original', { err: String(e) });
+        const data = await fsp.readFile(filePath);
+        const base64 = data.toString('base64');
+        res.status(200).json({
+          success: true,
+          message: 'ok',
+          data: {
+            file_path: filePath,
+            file_type: 'image',
+            mime_type: mime,
+            content: `data:${mime};base64,${base64}`,
+            size,
+          },
+          error: null,
+          timestamp: new Date().toISOString(),
+          request_id: '',
+        });
+        return;
+      }
     }
 
     // Text-like preview (default)

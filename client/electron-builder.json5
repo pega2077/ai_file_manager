@@ -21,6 +21,19 @@
       "from": "locales",
       "to": "locales"
     }
+    ,
+    {
+      // Include sharp native binaries if present
+      "from": "node_modules/sharp/",
+      "to": "resources/sharp",
+      "filter": [
+        "**/*.node",
+        "**/*.dll",
+        "**/*.dylib",
+        "**/*.so*",
+        "**/*.wasm"
+      ]
+    }
   ],
   "mac": {
     "target": [
