@@ -613,7 +613,7 @@ const FilesPage: React.FC = () => {
             onOk={handleCreateFolder}
             onCancel={() => { setCreateFolderVisible(false); form.resetFields(); }}
             confirmLoading={creating}
-            destroyOnClose
+            destroyOnHidden
           >
             <Form form={form} layout="vertical" preserve={false}>
               <Form.Item

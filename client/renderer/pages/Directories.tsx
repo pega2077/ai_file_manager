@@ -374,7 +374,7 @@ const Directories = () => {
           onOk={handleCreateFolder}
           onCancel={() => { setCreateModalOpen(false); form.resetFields(); }}
           confirmLoading={creating}
-          destroyOnClose
+          destroyOnHidden
         >
           <Form form={form} layout="vertical" preserve={false}>
             <Form.Item
