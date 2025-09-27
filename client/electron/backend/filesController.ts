@@ -9,11 +9,13 @@ import { MAX_TEXT_PREVIEW_BYTES, getMimeByExt, isImageExt, decodeTextBuffer, CAT
 import { ensureTxtFile, chunkText } from "./utils/fileConversion";
 import { ensureTempDir } from "./utils/pathHelper";
 import { embedText, generateStructuredJson, describeImage } from "./utils/llm";
+import { buildVisionDescribePrompt, normalizeLanguage } from "./utils/promptHelper";
 import type { ProviderName } from "./utils/llm";
 import { app } from "electron";
 import { randomUUID } from "crypto";
 import ChunkModel from "./models/chunk";
 import { updateGlobalFaissIndex } from "./utils/vectorStore";
+import { configManager } from "../configManager";
 
 interface ListFilesRequestBody {
   page?: unknown;
@@ -551,16 +553,17 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
       const buf = await fsp.readFile(filePath);
       const base64 = buf.toString("base64");
       let description = "";
+      const cfg = configManager.getConfig();
+      const language = normalizeLanguage(cfg.language ?? "zh", "zh");
+      const visionPrompt = buildVisionDescribePrompt(language);
       try {
-        description = await describeImage(base64, {
-          prompt: "Describe this image in Chinese, include key objects, text, scenes, and potential tags.",
-        });
+        description = await describeImage(base64, { prompt: visionPrompt });
       } catch (e) {
         logger.warn("Image description via vision provider failed, continuing with empty description", e as unknown);
         description = "";
       }
       // Save a temp txt containing the description for chunking/embedding
-  const tempDir = await ensureTempDir();
+      const tempDir = await ensureTempDir();
       txtPath = path.join(tempDir, `${Date.now()}_${path.basename(filePath, path.extname(filePath))}_vision.txt`);
       content = description || `Image file ${path.basename(filePath)}.`;
       await fsp.writeFile(txtPath, content, "utf8");
@@ -571,14 +574,14 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
     }
     // 2) chunk
     const chunks = chunkText(content, chunkSize, overlap);
-  // 3) embed via active provider
-  const embeddings = await embedText(chunks, model);
+    // 3) embed via active provider
+    const embeddings = await embedText(chunks, model);
     if (embeddings.length !== chunks.length) {
       throw new Error("Embeddings count does not match chunks count");
     }
 
-  // 4) Persist chunks to DB (replace existing for file_id)
-  const nowIso = new Date().toISOString();
+    // 4) Persist chunks to DB (replace existing for file_id)
+    const nowIso = new Date().toISOString();
     // Capture previous chunk row ids to remove stale vectors from FAISS
     const prevChunkRows = (await ChunkModel.findAll({ where: { file_id: fileId }, attributes: ["id"], raw: true }).catch(() => [])) as Array<{ id: number }>;
     const prevChunkIds = prevChunkRows.map((r) => r.id);
@@ -588,31 +591,35 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
     } catch (e) {
       logger.warn("Failed to clear existing chunks", e as unknown);
     }
-  const bulkRows = chunks.map((c, i) => ({
-    chunk_id: `${fileId}_chunk_${i}`,
-    file_id: fileId,
-    chunk_index: i,
-    content: c,
-    content_type: "text",
-    char_count: c.length,
-    token_count: c.split(/\s+/).filter(Boolean).length,
-    embedding_id: `${fileId}_chunk_${i}`,
-    start_pos: null as number | null,
-    end_pos: null as number | null,
-    created_at: nowIso,
-  }));
-  await ChunkModel.bulkCreate(bulkRows);
-  // Re-query to get actual chunk IDs in correct order
-  const savedChunks = await ChunkModel.findAll({ where: { file_id: fileId }, order: [["chunk_index", "ASC"]], raw: true }) as Array<{ id: number; chunk_index: number; }>;
-  const chunkIds = savedChunks.map((r) => r.id);
+    const bulkRows = chunks.map((c, i) => ({
+      chunk_id: `${fileId}_chunk_${i}`,
+      file_id: fileId,
+      chunk_index: i,
+      content: c,
+      content_type: "text",
+      char_count: c.length,
+      token_count: c.split(/\s+/).filter(Boolean).length,
+      embedding_id: `${fileId}_chunk_${i}`,
+      start_pos: null as number | null,
+      end_pos: null as number | null,
+      created_at: nowIso,
+    }));
+    await ChunkModel.bulkCreate(bulkRows);
+    // Re-query to get actual chunk IDs in correct order
+    const savedChunks = await ChunkModel.findAll({ where: { file_id: fileId }, order: [["chunk_index", "ASC"]], raw: true }) as Array<{ id: number; chunk_index: number }>;
+    const chunkIds = savedChunks.map((r) => r.id);
 
-    // If this was an image, also update file summary with the description for quick preview
-    if (isImage) {
-      try {
-        await FileModel.update({ summary: content, updated_at: nowIso, processed: true }, { where: { file_id: fileId } });
-      } catch (e) {
-        logger.warn("Failed to update file summary after image description", e as unknown);
-      }
+    const fileUpdate: { processed: boolean; updated_at: string; summary?: string } = {
+      processed: true,
+      updated_at: nowIso,
+    };
+    if (isImage && content) {
+      fileUpdate.summary = content;
+    }
+    try {
+      await FileModel.update(fileUpdate, { where: { file_id: fileId } });
+    } catch (e) {
+      logger.warn("Failed to update file metadata after RAG import", e as unknown);
     }
 
     // 5) Update global FAISS index using chunk IDs as vector IDs

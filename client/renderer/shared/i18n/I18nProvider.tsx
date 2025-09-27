@@ -105,6 +105,7 @@ export function I18nProvider({ children, initialLocale }: I18nProviderProps) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTranslation() {
   const context = useContext(I18nContext)
 
