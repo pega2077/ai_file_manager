@@ -96,7 +96,7 @@ export interface AppConfig {
   localServicePort: number;
   localServiceHost: string;
   /** Selected LLM provider for chat/completions */
-  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter';
+  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian';
   ollamaEndpoint?: string;
   ollamaModel?: string;
   ollamaEmbedModel?: string;

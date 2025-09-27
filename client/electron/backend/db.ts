@@ -3,7 +3,6 @@ import path from "path";
 import fs from "fs";
 import { configManager } from "../configManager";
 import { logger } from "../logger";
-import {app} from "electron";
 
 // Initialize Sequelize with SQLite using configured database path
 const config = configManager.loadConfig();

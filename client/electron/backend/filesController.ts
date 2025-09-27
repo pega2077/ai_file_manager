@@ -940,6 +940,8 @@ export async function recommendDirectoryHandler(req: Request, res: Response): Pr
       ? "azure-openai"
       : providerRaw === "openrouter"
       ? "openrouter"
+      : providerRaw === "bailian" || providerRaw === "aliyun" || providerRaw === "dashscope"
+      ? "bailian"
       : providerRaw === "ollama"
       ? "ollama"
       : undefined;

@@ -17,17 +17,25 @@ import {
   describeImageWithOpenRouter,
   embedWithOpenRouter,
 } from "./openrouter";
+import {
+  embedWithBailian,
+  generateStructuredJsonWithBailian,
+  describeImageWithBailian,
+} from "./bailian";
 
 export type LlmMessage = OllamaMessage; // role + string content
 
 export type LlmTask = "chat" | "embed" | "vision";
 
-export type ProviderName = "ollama" | "openai" | "azure-openai" | "openrouter";
+export type ProviderName = "ollama" | "openai" | "azure-openai" | "openrouter" | "bailian";
 
 export function getActiveProvider(): ProviderName {
   const cfg = configManager.getConfig();
   const p = cfg.llmProvider || "ollama";
-  return p === "openai" || p === "azure-openai" || p === "openrouter" ? p : "ollama";
+  if (p === "openai" || p === "azure-openai" || p === "openrouter" || p === "bailian") {
+    return p;
+  }
+  return "ollama";
 }
 
 export function getActiveModelName(task: LlmTask, providerOverride?: ProviderName): string {
@@ -46,6 +54,12 @@ export function getActiveModelName(task: LlmTask, providerOverride?: ProviderNam
     if (task === "vision") return oc.openrouterVisionModel || oc.openrouterModel || "";
     return oc.openrouterModel || "";
   }
+  if (provider === "bailian") {
+    const bc = cfg.bailian || {};
+    if (task === "embed") return bc.bailianEmbedModel || cfg.bailianEmbedModel || "";
+    if (task === "vision") return bc.bailianVisionModel || bc.bailianModel || cfg.bailianVisionModel || cfg.bailianModel || "";
+    return bc.bailianModel || cfg.bailianModel || "";
+  }
   // default to ollama
   const oc = cfg.ollama || {};
   if (task === "embed") return oc.ollamaEmbedModel || cfg.ollamaEmbedModel || "";
@@ -60,6 +74,9 @@ export async function embedText(inputs: string[], overrideModel?: string): Promi
   }
   if (provider === "openrouter") {
     return embedWithOpenRouter(inputs, overrideModel);
+  }
+  if (provider === "bailian") {
+    return embedWithBailian(inputs, overrideModel);
   }
   return embedWithOllama(inputs, overrideModel);
 }
@@ -85,6 +102,11 @@ export async function generateStructuredJson(
     const schema = responseFormat?.json_schema?.schema as Record<string, unknown> | undefined;
     return generateStructuredJsonWithOpenRouter(oaMessages, schema, temperature, maxTokens, overrideModel || undefined);
   }
+  if (provider === "bailian") {
+    const oaMessages = messages.map((m) => ({ role: m.role, content: m.content }));
+    const schema = responseFormat?.json_schema?.schema as Record<string, unknown> | undefined;
+    return generateStructuredJsonWithBailian(oaMessages, schema, temperature, maxTokens, overrideModel || undefined);
+  }
   return generateStructuredJsonWithOllama(
     messages,
     responseFormat,
@@ -107,6 +129,10 @@ export async function describeImage(
   if (provider === "openrouter") {
     const img = Array.isArray(imageBase64) ? imageBase64[0] : imageBase64;
     return describeImageWithOpenRouter(img, options?.prompt, options?.overrideModel);
+  }
+  if (provider === "bailian") {
+    const img = Array.isArray(imageBase64) ? imageBase64[0] : imageBase64;
+    return describeImageWithBailian(img, options?.prompt, options?.overrideModel, options?.timeoutMs);
   }
   const imgs = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
   return describeImageWithOllama(imgs, {

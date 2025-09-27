@@ -80,6 +80,8 @@ export async function chatRecommendDirectoryHandler(
       ? "azure-openai"
       : providerRaw === "openrouter"
       ? "openrouter"
+      : providerRaw === "bailian" || providerRaw === "aliyun" || providerRaw === "dashscope"
+      ? "bailian"
       : providerRaw === "ollama"
       ? "ollama"
       : undefined;
@@ -1241,6 +1243,8 @@ export async function chatDirectoryStructureHandler(
       ? "azure-openai"
       : providerRaw === "openrouter"
       ? "openrouter"
+      : providerRaw === "bailian" || providerRaw === "aliyun" || providerRaw === "dashscope"
+      ? "bailian"
       : providerRaw === "ollama"
       ? "ollama"
       : undefined;

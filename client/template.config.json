@@ -26,6 +26,13 @@
     "openrouterEmbedKey": "",
     "openrouterVisionModel": "gpt-4o-mini"
   },
+  "bailian": {
+    "bailianEndpoint": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "bailianApiKey": "",
+    "bailianModel": "qwen-plus",
+    "bailianEmbedModel": "text-embedding-v4",
+    "bailianVisionModel": "qwen3-vl-plus"
+  },
   "fileConvertEndpoint": "https://converter.pegamob.com",
   "sqliteDbPath": "database\\files.db",
   "language": "zh",

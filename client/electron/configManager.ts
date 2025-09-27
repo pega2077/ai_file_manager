@@ -16,8 +16,20 @@ export interface AppConfig {
     ollamaVisionModel?: string;
     ollamaApiKey?: string;
   };
-  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' (future) */
-  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter';
+  bailian?: {
+    /** Bailian (DashScope) OpenAI-compatible endpoint */
+    bailianEndpoint?: string;
+    /** Bailian access token (env fallback: BAILIAN_API_KEY or DASHSCOPE_API_KEY) */
+    bailianApiKey?: string;
+    /** Default chat/completion model */
+    bailianModel?: string;
+    /** Default embedding model */
+    bailianEmbedModel?: string;
+    /** Default multimodal/vision model */
+    bailianVisionModel?: string;
+  };
+  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' */
+  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian';
   openai?: {
     /** OpenAI compatible endpoint (e.g., https://api.openai.com/v1 or custom) */
     openaiEndpoint?: string;
@@ -58,6 +70,11 @@ export interface AppConfig {
   openaiEmbedModel?: string;
   openaiVisionModel?: string;
   // Potential legacy OpenRouter flat fields (none defined yet, reserved)
+  bailianEndpoint?: string;
+  bailianApiKey?: string;
+  bailianModel?: string;
+  bailianEmbedModel?: string;
+  bailianVisionModel?: string;
   /** Optional HTTP endpoint for third-party file conversion service */
   fileConvertEndpoint?: string;
   /** Relative or absolute path to the local SQLite database file */
@@ -113,6 +130,13 @@ const DEFAULT_CONFIG: AppConfig = {
     openrouterEmbedEndpoint: "https://embed.pegamob.com",
     openrouterEmbedKey: undefined,
     openrouterVisionModel: "google/gemma-3-12b-it:free",
+  },
+  bailian: {
+    bailianEndpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    bailianApiKey: undefined,
+    bailianModel: "qwen-plus",
+    bailianEmbedModel: "text-embedding-v4",
+    bailianVisionModel: "qwen3-vl-plus",//
   },
   fileConvertEndpoint: "",
   // Default to repository-standard SQLite location; can be overridden in config.json
@@ -176,6 +200,7 @@ export class ConfigManager {
           ollama: { ...(DEFAULT_CONFIG.ollama || {}), ...(userConfig.ollama || {}) },
           openai: { ...(DEFAULT_CONFIG.openai || {}), ...(userConfig.openai || {}) },
           openrouter: { ...(DEFAULT_CONFIG.openrouter || {}), ...(userConfig.openrouter || {}) },
+          bailian: { ...(DEFAULT_CONFIG.bailian || {}), ...(userConfig.bailian || {}) },
         };
 
         // Backward compatibility: map legacy flat fields into grouped blocks
@@ -211,6 +236,22 @@ export class ConfigManager {
             openaiVisionModel: userConfig.openaiVisionModel ?? merged.openai?.openaiVisionModel,
           };
         }
+        if (
+          userConfig.bailianEndpoint ||
+          userConfig.bailianApiKey ||
+          userConfig.bailianModel ||
+          userConfig.bailianEmbedModel ||
+          userConfig.bailianVisionModel
+        ) {
+          merged.bailian = {
+            ...(merged.bailian || {}),
+            bailianEndpoint: userConfig.bailianEndpoint ?? merged.bailian?.bailianEndpoint,
+            bailianApiKey: userConfig.bailianApiKey ?? merged.bailian?.bailianApiKey,
+            bailianModel: userConfig.bailianModel ?? merged.bailian?.bailianModel,
+            bailianEmbedModel: userConfig.bailianEmbedModel ?? merged.bailian?.bailianEmbedModel,
+            bailianVisionModel: userConfig.bailianVisionModel ?? merged.bailian?.bailianVisionModel,
+          };
+        }
 
         // Env injection for OpenRouter API key if not set
         if (!merged.openrouter?.openrouterApiKey) {
@@ -225,6 +266,17 @@ export class ConfigManager {
           const envKey = process.env.OPENAI_API_KEY || process.env.OPENAIKEY || process.env.OPENAI_TOKEN;
           if (envKey) {
             merged.openai = { ...(merged.openai || {}), openaiApiKey: envKey };
+          }
+        }
+
+        if (!merged.bailian?.bailianApiKey) {
+          const envKey =
+            process.env.BAILIAN_API_KEY ||
+            process.env.DASHSCOPE_API_KEY ||
+            process.env.ALIYUN_BAILIAN_API_KEY ||
+            process.env.ALIYUN_DASHSCOPE_API_KEY;
+          if (envKey) {
+            merged.bailian = { ...(merged.bailian || {}), bailianApiKey: envKey };
           }
         }
 
