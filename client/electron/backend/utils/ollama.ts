@@ -228,7 +228,7 @@ export async function generateStructuredJsonWithOllama(
  */
 export async function describeImageWithOllama(
   images: string | string[],
-  options?: { prompt?: string; overrideModel?: string; timeoutMs?: number }
+  options?: { prompt?: string; overrideModel?: string; timeoutMs?: number; maxTokens?: number }
 ): Promise<string> {
   const imgs = Array.isArray(images) ? images : [images];
   if (imgs.length === 0) return "";
@@ -248,6 +248,9 @@ export async function describeImageWithOllama(
     think: false,
     images: imgs,
   };
+  if (options?.maxTokens && options.maxTokens > 0) {
+    payload.options = { ...(payload.options || {}), num_predict: options.maxTokens };
+  }
 
   const apiKey = oc2.ollamaApiKey || cfg.ollamaApiKey;
   const resp = await httpPostJson<OllamaGenerateResponseBody>(

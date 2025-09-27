@@ -201,6 +201,7 @@ type ChatDescribeImageBody = {
   language?: unknown; // 'zh' | 'en'
   prompt_hint?: unknown; // optional user hint
   timeout_ms?: unknown; // optional timeout override
+  max_tokens?: unknown; // optional max tokens for vision answer
 };
 
 export async function chatDescribeImageHandler(
@@ -213,6 +214,7 @@ export async function chatDescribeImageHandler(
     const language: SupportedLang = normalizeLanguage(body?.language);
     const hint = typeof body?.prompt_hint === "string" ? body.prompt_hint : undefined;
   const timeoutMs = typeof body?.timeout_ms === "number" ? Math.max(10000, Math.floor(body.timeout_ms)) : 300000;
+    const maxTokens = typeof body?.max_tokens === "number" && body.max_tokens > 0 ? Math.floor(body.max_tokens) : undefined;
 
     if (!base64) {
       res.status(400).json({
@@ -235,7 +237,7 @@ export async function chatDescribeImageHandler(
 
     let description = "";
     try {
-      description = await describeImage(cleaned, { prompt, timeoutMs });
+      description = await describeImage(cleaned, { prompt, timeoutMs, maxTokens });
     } catch (e) {
       logger.error("/api/chat/describe-image vision generation failed", e as unknown);
       res.status(500).json({

@@ -202,7 +202,8 @@ export async function describeImageWithBailian(
   imageBase64: string,
   prompt = "What is in this picture? Describe it in detail.",
   overrideModel?: string,
-  timeoutMs = 120000
+  timeoutMs = 120000,
+  maxTokens?: number
 ): Promise<string> {
   const { baseURL, apiKey, visionModel } = resolveConfig();
   const finalModel = overrideModel || visionModel;
@@ -218,7 +219,7 @@ export async function describeImageWithBailian(
       },
     ],
     temperature: 0.2,
-    max_tokens: 800,
+    max_tokens: typeof maxTokens === 'number' && maxTokens > 0 ? maxTokens : 800,
   };
 
   const resp = await httpPostJson<BailianChatCompletionResponse>(

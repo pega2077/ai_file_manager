@@ -119,25 +119,26 @@ export async function generateStructuredJson(
 
 export async function describeImage(
   imageBase64: string | string[],
-  options?: { prompt?: string; overrideModel?: string; timeoutMs?: number }
+  options?: { prompt?: string; overrideModel?: string; timeoutMs?: number; maxTokens?: number }
 ): Promise<string> {
   const provider = getActiveProvider();
   if (provider === "openai" || provider === "azure-openai") {
     const img = Array.isArray(imageBase64) ? imageBase64[0] : imageBase64;
-    return describeImageWithOpenAI(img, options?.prompt, options?.overrideModel);
+    return describeImageWithOpenAI(img, options?.prompt, options?.overrideModel, options?.maxTokens);
   }
   if (provider === "openrouter") {
     const img = Array.isArray(imageBase64) ? imageBase64[0] : imageBase64;
-    return describeImageWithOpenRouter(img, options?.prompt, options?.overrideModel);
+    return describeImageWithOpenRouter(img, options?.prompt, options?.overrideModel, options?.maxTokens);
   }
   if (provider === "bailian") {
     const img = Array.isArray(imageBase64) ? imageBase64[0] : imageBase64;
-    return describeImageWithBailian(img, options?.prompt, options?.overrideModel, options?.timeoutMs);
+    return describeImageWithBailian(img, options?.prompt, options?.overrideModel, options?.timeoutMs, options?.maxTokens);
   }
   const imgs = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
   return describeImageWithOllama(imgs, {
     prompt: options?.prompt,
     overrideModel: options?.overrideModel,
     timeoutMs: options?.timeoutMs,
+    maxTokens: options?.maxTokens,
   });
 }

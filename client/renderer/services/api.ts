@@ -317,8 +317,8 @@ class ApiService {
     });
   }
 
-  // 图像描述（Ollama 视觉）
-  async describeImage(imageBase64: string, language?: 'zh' | 'en', promptHint?: string, timeoutMs?: number) {
+  // 图像描述（视觉）：支持 max_tokens 限制
+  async describeImage(imageBase64: string, language?: 'zh' | 'en', promptHint?: string, timeoutMs?: number, maxTokens?: number) {
     const provider = await this.ensureProvider();
     return this.request<DescribeImageResponse>('/chat/describe-image', {
       method: 'POST',
@@ -328,6 +328,7 @@ class ApiService {
         language,
         prompt_hint: promptHint,
         timeout_ms: timeoutMs,
+        ...(typeof maxTokens === 'number' && maxTokens > 0 ? { max_tokens: maxTokens } : {}),
       }),
     });
   }

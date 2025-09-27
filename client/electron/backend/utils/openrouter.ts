@@ -168,7 +168,8 @@ export async function generateStructuredJsonWithOpenRouter(
 export async function describeImageWithOpenRouter(
   imageBase64: string,
   prompt = "What is in this picture? Describe it in detail.",
-  overrideModel?: string
+  overrideModel?: string,
+  maxTokens?: number
 ): Promise<string> {
   const cfg = configManager.getConfig();
   const oc = cfg.openrouter || {};
@@ -185,7 +186,7 @@ export async function describeImageWithOpenRouter(
         { role: "user", content },
       ],
       temperature: 0.2,
-      max_tokens: 800,
+      max_tokens: typeof maxTokens === 'number' && maxTokens > 0 ? maxTokens : 800,
     });
     const out = resp.choices?.[0]?.message?.content || "";
     return out;
