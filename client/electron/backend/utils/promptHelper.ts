@@ -186,3 +186,43 @@ export function buildVisionDescribePrompt(
     "Output in English."
   );
 }
+
+/** Build messages for extracting keyword tags from a piece of text. */
+export function buildExtractTagsMessages(params: {
+  language: SupportedLang;
+  text: string;
+  topK?: number;
+  domainHint?: string;
+}): { role: "system" | "user"; content: string }[] {
+  const { language, text } = params;
+  const topK = Math.max(1, Math.min(50, Math.floor(params.topK ?? 10)));
+  const hint = typeof params.domainHint === "string" && params.domainHint.trim() ? params.domainHint.trim() : "";
+
+  if (language === "zh") {
+    return [
+      {
+        role: "system",
+        content:
+          "你是一名信息抽取助手，请从输入文本中提取最能代表主题的关键标签（短语）。严格输出 JSON，仅包含字段 tags。要求：1) 标签简短清晰，以名词或名词短语为主；2) 不要包含标点或编号；3) 去重；4) 数量不超过指定上限；5) 尽量通用而非过度细碎。",
+      },
+      {
+        role: "user",
+        content:
+          `标签上限：${topK}\n${hint ? `领域提示：${hint}\n` : ""}文本：\n${text}\n\n仅返回 JSON，例如：{\n  "tags": ["标签1", "标签2"]\n}`,
+      },
+    ];
+  }
+
+  return [
+    {
+      role: "system",
+      content:
+        "You are an information extraction assistant. Extract concise, representative keyword tags from the input. Output JSON only with field 'tags'. Rules: 1) short noun phrases; 2) no punctuation or numbering; 3) deduplicate; 4) do not exceed limit; 5) prefer broadly useful terms over overly specific ones.",
+    },
+    {
+      role: "user",
+      content:
+        `Max tags: ${topK}\n${hint ? `Domain hint: ${hint}\n` : ""}Text:\n${text}\n\nReturn JSON only, e.g.: {\n  "tags": ["tag1", "tag2"]\n}`,
+    },
+  ];
+}

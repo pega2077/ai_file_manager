@@ -64,6 +64,7 @@
 | 文档分段 | 分段列表 | POST | `/api/files/chunks/list` | 获取文件分段列表 |
 | 文档分段 | 分段内容 | GET | `/api/files/chunks/{chunk_id}` | 获取单个分段的完整内容 |
 | 文档分段 | 重新分段 | POST | `/api/files/reprocess` | 重新处理文件分段 |
+| 文件管理 | 提取关键标签 | POST | `/api/files/extract-tags` | 使用 LLM 从文本/文件中提取标签并可保存到文件记录 |
 | 搜索检索 | 语义搜索 | POST | `/api/search/semantic` | 基于向量的语义搜索 |
 | 搜索检索 | 关键词搜索 | POST | `/api/search/keyword` | 基于关键词的全文搜索 |
 | 搜索检索 | 文件名搜索 | POST | `/api/search/filename` | 基于文件名的模糊搜索 |
@@ -395,6 +396,37 @@
 ```
 
 ### 1.8 文件预览
+
+### 1.x 提取关键标签（LLM）
+
+接口: `POST /api/files/extract-tags`
+
+用途：从一段文本中抽取代表性的关键标签（短语）。仅分析文本并返回结果，不进行文件保存或数据库更新。
+
+请求参数:
+
+```json
+{
+  "text": "string",          // 必填，直接提供文本
+  "top_k": 10,                // 可选，最大返回标签数量，默认 10，范围 1~50
+  "language": "zh|en",       // 可选，提示词语言（影响模型输出风格），默认读取系统配置
+  "domain_hint": "string",   // 可选，领域提示，如“编程/前端/论文”等
+  "provider": "ollama|openai|azure-openai|openrouter|bailian" // 可选，临时覆盖后端配置的提供商
+}
+```
+
+响应数据:
+
+```json
+{
+  "tags": ["string"],
+  "model_used": "string"
+}
+```
+
+说明：
+- 仅对输入文本进行标签抽取，不涉及文件读取与数据库持久化。
+
 
 **接口**: `POST /api/files/preview`
 

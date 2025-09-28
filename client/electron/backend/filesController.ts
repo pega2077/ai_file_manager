@@ -8,8 +8,11 @@ import { promises as fsp } from "fs";
 import { MAX_TEXT_PREVIEW_BYTES, getMimeByExt, isImageExt, decodeTextBuffer, CATEGORY_EXTENSIONS, toNumber, isNonEmptyString, parseTags } from "./utils/fileHelpers";
 import { ensureTxtFile, chunkText } from "./utils/fileConversion";
 import { ensureTempDir } from "./utils/pathHelper";
-import { embedText, generateStructuredJson, describeImage } from "./utils/llm";
+import { embedText, generateStructuredJson, describeImage, getActiveModelName } from "./utils/llm";
+import type { LlmMessage } from "./utils/llm";
+import type { StructuredResponseFormat } from "./utils/ollama";
 import { buildVisionDescribePrompt, normalizeLanguage } from "./utils/promptHelper";
+import { buildExtractTagsMessages } from "./utils/promptHelper";
 import type { ProviderName } from "./utils/llm";
 import { app } from "electron";
 import { randomUUID } from "crypto";
@@ -179,6 +182,8 @@ export function registerFilesRoutes(app: Express) {
   app.get("/api/files/:file_id", getFileDetailsHandler);
   // POST /api/files/delete
   app.post("/api/files/delete", deleteFileHandler);
+  // POST /api/files/extract-tags
+  app.post("/api/files/extract-tags", extractTagsHandler);
 }
 
 // -------- Handlers --------
@@ -1415,6 +1420,111 @@ export async function getFileDetailsHandler(req: Request, res: Response): Promis
       message: "internal_error",
       data: null,
       error: { code: "INTERNAL_ERROR", message: "Failed to get file details", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+// -------- Extract Tags via LLM and optionally save to file record --------
+interface ExtractTagsBody {
+  text?: unknown; // required: direct text to analyze
+  top_k?: unknown; // default 10
+  language?: unknown; // 'zh' | 'en'
+  domain_hint?: unknown; // optional domain hint to improve tags
+  provider?: unknown; // optional override provider name
+}
+
+export async function extractTagsHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as ExtractTagsBody | undefined;
+    const rawText = typeof body?.text === "string" ? body.text : "";
+    const topK = Math.max(1, Math.min(50, toNumber(body?.top_k, 10)));
+    const language = normalizeLanguage(body?.language ?? (configManager.getConfig().language ?? "zh"), "zh");
+    const domainHint = typeof body?.domain_hint === "string" ? body.domain_hint : "";
+    const providerRaw = typeof body?.provider === "string" ? body.provider.trim().toLowerCase() : undefined;
+    const provider: ProviderName | undefined = providerRaw === "openai"
+      ? "openai"
+      : providerRaw === "azure-openai" || providerRaw === "azure" || providerRaw === "azure_openai"
+      ? "azure-openai"
+      : providerRaw === "openrouter"
+      ? "openrouter"
+      : providerRaw === "bailian" || providerRaw === "aliyun" || providerRaw === "dashscope"
+      ? "bailian"
+      : providerRaw === "ollama"
+      ? "ollama"
+      : undefined;
+    const text = rawText;
+    if (!text || !text.trim()) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "text is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const snippet = text.length > 5000 ? text.slice(0, 5000) : text;
+    const messages: LlmMessage[] = buildExtractTagsMessages({ language, text: snippet, topK, domainHint });
+    const responseFormat: StructuredResponseFormat = {
+      json_schema: {
+        name: "extract_tags_schema",
+        schema: {
+          type: "object",
+          properties: {
+            tags: { type: "array", items: { type: "string" } },
+          },
+          required: ["tags"],
+          additionalProperties: false,
+        },
+        strict: true,
+      },
+    } as const;
+
+    let result: unknown;
+    try {
+  result = await generateStructuredJson(messages, responseFormat, 0.2, 800, "", language, provider);
+    } catch (e) {
+      logger.error("/api/files/extract-tags LLM failed", e as unknown);
+      res.status(500).json({
+        success: false,
+        message: "llm_error",
+        data: null,
+        error: { code: "LLM_ERROR", message: (e as Error).message, details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const obj = (result || {}) as Record<string, unknown>;
+    const tags = Array.isArray(obj.tags)
+      ? (obj.tags as unknown[])
+          .filter((t: unknown): t is string => typeof t === "string" && t.trim().length > 0)
+          .map((t) => t.trim())
+      : [];
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        tags,
+        model_used: getActiveModelName("chat", provider),
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/files/extract-tags failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Extract tags failed", details: null },
       timestamp: new Date().toISOString(),
       request_id: "",
     });
