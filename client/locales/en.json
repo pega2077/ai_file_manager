@@ -151,6 +151,8 @@
       "showHiddenFiles": "Show hidden files",
       "enablePreview": "File preview",
       "autoSaveRAG": "Auto-save to RAG",
+      "autoTagEnabled": "Auto tagging",
+      "tagSummaryMaxLength": "Tag summary max length",
       "autoClassify": "Auto classify without confirmation",
       "useLocalService": "Use local service",
       "workDirectory": "Current workspace",
@@ -159,6 +161,8 @@
     "descriptions": {
       "enablePreview": "Double-click files to preview them before opening the default app.",
       "autoSaveRAG": "Automatically add imported files to the RAG knowledge base.",
+      "autoTagEnabled": "Automatically extract tags for files during import or processing.",
+      "tagSummaryMaxLength": "Maximum characters used when generating tag summaries (affects auto-tagging).",
       "autoClassify": "Skip confirmation dialogs when saving files to recommended directories.",
       "useLocalService": "When enabled, use the local Python service (typically http://localhost:8000). When disabled, you can configure a remote API URL.",
       "workDirectory": "The workspace folder is defined during setup. Re-run the setup wizard to change it.",
@@ -292,12 +296,20 @@
       "openDirectory": "Open Directory",
       "openFile": "Open File",
       "importToRag": "Import to Knowledge Base",
-      "askQuestion": "Ask Question"
+      "askQuestion": "Ask Question",
+      "editFile": "Edit"
+    },
+    "edit": {
+      "modalTitle": "Edit File",
+      "nameLabel": "Name",
+      "categoryLabel": "Category",
+      "tagsLabel": "Tags"
     },
     "placeholders": {
       "searchFileName": "Search file name",
       "selectCategory": "Select category",
-      "selectType": "Select type"
+      "selectType": "Select type",
+      "tagsCommaSeparated": "tag1, tag2"
     },
     "options": {
       "categories": {
@@ -354,6 +366,10 @@
       "saveSuccessRagFailed": "File saved successfully, but importing to RAG library failed",
       "describingImage": "Describing image content for analysis...",
       "imageDescription": "Image description: {text}"
+    ,
+      "updateSuccess": "File updated",
+      "updateFailed": "Failed to update file",
+      "editInvalidName": "Please enter a valid file name"
     },
     "createFolder": {
       "modalTitle": "Create Folder",

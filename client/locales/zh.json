@@ -148,6 +148,8 @@
       "showHiddenFiles": "显示隐藏文件",
       "enablePreview": "文件预览",
       "autoSaveRAG": "自动保存到 RAG",
+      "autoTagEnabled": "自动打标签",
+      "tagSummaryMaxLength": "标签摘要最大长度",
       "autoClassify": "自动分类无需确认",
       "useLocalService": "使用本地服务",
       "workDirectory": "当前工作区",
@@ -156,6 +158,8 @@
     "descriptions": {
       "enablePreview": "双击文件以在打开默认应用前预览。",
       "autoSaveRAG": "自动将导入的文件添加到 RAG 知识库。",
+      "autoTagEnabled": "在导入或处理文件时自动提取标签。",
+      "tagSummaryMaxLength": "生成标签摘要时使用的最大字符数（影响自动打标签）。",
       "autoClassify": "保存文件到推荐目录时跳过确认对话框。",
       "useLocalService": "启用后使用本地 Python 服务（通常为 http://localhost:8000 ）。关闭后可手动配置远程 API 地址。",
       "workDirectory": "工作区文件夹在设置期间定义。重新运行设置向导以更改。",
@@ -289,12 +293,20 @@
       "openDirectory": "打开目录",
       "openFile": "打开文件",
       "importToRag": "导入知识库",
-      "askQuestion": "提问"
+      "askQuestion": "提问",
+      "editFile": "编辑"
+    },
+    "edit": {
+      "modalTitle": "编辑文件",
+      "nameLabel": "名称",
+      "categoryLabel": "分类",
+      "tagsLabel": "标签"
     },
     "placeholders": {
       "searchFileName": "搜索文件名",
       "selectCategory": "选择分类",
-      "selectType": "选择类型"
+      "selectType": "选择类型",
+      "tagsCommaSeparated": "标签1, 标签2"
     },
     "options": {
       "categories": {
@@ -351,6 +363,10 @@
       "saveSuccessRagFailed": "文件保存成功，但导入RAG库失败",
       "describingImage": "正在描述图片内容以便分析...",
       "imageDescription": "图片描述：{text}"
+    ,
+      "updateSuccess": "文件已更新",
+      "updateFailed": "更新文件失败",
+      "editInvalidName": "请输入合法的文件名"
     },
     "createFolder": {
       "modalTitle": "创建文件夹",
