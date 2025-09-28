@@ -966,6 +966,107 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
       return;
     }
 
+    // Auto-tagging and summary (document/image) per configuration
+    let autoTags: string[] = [];
+    let autoSummary: string | null = null;
+    try {
+      const cfg = configManager.getConfig();
+      const autoTagEnabled = Boolean(cfg.autoTagEnabled);
+      if (autoTagEnabled) {
+        const language = normalizeLanguage(cfg.language ?? "zh", "zh");
+        const tagTopK = 10;
+        const maxLen = Math.max(100, Math.min(5000, Number(cfg.tagSummaryMaxLength) || 1000));
+
+        // Helper to extract tags from text using LLM structured output
+        const extractTagsFromText = async (text: string): Promise<string[]> => {
+          const snippet = text.length > 5000 ? text.slice(0, 5000) : text;
+          const messages: LlmMessage[] = buildExtractTagsMessages({ language, text: snippet, topK: tagTopK, domainHint: "" });
+          const responseFormat: StructuredResponseFormat = {
+            json_schema: {
+              name: "extract_tags_schema",
+              schema: {
+                type: "object",
+                properties: {
+                  tags: { type: "array", items: { type: "string" } },
+                },
+                required: ["tags"],
+                additionalProperties: false,
+              },
+              strict: true,
+            },
+          } as const;
+          let result: unknown = {};
+          try {
+            result = await generateStructuredJson(messages, responseFormat, 0.2, 800, "", language);
+          } catch (e) {
+            logger.warn("Auto-tag generateStructuredJson failed", e as unknown);
+            return [];
+          }
+          const obj = (result || {}) as Record<string, unknown>;
+          const tags = Array.isArray(obj.tags)
+            ? (obj.tags as unknown[])
+                .filter((t: unknown): t is string => typeof t === "string" && t.trim().length > 0)
+                .map((t) => t.trim())
+            : [];
+          return tags;
+        };
+
+        if (category === "image") {
+          // Image: describe then extract tags
+          try {
+            const buf = await fsp.readFile(destPath);
+            const base64 = buf.toString("base64");
+            const visionPrompt = buildVisionDescribePrompt(language);
+            const desc = await describeImage(base64, { prompt: visionPrompt });
+            autoSummary = (desc || "").trim() || null;
+            if (autoSummary) {
+              autoTags = await extractTagsFromText(autoSummary);
+            }
+          } catch (e) {
+            logger.warn("Auto-tag image processing failed", e as unknown);
+          }
+        } else if (category === "document") {
+          // Document: convert to text, take snippet, then extract tags
+          try {
+            let textContent = "";
+            try {
+              const txtPath = await ensureTxtFile(destPath);
+              textContent = await fsp.readFile(txtPath, "utf8");
+            } catch (convErr) {
+              // If conversion fails, try direct read for simple text-like files
+              try {
+                textContent = await fsp.readFile(destPath, "utf8");
+              } catch {
+                textContent = "";
+              }
+            }
+            if (textContent && textContent.trim()) {
+              autoSummary = textContent.slice(0, maxLen);
+              autoTags = await extractTagsFromText(autoSummary);
+            }
+          } catch (e) {
+            logger.warn("Auto-tag document processing failed", e as unknown);
+          }
+        }
+
+        // Persist when we have any result
+        if ((autoSummary && autoSummary.length > 0) || (autoTags && autoTags.length > 0)) {
+          const update: { summary?: string | null; tags?: string | null; updated_at: string } = {
+            updated_at: new Date().toISOString(),
+          };
+          if (autoSummary && autoSummary.length > 0) update.summary = autoSummary;
+          if (autoTags && autoTags.length > 0) update.tags = JSON.stringify(autoTags);
+          try {
+            await FileModel.update(update, { where: { file_id: newFileId } });
+          } catch (e) {
+            logger.warn("Failed to update file with auto tags/summary", e as unknown);
+          }
+        }
+      }
+    } catch (e) {
+      logger.warn("Auto-tag pipeline failed", e as unknown);
+    }
+
     res.status(200).json({
       success: true,
       message: "ok",
@@ -975,6 +1076,9 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
         filename: path.basename(destPath),
         overwritten,
         file_id: newFileId,
+        // optional enrichment for caller convenience
+        tags: autoTags,
+        summary: autoSummary ?? undefined,
       },
       error: null,
       timestamp: new Date().toISOString(),
