@@ -1,5 +1,5 @@
 ﻿
-import { Layout, Card, Typography, Switch, Input, Button, message, Modal, Select } from 'antd';
+import { Layout, Card, Typography, Switch, Input, Button, message, Modal, Select, InputNumber } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { updateApiBaseUrl } from '../services/api';
@@ -17,6 +17,8 @@ interface SettingsState {
   showHiddenFiles: boolean;
   enablePreview: boolean;
   autoSaveRAG: boolean;
+  autoTagEnabled: boolean;
+  tagSummaryMaxLength: number;
   autoClassifyWithoutConfirmation: boolean;
   workDirectory: string;
   useLocalService: boolean;
@@ -29,6 +31,8 @@ const DEFAULT_SETTINGS: SettingsState = {
   showHiddenFiles: false,
   enablePreview: true,
   autoSaveRAG: true,
+  autoTagEnabled: false,
+  tagSummaryMaxLength: 1000,
   autoClassifyWithoutConfirmation: false,
   workDirectory: '',
   useLocalService: true,
@@ -68,6 +72,10 @@ const Settings = () => {
             showHiddenFiles: Boolean(appConfig.showHiddenFiles ?? DEFAULT_SETTINGS.showHiddenFiles),
             enablePreview: Boolean(appConfig.enablePreview ?? DEFAULT_SETTINGS.enablePreview),
             autoSaveRAG: Boolean(appConfig.autoSaveRAG ?? DEFAULT_SETTINGS.autoSaveRAG),
+            autoTagEnabled: Boolean(appConfig.autoTagEnabled ?? DEFAULT_SETTINGS.autoTagEnabled),
+            tagSummaryMaxLength: Number.isFinite(Number(appConfig.tagSummaryMaxLength))
+              ? Math.max(1, Math.floor(Number(appConfig.tagSummaryMaxLength)))
+              : DEFAULT_SETTINGS.tagSummaryMaxLength,
             autoClassifyWithoutConfirmation: Boolean(appConfig.autoClassifyWithoutConfirmation ?? DEFAULT_SETTINGS.autoClassifyWithoutConfirmation),
             workDirectory: String(appConfig.workDirectory ?? DEFAULT_SETTINGS.workDirectory),
             useLocalService: Boolean(appConfig.useLocalService ?? DEFAULT_SETTINGS.useLocalService),
@@ -134,6 +142,8 @@ const Settings = () => {
         showHiddenFiles: settings.showHiddenFiles,
         enablePreview: settings.enablePreview,
         autoSaveRAG: settings.autoSaveRAG,
+        autoTagEnabled: settings.autoTagEnabled,
+        tagSummaryMaxLength: settings.tagSummaryMaxLength,
         autoClassifyWithoutConfirmation: settings.autoClassifyWithoutConfirmation,
         useLocalService: settings.useLocalService,
       });
@@ -267,6 +277,37 @@ const Settings = () => {
                 />
                 <Text type="secondary" style={{ marginLeft: 8 }}>
                   {t('settings.descriptions.autoSaveRAG')}
+                </Text>
+              </div>
+
+              <div>
+                <Text strong>{t('settings.labels.autoTagEnabled')}</Text>
+                <Switch
+                  checkedChildren={t('settings.common.enabled')}
+                  unCheckedChildren={t('settings.common.disabled')}
+                  checked={settings.autoTagEnabled}
+                  onChange={(checked) => handleSettingChange('autoTagEnabled', checked)}
+                  style={{ marginLeft: 16 }}
+                />
+                <Text type="secondary" style={{ marginLeft: 8 }}>
+                  {t('settings.descriptions.autoTagEnabled')}
+                </Text>
+              </div>
+
+              <div>
+                <Text strong>{t('settings.labels.tagSummaryMaxLength')}</Text>
+                <InputNumber
+                  min={1}
+                  max={10000}
+                  step={100}
+                  value={settings.tagSummaryMaxLength}
+                  onChange={(value) =>
+                    handleSettingChange('tagSummaryMaxLength', Math.max(1, Math.floor(Number(value || 0))))
+                  }
+                  style={{ marginLeft: 16 }}
+                />
+                <Text type="secondary" style={{ marginLeft: 8 }}>
+                  {t('settings.descriptions.tagSummaryMaxLength')}
                 </Text>
               </div>
 

@@ -41,6 +41,8 @@
   "showHiddenFiles": false,
   "enablePreview": true,
   "autoSaveRAG": true,
+  "autoTagEnabled": true,
+  "tagSummaryMaxLength": 1000,
   "autoClassifyWithoutConfirmation": true,
   "workDirectory": "",
   "isInitialized": false,

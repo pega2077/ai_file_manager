@@ -91,6 +91,10 @@ export interface AppConfig {
   enablePreview?: boolean;
   /** Auto-import to RAG after save */
   autoSaveRAG?: boolean;
+  /** Enable automatic tagging when importing/processing files */
+  autoTagEnabled?: boolean;
+  /** Max summary content length when generating tag summary (characters) */
+  tagSummaryMaxLength?: number;
   /** Auto classify without confirmation */
   autoClassifyWithoutConfirmation?: boolean;
   /** Current workspace directory path */
@@ -148,7 +152,9 @@ const DEFAULT_CONFIG: AppConfig = {
   showHiddenFiles: false,
   enablePreview: true,
   autoSaveRAG: true,
-  autoClassifyWithoutConfirmation: false,
+  autoTagEnabled: true,
+  tagSummaryMaxLength: 1000,
+  autoClassifyWithoutConfirmation: true,
   workDirectory: '',
   isInitialized: false,
   apiBaseUrl: 'http://localhost:8000'
@@ -278,6 +284,17 @@ export class ConfigManager {
           if (envKey) {
             merged.bailian = { ...(merged.bailian || {}), bailianApiKey: envKey };
           }
+        }
+
+        // Sanitize new options
+        if (merged.tagSummaryMaxLength == null || Number.isNaN(Number(merged.tagSummaryMaxLength))) {
+          merged.tagSummaryMaxLength = DEFAULT_CONFIG.tagSummaryMaxLength;
+        } else {
+          const v = Math.floor(Number(merged.tagSummaryMaxLength));
+          merged.tagSummaryMaxLength = v > 0 ? v : DEFAULT_CONFIG.tagSummaryMaxLength;
+        }
+        if (typeof merged.autoTagEnabled !== 'boolean') {
+          merged.autoTagEnabled = DEFAULT_CONFIG.autoTagEnabled;
         }
 
         this.config = merged;

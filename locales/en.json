@@ -114,6 +114,8 @@
       "showHiddenFiles": "Show hidden files",
       "enablePreview": "File preview",
       "autoSaveRAG": "Auto-save to RAG",
+      "autoTagEnabled": "Auto tagging",
+      "tagSummaryMaxLength": "Tag summary length",
       "autoClassify": "Auto classify without confirmation",
       "useLocalService": "Use local service",
       "workDirectory": "Current workspace",
@@ -122,6 +124,8 @@
     "descriptions": {
       "enablePreview": "Double-click files to preview them before opening the default app.",
       "autoSaveRAG": "Automatically add imported files to the RAG knowledge base.",
+      "autoTagEnabled": "When enabled, automatically generate tags during file import/processing.",
+      "tagSummaryMaxLength": "Maximum text length (characters) used for summary analysis when generating tags.",
       "autoClassify": "Skip confirmation dialogs when saving files to recommended directories.",
       "useLocalService": "When enabled, use the local Python service (typically http://localhost:8000). When disabled, you can configure a remote API URL.",
       "workDirectory": "The workspace folder is defined during setup. Re-run the setup wizard to change it.",

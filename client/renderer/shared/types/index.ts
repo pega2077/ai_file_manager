@@ -30,6 +30,8 @@ export interface Settings {
   enablePreview: boolean;
   autoClassifyWithoutConfirmation: boolean;
   autoSaveRAG: boolean;
+  autoTagEnabled?: boolean;
+  tagSummaryMaxLength?: number;
   workDirectory: string;
 }
 
@@ -109,6 +111,8 @@ export interface AppConfig {
   showHiddenFiles?: boolean;
   enablePreview?: boolean;
   autoSaveRAG?: boolean;
+  autoTagEnabled?: boolean;
+  tagSummaryMaxLength?: number;
   autoClassifyWithoutConfirmation?: boolean;
   workDirectory?: string;
   isInitialized?: boolean;

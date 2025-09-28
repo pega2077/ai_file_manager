@@ -111,6 +111,8 @@
       "showHiddenFiles": "显示隐藏文件",
       "enablePreview": "文件预览",
       "autoSaveRAG": "自动保存到 RAG",
+      "autoTagEnabled": "自动打标签",
+      "tagSummaryMaxLength": "打标签摘要长度",
       "autoClassify": "自动分类无需确认",
       "useLocalService": "使用本地服务",
       "workDirectory": "当前工作区",
@@ -119,6 +121,8 @@
     "descriptions": {
       "enablePreview": "双击文件以在打开默认应用前预览。",
       "autoSaveRAG": "自动将导入的文件添加到 RAG 知识库。",
+      "autoTagEnabled": "启用后在导入/处理文件时自动生成标签。",
+      "tagSummaryMaxLength": "生成标签时用于摘要分析的最大文本长度（字符数）。",
       "autoClassify": "保存文件到推荐目录时跳过确认对话框。",
       "useLocalService": "启用后使用本地 Python 服务（通常为 http://localhost:8000 ）。关闭后可手动配置远程 API 地址。",
       "workDirectory": "工作区文件夹在设置期间定义。重新运行设置向导以更改。",
