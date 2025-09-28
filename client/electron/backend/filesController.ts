@@ -161,6 +161,207 @@ export async function listFilesHandler(req: Request, res: Response): Promise<voi
   }
 }
 
+// -------- Update File (metadata + optional rename on disk) --------
+interface UpdateFileBody {
+  file_id?: unknown;
+  name?: unknown; // new file name (with or without extension)
+  category?: unknown; // new category
+  tags?: unknown; // string[]
+}
+
+export async function updateFileHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as UpdateFileBody | undefined;
+    const fileId = typeof body?.file_id === "string" ? body.file_id.trim() : "";
+    const newNameRaw = typeof body?.name === "string" ? body.name.trim() : "";
+    const newCategoryRaw = typeof body?.category === "string" ? body.category.trim().toLowerCase() : "";
+    const newTags = parseTags(body?.tags) ?? undefined;
+
+    if (!fileId) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "file_id is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    // Load file row
+    const row = (await FileModel.findOne({ where: { file_id: fileId }, raw: true }).catch(() => null)) as
+      | {
+          file_id: string;
+          name: string;
+          path: string;
+          type: string;
+          category: string;
+          tags: string | null;
+          size: number;
+          created_at: string;
+          updated_at: string | null;
+        }
+      | null;
+
+    if (!row) {
+      res.status(404).json({
+        success: false,
+        message: "not_found",
+        data: null,
+        error: { code: "RESOURCE_NOT_FOUND", message: "file not found", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const currentDir = path.dirname(row.path);
+    let targetName = row.name;
+    if (newNameRaw) {
+      // For safety, forbid path separators in name
+      if (/[\\/]/.test(newNameRaw)) {
+        res.status(400).json({
+          success: false,
+          message: "invalid_request",
+          data: null,
+          error: { code: "INVALID_REQUEST", message: "name must not contain path separators", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+      targetName = newNameRaw;
+    }
+
+    const oldPath = row.path;
+    let newPath = oldPath;
+    let renamedOnDisk = false;
+
+    if (targetName !== row.name) {
+      // Ensure extension preservation if user omitted it
+      const oldExt = path.extname(row.name);
+      const hasExt = path.extname(targetName).length > 0;
+      const finalName = hasExt ? targetName : `${targetName}${oldExt}`;
+      newPath = path.join(currentDir, finalName);
+
+      // If destination exists and is different file, reject to avoid overwrite
+      const exists = await fsp
+        .access(newPath, fs.constants.F_OK)
+        .then(() => true)
+        .catch(() => false);
+      if (exists && path.normalize(newPath) !== path.normalize(oldPath)) {
+        res.status(409).json({
+          success: false,
+          message: "conflict",
+          data: null,
+          error: { code: "FILE_EXISTS", message: "Target filename already exists", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+      try {
+        await fsp.rename(oldPath, newPath);
+        renamedOnDisk = true;
+      } catch (e) {
+        logger.error("Rename file on disk failed", e as unknown);
+        res.status(500).json({
+          success: false,
+          message: "internal_error",
+          data: null,
+          error: { code: "RENAME_FAILED", message: "Failed to rename file on disk", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+    }
+
+    // Compute updated fields
+    const nowIso = new Date().toISOString();
+    const nameToSave = path.basename(newPath);
+    const ext = path.extname(nameToSave).replace(/^\./, "").toLowerCase();
+    const type = getMimeByExt(ext);
+
+    // Determine category to save: explicit request or infer from extension
+    let category = row.category;
+    if (newCategoryRaw) {
+      category = newCategoryRaw;
+    } else if (targetName !== row.name) {
+      // Infer when name changed (might change extension)
+      let inferred = "other";
+      for (const [cat, exts] of Object.entries(CATEGORY_EXTENSIONS)) {
+        if (cat === "other") continue;
+        if (exts.includes(ext)) {
+          inferred = cat;
+          break;
+        }
+      }
+      category = inferred;
+    }
+
+    // Build DB update
+    const update: Record<string, unknown> = {
+      updated_at: nowIso,
+    };
+    if (nameToSave !== row.name) update.name = nameToSave;
+    if (newPath !== oldPath) update.path = newPath;
+    if (type && type !== row.type) update.type = type;
+    if (category && category !== row.category) update.category = category;
+    if (newTags) update.tags = JSON.stringify(newTags);
+
+    try {
+      if (Object.keys(update).length > 1) {
+        await FileModel.update(update, { where: { file_id: fileId } });
+      }
+    } catch (e) {
+      // Try rollback rename if possible
+      if (renamedOnDisk) {
+        try { await fsp.rename(newPath, oldPath); } catch { /* ignore */ }
+      }
+      logger.error("DB update failed in updateFileHandler", e as unknown);
+      res.status(500).json({
+        success: false,
+        message: "internal_error",
+        data: null,
+        error: { code: "DB_UPDATE_FAILED", message: "Failed to update file record", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        file_id: fileId,
+        name: nameToSave,
+        path: newPath,
+        type,
+        category,
+        tags: newTags ?? (row.tags ? JSON.parse(row.tags) : []),
+        renamed: renamedOnDisk,
+        updated_at: nowIso,
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/files/update failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Update file failed", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
 export function registerFilesRoutes(app: Express) {
   // POST /api/files/list
   app.post("/api/files/list", listFilesHandler);
@@ -168,6 +369,8 @@ export function registerFilesRoutes(app: Express) {
   app.post("/api/files/preview", previewFileHandler);
   // POST /api/files/save-file
   app.post("/api/files/save-file", saveFileHandler);
+  // POST /api/files/update
+  app.post("/api/files/update", updateFileHandler);
   // POST /api/files/import-to-rag
   app.post("/api/files/import-to-rag", importToRagHandler);
   // POST /api/files/list-directory-recursive

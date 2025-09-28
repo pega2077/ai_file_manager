@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Layout, Button, message, Select, Table, Input, Tag, Space, Pagination, Modal, Form } from 'antd';
 import type { TableProps } from 'antd';
-import { ReloadOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined, QuestionCircleOutlined, FileAddOutlined, FolderAddOutlined } from '@ant-design/icons';
+import { ReloadOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined, QuestionCircleOutlined, FileAddOutlined, FolderAddOutlined, EditOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import FilePreview from "../components/FilePreview";
@@ -56,6 +56,11 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
   // 预览状态
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ path: string; name: string } | null>(null);
+  // Edit modal state
+  const [editVisible, setEditVisible] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editingFile, setEditingFile] = useState<ImportedFileItem | null>(null);
+  const [editForm] = Form.useForm<{ name: string; category: string; tags: string[]; path?: string; type?: string }>();
 
   // 获取文件列表
   const fetchFiles = useCallback(async (page: number = 1) => {
@@ -146,6 +151,75 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
     } catch (error) {
       message.error(t('files.messages.importToRagFailed', { name: file.name }));
       console.error('导入知识库失败:', error);
+    }
+  };
+
+  // Open edit modal
+  const openEdit = async (file: ImportedFileItem) => {
+    setEditingFile(file);
+    // Prefill from row data immediately
+    editForm.setFieldsValue({
+      name: file.name,
+      category: file.category || '',
+      tags: (file.tags || []),
+      // extra fields for read-only display
+      path: file.path,
+      type: file.type,
+    });
+    setEditVisible(true);
+    // Then fetch latest detail to ensure up-to-date values
+    try {
+      const detailResp = await apiService.getFileDetail(file.file_id);
+      if (detailResp?.success && detailResp.data) {
+        const d = detailResp.data;
+        editForm.setFieldsValue({
+          name: d.name,
+          category: d.category || '',
+          tags: (d.tags || []),
+          path: d.path,
+          type: d.type,
+        });
+      }
+    } catch {
+      // ignore detail fetch error; keep row values
+    }
+  };
+
+  // Submit edit
+  const submitEdit = async () => {
+    try {
+      const values = await editForm.validateFields();
+      const name = (values.name || '').trim();
+      const category = (values.category || '').trim();
+  const rawTags = Array.isArray(values.tags) ? values.tags : [];
+      if (!editingFile) return;
+      if (!name) {
+        message.warning(t('files.messages.editInvalidName') || 'Invalid name');
+        return;
+      }
+      // Basic invalid characters check for Windows and general OS
+      const invalidPattern = /[<>:"/\\|?*]/;
+      if (invalidPattern.test(name)) {
+        message.error(t('files.messages.createFolderInvalidChars'));
+        return;
+      }
+      const tags = rawTags.map((s) => (s || '').trim()).filter((s) => s.length > 0);
+      setEditing(true);
+      const resp = await apiService.updateFile({ file_id: editingFile.file_id, name, category: category || undefined, tags });
+      if (resp.success) {
+        message.success(t('files.messages.updateSuccess') || 'Updated');
+        setEditVisible(false);
+        setEditing(false);
+        setEditingFile(null);
+        fetchFiles(pagination.current_page);
+      } else {
+        setEditing(false);
+        message.error(resp.message || t('files.messages.updateFailed') || 'Update failed');
+      }
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'errorFields' in e) return; // form validation error
+      setEditing(false);
+      message.error(t('files.messages.updateFailed') || 'Update failed');
     }
   };
 
@@ -318,6 +392,12 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
             onClick={() => handleAskQuestion(record)}
             title={t('files.actions.askQuestion')}
           />
+          <Button
+            type="text"
+            icon={<EditOutlined />}
+            onClick={() => openEdit(record)}
+            title={t('files.actions.editFile') || 'Edit'}
+          />
         </Space>
       ),
     },
@@ -484,6 +564,46 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
           }}
         />
       )}
+
+      {/* 编辑文件信息模态框 */}
+      <Modal
+        open={editVisible}
+        title={t('files.edit.modalTitle') || 'Edit File'}
+        okText={t('common.confirm') || 'Confirm'}
+        cancelText={t('common.cancel') || 'Cancel'}
+        onOk={submitEdit}
+        onCancel={() => { setEditVisible(false); setEditingFile(null); editForm.resetFields(); }}
+        confirmLoading={editing}
+        destroyOnHidden
+      >
+        <Form form={editForm} layout="vertical" preserve={false}>
+          <Form.Item label={t('files.table.columns.path')} name="path">
+            <Input disabled />
+          </Form.Item>
+          <Form.Item label={t('files.table.columns.name')} name="name" rules={[{ required: true, message: t('files.messages.editInvalidName') || 'Please input name' }]}> 
+            <Input allowClear />
+          </Form.Item>
+          <Form.Item label={t('files.table.columns.category')} name="category">
+            <Select allowClear placeholder={t('files.placeholders.selectCategory')}>
+              <Option value="document">{t('files.options.categories.document')}</Option>
+              <Option value="sheet">{t('files.options.categories.sheet')}</Option>
+              <Option value="image">{t('files.options.categories.image')}</Option>
+              <Option value="video">{t('files.options.categories.video')}</Option>
+              <Option value="audio">{t('files.options.categories.audio')}</Option>
+              <Option value="archive">{t('files.options.categories.archive')}</Option>
+              <Option value="other">{t('files.options.categories.other')}</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label={t('files.table.columns.tags')} name="tags">
+            <Select
+              mode="tags"
+              allowClear
+              tokenSeparators={[',', ' ']}
+              placeholder={t('files.placeholders.tagsCommaSeparated') || 'Add tags, press Enter'}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

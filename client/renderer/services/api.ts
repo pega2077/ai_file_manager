@@ -413,6 +413,14 @@ class ApiService {
     });
   }
 
+  // 更新文件信息（名称、分类、标签），支持重命名磁盘文件
+  async updateFile(payload: { file_id: string; name?: string; category?: string; tags?: string[] }) {
+    return this.request('/files/update', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   // 创建单个目录
   async createDirectory(directoryPath: string) {
     return this.request('/files/create-directory', {
