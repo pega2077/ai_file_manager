@@ -119,9 +119,15 @@ export async function generateStructuredJson(
 
 export async function describeImage(
   imageBase64: string | string[],
-  options?: { prompt?: string; overrideModel?: string; timeoutMs?: number; maxTokens?: number }
+  options?: {
+    prompt?: string;
+    overrideModel?: string;
+    timeoutMs?: number;
+    maxTokens?: number;
+    providerOverride?: ProviderName;
+  }
 ): Promise<string> {
-  const provider = getActiveProvider();
+  const provider = options?.providerOverride || getActiveProvider();
   if (provider === "openai" || provider === "azure-openai") {
     const img = Array.isArray(imageBase64) ? imageBase64[0] : imageBase64;
     return describeImageWithOpenAI(img, options?.prompt, options?.overrideModel, options?.maxTokens);

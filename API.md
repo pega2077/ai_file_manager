@@ -72,6 +72,7 @@
 | RAG问答 | 对话历史 | POST | `/api/chat/history` | 获取对话历史记录 |
 | RAG问答 | 目录结构推荐 | POST | `/api/chat/directory-structure` | 基于职业和用途推荐目录结构 |
 | RAG问答 | 推荐存放目录 | POST | `/api/chat/recommend-directory` | 基于文件内容推荐存放目录 |
+| RAG问答 | 图片描述 | POST | `/api/chat/describe-image` | 传入图片（base64 或 URL）并生成描述 |
 | 系统管理 | 系统状态 | GET | `/api/system/status` | 获取系统运行状态 |
 | 系统管理 | 系统配置 | GET | `/api/system/config` | 获取系统配置信息 |
 | 系统管理 | 更新配置 | POST | `/api/system/config/update` | 更新系统配置 |
@@ -1175,6 +1176,35 @@
 ## 4. 问答模块接口
 
 ### 4.1 智能问答
+### 4.x 图片描述
+
+**接口**: `POST /api/chat/describe-image`
+
+支持对图片进行内容描述，输入可为 base64 或公网可访问的图片 URL。
+
+**请求参数**:
+```json
+{
+  "image_base64": "string",   // 可选，原始base64或dataURL（data:*;base64,...）
+  "image_url": "string",      // 可选，http(s) 图片地址；当同时提供时优先使用 image_base64
+  "language": "zh|en",        // 可选，输出语言（默认读取系统配置）
+  "prompt_hint": "string",    // 可选，补充指令
+  "timeout_ms": 300000,        // 可选，请求超时（10s~300s）
+  "max_tokens": 800            // 可选，最大生成token数
+}
+```
+
+注意：`image_base64` 与 `image_url` 需至少提供一个；若都提供，则优先使用 `image_base64`。
+
+**响应数据**:
+```json
+{
+  "description": "string",
+  "language": "zh|en",
+  "model_used": "string"
+}
+```
+
 
 **接口**: `POST /api/chat/ask`
 

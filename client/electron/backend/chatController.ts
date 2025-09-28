@@ -73,18 +73,26 @@ export async function chatRecommendDirectoryHandler(
     }
 
     const language: SupportedLang = normalizeLanguage(body?.language);
-    const providerRaw = typeof body?.provider === "string" ? body.provider.trim().toLowerCase() : undefined;
-    const provider: ProviderName | undefined = providerRaw === "openai"
-      ? "openai"
-      : providerRaw === "azure-openai" || providerRaw === "azure" || providerRaw === "azure_openai"
-      ? "azure-openai"
-      : providerRaw === "openrouter"
-      ? "openrouter"
-      : providerRaw === "bailian" || providerRaw === "aliyun" || providerRaw === "dashscope"
-      ? "bailian"
-      : providerRaw === "ollama"
-      ? "ollama"
-      : undefined;
+    const providerRaw =
+      typeof body?.provider === "string"
+        ? body.provider.trim().toLowerCase()
+        : undefined;
+    const provider: ProviderName | undefined =
+      providerRaw === "openai"
+        ? "openai"
+        : providerRaw === "azure-openai" ||
+          providerRaw === "azure" ||
+          providerRaw === "azure_openai"
+        ? "azure-openai"
+        : providerRaw === "openrouter"
+        ? "openrouter"
+        : providerRaw === "bailian" ||
+          providerRaw === "aliyun" ||
+          providerRaw === "dashscope"
+        ? "bailian"
+        : providerRaw === "ollama"
+        ? "ollama"
+        : undefined;
     const messages = buildRecommendDirectoryMessages({
       language,
       fileName,
@@ -198,10 +206,12 @@ export async function chatRecommendDirectoryHandler(
 // ------------- Describe Image (Vision) -------------
 type ChatDescribeImageBody = {
   image_base64?: unknown; // raw base64 string or data URL
+  image_url?: unknown; // http(s) URL to image
   language?: unknown; // 'zh' | 'en'
   prompt_hint?: unknown; // optional user hint
   timeout_ms?: unknown; // optional timeout override
   max_tokens?: unknown; // optional max tokens for vision answer
+  provider?: unknown; // optional provider override: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian'
 };
 
 export async function chatDescribeImageHandler(
@@ -210,41 +220,136 @@ export async function chatDescribeImageHandler(
 ): Promise<void> {
   try {
     const body = req.body as ChatDescribeImageBody | undefined;
-    const base64 = typeof body?.image_base64 === "string" ? body.image_base64.trim() : "";
+    const base64 =
+      typeof body?.image_base64 === "string" ? body.image_base64.trim() : "";
+    const imageUrl =
+      typeof body?.image_url === "string" ? body.image_url.trim() : "";
     const language: SupportedLang = normalizeLanguage(body?.language);
-    const hint = typeof body?.prompt_hint === "string" ? body.prompt_hint : undefined;
-  const timeoutMs = typeof body?.timeout_ms === "number" ? Math.max(10000, Math.floor(body.timeout_ms)) : 300000;
-    const maxTokens = typeof body?.max_tokens === "number" && body.max_tokens > 0 ? Math.floor(body.max_tokens) : undefined;
+    const hint =
+      typeof body?.prompt_hint === "string" ? body.prompt_hint : undefined;
+    const timeoutMs =
+      typeof body?.timeout_ms === "number"
+        ? Math.max(10000, Math.floor(body.timeout_ms))
+        : 300000;
+    const maxTokens =
+      typeof body?.max_tokens === "number" && body.max_tokens > 0
+        ? Math.floor(body.max_tokens)
+        : undefined;
+    const providerRaw =
+      typeof body?.provider === "string"
+        ? body.provider.trim().toLowerCase()
+        : undefined;
+    const provider: ProviderName | undefined =
+      providerRaw === "openai"
+        ? "openai"
+        : providerRaw === "azure-openai" ||
+          providerRaw === "azure" ||
+          providerRaw === "azure_openai"
+        ? "azure-openai"
+        : providerRaw === "openrouter"
+        ? "openrouter"
+        : providerRaw === "bailian" ||
+          providerRaw === "aliyun" ||
+          providerRaw === "dashscope"
+        ? "bailian"
+        : providerRaw === "ollama"
+        ? "ollama"
+        : undefined;
 
-    if (!base64) {
+    if (!base64 && !imageUrl) {
       res.status(400).json({
         success: false,
         message: "invalid_request",
         data: null,
-        error: { code: "INVALID_REQUEST", message: "image_base64 is required", details: null },
+        error: {
+          code: "INVALID_REQUEST",
+          message: "image_base64 or image_url is required",
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
       return;
     }
 
-    // Strip data URL prefix if present
-    const cleaned = base64.includes(",") && base64.toLowerCase().startsWith("data:")
-      ? base64.split(",")[1] ?? ""
-      : base64;
+    // Prepare base64 input: either from provided base64 (supports data URL) or fetched from image_url
+    let cleaned = "";
+    if (base64) {
+      cleaned =
+        base64.includes(",") && base64.toLowerCase().startsWith("data:")
+          ? base64.split(",")[1] ?? ""
+          : base64;
+    } else {
+      // fetch image from URL
+      try {
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(
+          () => controller.abort(),
+          Math.max(10000, Math.min(timeoutMs, 300000))
+        );
+        try {
+          const resp = await fetch(imageUrl, { signal: controller.signal });
+          if (!resp.ok) {
+            res.status(400).json({
+              success: false,
+              message: "invalid_request",
+              data: null,
+              error: {
+                code: "INVALID_IMAGE_URL",
+                message: `Failed to fetch image_url (HTTP ${resp.status})`,
+                details: null,
+              },
+              timestamp: new Date().toISOString(),
+              request_id: "",
+            });
+            return;
+          }
+          const ab = await resp.arrayBuffer();
+          cleaned = Buffer.from(ab).toString("base64");
+        } finally {
+          clearTimeout(fetchTimeout);
+        }
+      } catch (e) {
+        res.status(400).json({
+          success: false,
+          message: "invalid_request",
+          data: null,
+          error: {
+            code: "INVALID_IMAGE_URL",
+            message: `Failed to fetch image_url: ${(e as Error).message}`,
+            details: null,
+          },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+    }
 
     const prompt = buildVisionDescribePrompt(language, hint);
 
     let description = "";
     try {
-      description = await describeImage(cleaned, { prompt, timeoutMs, maxTokens });
+      description = await describeImage(cleaned, {
+        prompt,
+        timeoutMs,
+        maxTokens,
+        providerOverride: provider,
+      });
     } catch (e) {
-      logger.error("/api/chat/describe-image vision generation failed", e as unknown);
+      logger.error(
+        "/api/chat/describe-image vision generation failed",
+        e as unknown
+      );
       res.status(500).json({
         success: false,
         message: "llm_error",
         data: null,
-        error: { code: "LLM_ERROR", message: (e as Error).message, details: null },
+        error: {
+          code: "LLM_ERROR",
+          message: (e as Error).message,
+          details: null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -257,7 +362,7 @@ export async function chatDescribeImageHandler(
       data: {
         description,
         language,
-        model_used: getActiveModelName("vision"),
+        model_used: getActiveModelName("vision", provider),
       },
       error: null,
       timestamp: new Date().toISOString(),
@@ -269,7 +374,11 @@ export async function chatDescribeImageHandler(
       success: false,
       message: "internal_error",
       data: null,
-      error: { code: "INTERNAL_ERROR", message: "Describe image failed", details: null },
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Describe image failed",
+        details: null,
+      },
       timestamp: new Date().toISOString(),
       request_id: "",
     });
@@ -1238,18 +1347,26 @@ export async function chatDirectoryStructureHandler(
       Math.min(100, Math.floor(maxDirsRaw))
     );
     const language: SupportedLang = normalizeLanguage(body?.language);
-    const providerRaw = typeof body?.provider === "string" ? body.provider.trim().toLowerCase() : undefined;
-    const provider: ProviderName | undefined = providerRaw === "openai"
-      ? "openai"
-      : providerRaw === "azure-openai" || providerRaw === "azure" || providerRaw === "azure_openai"
-      ? "azure-openai"
-      : providerRaw === "openrouter"
-      ? "openrouter"
-      : providerRaw === "bailian" || providerRaw === "aliyun" || providerRaw === "dashscope"
-      ? "bailian"
-      : providerRaw === "ollama"
-      ? "ollama"
-      : undefined;
+    const providerRaw =
+      typeof body?.provider === "string"
+        ? body.provider.trim().toLowerCase()
+        : undefined;
+    const provider: ProviderName | undefined =
+      providerRaw === "openai"
+        ? "openai"
+        : providerRaw === "azure-openai" ||
+          providerRaw === "azure" ||
+          providerRaw === "azure_openai"
+        ? "azure-openai"
+        : providerRaw === "openrouter"
+        ? "openrouter"
+        : providerRaw === "bailian" ||
+          providerRaw === "aliyun" ||
+          providerRaw === "dashscope"
+        ? "bailian"
+        : providerRaw === "ollama"
+        ? "ollama"
+        : undefined;
     const messages = buildDirectoryStructureMessages({
       language,
       profession,
@@ -1265,21 +1382,21 @@ export async function chatDirectoryStructureHandler(
         schema: {
           type: "object",
           properties: {
-            directories: { 
-              type: "array", 
-              items: { 
+            directories: {
+              type: "array",
+              items: {
                 type: "object",
                 properties: {
-                  "path": { 
-                    type: "string" 
+                  path: {
+                    type: "string",
                   },
-                  "description": { 
-                    type: "string" 
-                  }
+                  description: {
+                    type: "string",
+                  },
                 },
-                required: ["path", "description"]
-              } 
-            }
+                required: ["path", "description"],
+              },
+            },
           },
           required: ["directories"],
         },
@@ -1322,7 +1439,10 @@ export async function chatDirectoryStructureHandler(
     const resultObj = result as { directories?: DirectoryItem[] } | undefined;
     for (const item of resultObj?.directories ?? []) {
       if (
-        item && typeof item === "object" && "path" in item && "description" in item &&
+        item &&
+        typeof item === "object" &&
+        "path" in item &&
+        "description" in item &&
         typeof item.path === "string" &&
         typeof item.description === "string"
       ) {
@@ -1336,11 +1456,11 @@ export async function chatDirectoryStructureHandler(
       data: {
         directories,
         metadata: {
-          model_used: getActiveModelName("chat", provider) || cfg.ollamaModel || "",
+          model_used:
+            getActiveModelName("chat", provider) || cfg.ollamaModel || "",
           tokens_used: 0,
           response_time_ms: responseTime,
           generation_time_ms: responseTime,
-          
         },
       },
       error: null,
