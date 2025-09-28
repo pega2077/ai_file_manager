@@ -212,6 +212,7 @@ type ChatDescribeImageBody = {
   timeout_ms?: unknown; // optional timeout override
   max_tokens?: unknown; // optional max tokens for vision answer
   provider?: unknown; // optional provider override: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian'
+  model?: unknown; // optional model override for selected provider
 };
 
 export async function chatDescribeImageHandler(
@@ -234,6 +235,10 @@ export async function chatDescribeImageHandler(
     const maxTokens =
       typeof body?.max_tokens === "number" && body.max_tokens > 0
         ? Math.floor(body.max_tokens)
+        : undefined;
+    const overrideModel =
+      typeof body?.model === "string" && body.model.trim().length > 0
+        ? body.model.trim()
         : undefined;
     const providerRaw =
       typeof body?.provider === "string"
@@ -335,6 +340,7 @@ export async function chatDescribeImageHandler(
         timeoutMs,
         maxTokens,
         providerOverride: provider,
+        overrideModel,
       });
     } catch (e) {
       logger.error(
@@ -362,7 +368,7 @@ export async function chatDescribeImageHandler(
       data: {
         description,
         language,
-        model_used: getActiveModelName("vision", provider),
+        model_used: overrideModel || getActiveModelName("vision", provider),
       },
       error: null,
       timestamp: new Date().toISOString(),
