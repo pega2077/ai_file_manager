@@ -277,7 +277,7 @@
         "size": "大小",
         "tags": "标签",
         "addedAt": "添加时间",
-        "ragStatus": "知识库状态",
+        "ragStatus": "知识库",
         "actions": "操作"
       },
       "ragStatus": {

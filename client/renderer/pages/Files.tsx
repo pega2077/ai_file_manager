@@ -268,35 +268,36 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       key: 'name',
       ellipsis: false,
       width: 200,
+      fixed: 'left',
       sorter: true,
-      render: (name: string) => (
+      render: (name: string, path: string) => (
         <div>
           <FileTextOutlined style={{ marginRight: 8 }} />
-          <span>{name}</span>
+          <span title={path}>{name}</span>
         </div>
       ),
     },
-    {
-      title: t('files.table.columns.path'),
-      dataIndex: 'path',
-      key: 'path',
-      ellipsis: true,
-      width: 200,
-      render: (path: string) => (
-        <span style={{ fontSize: '12px', color: '#666' }} title={path}>
-          {getRelativePath(path)}
-        </span>
-      ),
-    },
-    {
-      title: t('files.table.columns.type'),
-      dataIndex: 'type',
-      key: 'type',
-      width: 100,
-      render: (type: string) => (
-        <Tag color="blue">{type}</Tag>
-      ),
-    },
+    // {
+    //   title: t('files.table.columns.path'),
+    //   dataIndex: 'path',
+    //   key: 'path',
+    //   ellipsis: true,
+    //   width: 200,
+    //   render: (path: string) => (
+    //     <span style={{ fontSize: '12px', color: '#666' }} title={path}>
+    //       {getRelativePath(path)}
+    //     </span>
+    //   ),
+    // },
+    // {
+    //   title: t('files.table.columns.type'),
+    //   dataIndex: 'type',
+    //   key: 'type',
+    //   width: 100,
+    //   render: (type: string) => (
+    //     <Tag color="blue">{type}</Tag>
+    //   ),
+    // },
     {
       title: t('files.table.columns.category'),
       dataIndex: 'category',
@@ -318,7 +319,8 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       title: t('files.table.columns.tags'),
       dataIndex: 'tags',
       key: 'tags',
-      width: 120,
+      fixed: 'right',
+      width: 200,
       render: (tags: string[]) => (
         <div>
           {tags.map(tag => (
@@ -360,6 +362,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       title: t('files.table.columns.actions'),
       key: 'actions',
       width: 200,
+      fixed: 'right',
       render: (_: unknown, record: ImportedFileItem) => (
         <Space>
           <Button
