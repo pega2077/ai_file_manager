@@ -362,33 +362,6 @@ export async function updateFileHandler(req: Request, res: Response): Promise<vo
   }
 }
 
-export function registerFilesRoutes(app: Express) {
-  // POST /api/files/list
-  app.post("/api/files/list", listFilesHandler);
-  // POST /api/files/preview
-  app.post("/api/files/preview", previewFileHandler);
-  // POST /api/files/save-file
-  app.post("/api/files/save-file", saveFileHandler);
-  // POST /api/files/update
-  app.post("/api/files/update", updateFileHandler);
-  // POST /api/files/import-to-rag
-  app.post("/api/files/import-to-rag", importToRagHandler);
-  // POST /api/files/list-directory-recursive
-  app.post("/api/files/list-directory-recursive", listDirectoryRecursiveHandler);
-  // POST /api/files/recommend-directory
-  app.post("/api/files/recommend-directory", recommendDirectoryHandler);
-  // POST /api/files/chunks/list
-  app.post("/api/files/chunks/list", listChunksHandler);
-  // GET /api/files/chunks/{chunk_id}
-  app.get("/api/files/chunks/:chunk_id", getChunkContentHandler);
-  // GET /api/files/{file_id}
-  app.get("/api/files/:file_id", getFileDetailsHandler);
-  // POST /api/files/delete
-  app.post("/api/files/delete", deleteFileHandler);
-  // POST /api/files/extract-tags
-  app.post("/api/files/extract-tags", extractTagsHandler);
-}
-
 // -------- Handlers --------
 export async function previewFileHandler(req: Request, res: Response): Promise<void> {
   try {
@@ -1835,4 +1808,32 @@ export async function extractTagsHandler(req: Request, res: Response): Promise<v
       request_id: "",
     });
   }
+}
+
+
+export function registerFilesRoutes(app: Express) {
+  // POST /api/files/list
+  app.post("/api/files/list", listFilesHandler);
+  // POST /api/files/preview
+  app.post("/api/files/preview", previewFileHandler);
+  // POST /api/files/save-file
+  app.post("/api/files/save-file", saveFileHandler);
+  // POST /api/files/update
+  app.post("/api/files/update", updateFileHandler);
+  // POST /api/files/import-to-rag
+  app.post("/api/files/import-to-rag", importToRagHandler);
+  // POST /api/files/list-directory-recursive
+  app.post("/api/files/list-directory-recursive", listDirectoryRecursiveHandler);
+  // POST /api/files/recommend-directory
+  app.post("/api/files/recommend-directory", recommendDirectoryHandler);
+  // POST /api/files/chunks/list
+  app.post("/api/files/chunks/list", listChunksHandler);
+  // GET /api/files/chunks/{chunk_id}
+  app.get("/api/files/chunks/:chunk_id", getChunkContentHandler);
+  // GET /api/files/{file_id}
+  app.get("/api/files/:file_id", getFileDetailsHandler);
+  // POST /api/files/delete
+  app.post("/api/files/delete", deleteFileHandler);
+  // POST /api/files/extract-tags
+  app.post("/api/files/extract-tags", extractTagsHandler);
 }

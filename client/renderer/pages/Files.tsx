@@ -318,6 +318,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       title: t('files.table.columns.tags'),
       dataIndex: 'tags',
       key: 'tags',
+      width: 120,
       render: (tags: string[]) => (
         <div>
           {tags.map(tag => (
@@ -330,7 +331,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       title: t('files.table.columns.addedAt'),
       dataIndex: 'created_at',
       key: 'created_at',
-      width: 150,
+      width: 120,
       sorter: true,
       render: (date: string) => new Date(date).toLocaleString(),
     },
