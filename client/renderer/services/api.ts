@@ -75,17 +75,91 @@ interface FileDetail {
   };
 }
 
-interface AskQuestionPayload {
-  question: string;
-  context_limit: number;
+export interface ChatSearchResultItem {
+  chunk_record_id: number;
+  chunk_id: string;
+  chunk_index: number;
+  file_id: string;
+  file_name: string;
+  file_path: string;
+  file_category: string;
+  file_tags: string[];
+  snippet: string;
+  relevance_score: number;
+  match_reason: string;
+}
+
+export interface ChatSearchMetadata {
+  query: string;
+  result_count: number;
+  keyword_time_ms: number;
+  vector_time_ms: number | null;
+  retrieval_time_ms: number;
   similarity_threshold: number;
-  temperature: number;
-  max_tokens: number;
-  stream: boolean;
-  provider?: string;
-  file_filters?: {
+  context_limit: number;
+  max_results: number;
+  filters_applied: {
     file_ids: string[];
+    categories: string[];
+    tags: string[];
   };
+  response_time_ms: number;
+}
+
+export interface ChatSearchResponse {
+  results: ChatSearchResultItem[];
+  retrieval_mode: 'keyword' | 'vector' | 'none';
+  metadata: ChatSearchMetadata;
+}
+
+export interface QuestionSource {
+  file_id: string;
+  file_name: string;
+  file_path: string;
+  chunk_id: string;
+  chunk_content: string;
+  chunk_index: number;
+  relevance_score: number;
+  match_reason?: string;
+}
+
+export interface QuestionResponse {
+  answer: string;
+  confidence: number;
+  sources: QuestionSource[];
+  metadata: {
+    model_used: string;
+    tokens_used: number;
+    response_time_ms: number;
+    retrieval_time_ms: number;
+    generation_time_ms: number;
+    retrieval_mode?: 'keyword' | 'vector' | 'none' | 'manual';
+  };
+}
+
+export interface AnalyzeChunkSelection {
+  chunk_record_id: number;
+  relevance_score: number;
+  match_reason: string;
+}
+
+export interface SearchKnowledgeOptions {
+  context_limit?: number;
+  similarity_threshold?: number;
+  max_results?: number;
+  file_ids?: string[];
+  categories?: string[];
+  tags?: string[];
+}
+
+export interface AnalyzeQuestionOptions {
+  context_limit?: number;
+  temperature?: number;
+  max_tokens?: number;
+  similarity_threshold?: number;
+  override_model?: string;
+  language?: string;
+  providerOverride?: string;
 }
 
 interface SystemConfigUpdate {
@@ -333,6 +407,88 @@ class ApiService {
     });
   }
 
+  async searchKnowledge(question: string, options?: SearchKnowledgeOptions): Promise<ApiResponse<ChatSearchResponse>> {
+    const contextLimit = Math.max(1, Math.floor(options?.context_limit ?? 5));
+    const similarityThreshold =
+      typeof options?.similarity_threshold === 'number'
+        ? options.similarity_threshold
+        : 0.7;
+    const maxResultsRaw =
+      typeof options?.max_results === 'number'
+        ? Math.max(1, Math.floor(options.max_results))
+        : contextLimit * 4;
+    const payload: Record<string, unknown> = {
+      query: question,
+      context_limit: contextLimit,
+      similarity_threshold: similarityThreshold,
+      max_results: Math.min(50, maxResultsRaw),
+    };
+
+    const filters: Record<string, unknown> = {};
+    if (options?.file_ids && options.file_ids.length > 0) {
+      filters.file_ids = options.file_ids;
+    }
+    if (options?.categories && options.categories.length > 0) {
+      filters.categories = options.categories;
+    }
+    if (options?.tags && options.tags.length > 0) {
+      filters.tags = options.tags;
+    }
+    if (Object.keys(filters).length > 0) {
+      payload.file_filters = filters;
+    }
+
+  return this.request<ChatSearchResponse>('/chat/search', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async analyzeQuestion(
+    question: string,
+    selectedChunks: AnalyzeChunkSelection[],
+    options?: AnalyzeQuestionOptions
+  ): Promise<ApiResponse<QuestionResponse>> {
+    const provider =
+      options?.providerOverride ?? (await this.ensureProvider());
+    const contextLimit = Math.max(
+      1,
+      Math.floor(options?.context_limit ?? Math.max(selectedChunks.length, 5))
+    );
+    const payload: Record<string, unknown> = {
+      question,
+      selected_chunks: selectedChunks.map((chunk) => ({
+        chunk_record_id: chunk.chunk_record_id,
+        relevance_score: chunk.relevance_score,
+        match_reason: chunk.match_reason,
+      })),
+      context_limit: contextLimit,
+      temperature:
+        typeof options?.temperature === 'number' ? options.temperature : 0.7,
+      max_tokens:
+        typeof options?.max_tokens === 'number'
+          ? Math.max(100, Math.floor(options.max_tokens))
+          : 2000,
+      similarity_threshold:
+        typeof options?.similarity_threshold === 'number'
+          ? options.similarity_threshold
+          : 0.7,
+      provider,
+    };
+
+    if (options?.override_model) {
+      payload.override_model = options.override_model;
+    }
+    if (options?.language) {
+      payload.language = options.language;
+    }
+
+  return this.request<QuestionResponse>('/chat/analyze', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   // 文件名搜索
   // 获取文件格式转换支持的格式
   async getConversionFormats() {
@@ -439,28 +595,88 @@ class ApiService {
     max_tokens?: number;
     stream?: boolean;
     file_ids?: string[];
-  }) {
-    console.log('askQuestion:', options);
+  }): Promise<ApiResponse<QuestionResponse>> {
     const provider = await this.ensureProvider();
-    const payload: AskQuestionPayload = {
-      question,
-      context_limit: options?.context_limit || 5,
-      similarity_threshold: options?.similarity_threshold || 0.5,
-      temperature: options?.temperature || 0.7,
-      max_tokens: options?.max_tokens || 2000,
-      stream: options?.stream || false,
-      provider,
-    };
+    const contextLimit = Math.max(1, Math.floor(options?.context_limit ?? 5));
+    const similarityThreshold =
+      typeof options?.similarity_threshold === 'number'
+        ? options.similarity_threshold
+        : 0.5;
 
-    if (options?.file_ids && options.file_ids.length > 0) {
-      payload.file_filters = {
-        file_ids: options.file_ids
+    const searchResponse = await this.searchKnowledge(question, {
+      context_limit: contextLimit,
+      similarity_threshold: similarityThreshold,
+      max_results: contextLimit * 4,
+      file_ids: options?.file_ids,
+    });
+
+    if (!searchResponse.success) {
+      return searchResponse as unknown as ApiResponse<QuestionResponse>;
+    }
+
+    const searchData = searchResponse.data as ChatSearchResponse | undefined;
+    if (!searchData) {
+      const nowIso = new Date().toISOString();
+      return {
+        success: true,
+        message: 'no_context',
+        data: {
+          answer: 'No relevant context found. Please refine your search or import more documents.',
+          confidence: 0,
+          sources: [],
+          metadata: {
+            model_used: provider,
+            tokens_used: 0,
+            response_time_ms: 0,
+            retrieval_time_ms: 0,
+            generation_time_ms: 0,
+            retrieval_mode: 'none',
+          },
+        },
+        error: null,
+        timestamp: nowIso,
+        request_id: '',
       };
     }
 
-    return this.request('/chat/ask', {
-      method: 'POST',
-      body: JSON.stringify(payload),
+    const selections = searchData.results
+      .slice(0, contextLimit)
+      .map((item) => ({
+        chunk_record_id: item.chunk_record_id,
+        relevance_score: item.relevance_score,
+        match_reason: item.match_reason,
+      }));
+
+    if (selections.length === 0) {
+      const nowIso = new Date().toISOString();
+      return {
+        success: true,
+        message: 'no_context',
+        data: {
+          answer: 'No relevant context found. Please refine your search or import more documents.',
+          confidence: 0,
+          sources: [],
+          metadata: {
+            model_used: provider,
+            tokens_used: 0,
+            response_time_ms: searchData.metadata.response_time_ms,
+            retrieval_time_ms: searchData.metadata.retrieval_time_ms,
+            generation_time_ms: 0,
+            retrieval_mode: searchData.retrieval_mode,
+          },
+        },
+        error: null,
+        timestamp: nowIso,
+        request_id: '',
+      };
+    }
+
+    return this.analyzeQuestion(question, selections, {
+      context_limit: contextLimit,
+      temperature: options?.temperature,
+      max_tokens: options?.max_tokens,
+      similarity_threshold: similarityThreshold,
+      providerOverride: provider,
     });
   }
 }

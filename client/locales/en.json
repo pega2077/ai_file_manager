@@ -487,7 +487,21 @@
     },
     "buttons": {
       "search": "Search",
-      "ask": "Ask"
+      "ask": "Ask",
+      "analyze": "Analyze"
+    },
+    "messages": {
+      "emptyQuestion": "Please enter a question.",
+      "askFailed": "Failed to get answer.",
+      "askRequestFailed": "Request failed, please try again.",
+      "loadReferencedFilesFailed": "Failed to load referenced files.",
+      "getChunkFailed": "Failed to get chunk content.",
+      "copySuccess": "Copied preview: {text}",
+      "copyFailed": "Copy failed.",
+      "openFileFailed": "Failed to open the file.",
+      "openFileNotSupported": "Opening files is not supported on this platform.",
+      "searchNoResults": "No results found. Try adjusting filters or keywords.",
+      "noChunksSelected": "Please select at least one chunk before analyzing."
     },
     "loading": {
       "searching": "Searching...",
@@ -514,7 +528,28 @@
       "contextLimit": "Context Limit",
       "maxTokens": "Max Tokens",
       "temperature": "Temperature",
-      "referencedFiles": "Referenced Files"
+      "referencedFiles": "Referenced Files",
+      "searchResultsTitle": "Search Results",
+      "resultsCount": "{count} chunks",
+      "retrievalTime": "Retrieval {value} ms",
+      "selectedCount": "Selected {count}",
+      "selectTop": "Select Top {count}",
+      "clearSelection": "Clear",
+      "noResultsPlaceholder": "No related chunks yet. Try a new search.",
+      "relevance": "Relevance {value}%",
+      "matchReason": {
+        "content": "Content match",
+        "fileName": "Filename match",
+        "category": "Category match",
+        "tag": "Tag match",
+        "vector": "Vector similarity"
+      },
+      "retrievalMode": {
+        "keyword": "Keyword first",
+        "vector": "Vector fallback",
+        "manual": "Manual selection",
+        "none": "Not searched"
+      }
     },
     "preview": {
       "contentType": "Content Type:",

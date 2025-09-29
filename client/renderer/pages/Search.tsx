@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Layout, Input, Button, List, Spin, message, Tag, Card, Modal, Slider, InputNumber } from 'antd';
+import { Layout, Input, Button, List, Spin, message, Tag, Card, Modal, Slider, InputNumber, Checkbox, Space, Empty } from 'antd';
 import { QuestionCircleOutlined, EyeOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
-import { apiService } from '../services/api';
+import { apiService, ChatSearchResultItem, ChatSearchMetadata, QuestionResponse, ChatSearchResponse } from '../services/api';
 import Sidebar from '../components/Sidebar';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 
@@ -21,29 +21,6 @@ interface SearchResult {
 }
 
 // Filename search removed; SearchResponse no longer needed
-
-interface QuestionSource {
-  file_id: string;
-  file_name: string;
-  file_path: string;
-  chunk_id: string;
-  chunk_content: string;
-  chunk_index: number;
-  relevance_score: number;
-}
-
-interface QuestionResponse {
-  answer: string;
-  confidence: number;
-  sources: QuestionSource[];
-  metadata: {
-    model_used: string;
-    tokens_used: number;
-    response_time_ms: number;
-    retrieval_time_ms: number;
-    generation_time_ms: number;
-  };
-}
 
 interface ChunkContent {
   id: string;
@@ -68,7 +45,12 @@ const SearchPage = () => {
   // 提问相关状态
   const [questionQuery, setQuestionQuery] = useState('');
   const [questionResult, setQuestionResult] = useState<QuestionResponse | null>(null);
-  const [asking, setAsking] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<ChatSearchResultItem[]>([]);
+  const [selectedChunkIds, setSelectedChunkIds] = useState<number[]>([]);
+  const [retrievalMode, setRetrievalMode] = useState<'keyword' | 'vector' | 'none' | 'manual'>('none');
+  const [searchMetadata, setSearchMetadata] = useState<ChatSearchMetadata | null>(null);
   const [referencedFiles, setReferencedFiles] = useState<SearchResult[]>([]);
   const [similarityThreshold, setSimilarityThreshold] = useState(0.4);
   const [contextLimit, setContextLimit] = useState(5);
@@ -144,43 +126,89 @@ const SearchPage = () => {
 
   // Filename search removed
 
-  const handleAskQuestion = async (value: string) => {
-    if (!value.trim()) {
+  const handleSearchCandidates = async (value: string) => {
+    const query = value.trim();
+    if (!query) {
       message.warning(t('search.messages.emptyQuestion'));
       return;
     }
 
-    setAsking(true);
+    setQuestionQuery(value);
+    setQuestionResult(null);
+    setSearching(true);
+    setAnalyzing(false);
+    setSearchResults([]);
+    setSelectedChunkIds([]);
+    setRetrievalMode('none');
+    setSearchMetadata(null);
+
     try {
-      const options: {
-        file_ids?: string[];
-        similarity_threshold?: number;
-        context_limit?: number;
-        max_tokens?: number;
-        temperature?: number;
-      } = {};
-      
-      // 如果有引用文件，添加到请求中
-      if (referencedFiles.length > 0) {
-        const validFileIds = referencedFiles
-          .map(file => file.file_id)
-          .filter(id => id && typeof id === 'string' && id.trim());
-        
-        if (validFileIds.length > 0) {
-          options.file_ids = validFileIds;
+      const validFileIds = referencedFiles
+        .map((file) => file.file_id)
+        .filter((id): id is string => Boolean(id && id.trim()));
+
+      const response = await apiService.searchKnowledge(query, {
+        context_limit: contextLimit,
+        similarity_threshold: similarityThreshold,
+        max_results: Math.max(contextLimit * 4, 10),
+        file_ids: validFileIds.length > 0 ? validFileIds : undefined,
+      });
+
+      if (response.success) {
+        const data = response.data as ChatSearchResponse;
+        setSearchResults(data.results);
+        setRetrievalMode(data.retrieval_mode);
+        setSearchMetadata(data.metadata);
+        if (data.results.length > 0) {
+          setSelectedChunkIds(
+            data.results
+              .slice(0, contextLimit)
+              .map((item) => item.chunk_record_id)
+          );
+        } else {
+          message.info(t('search.messages.searchNoResults'));
         }
+      } else {
+        message.error(response.message || t('search.messages.askFailed'));
       }
-      
-      // 设置相似度阈值
-      options.similarity_threshold = similarityThreshold;
-      
-      // 设置其他参数
-      options.context_limit = contextLimit;
-      options.max_tokens = maxTokens;
-      options.temperature = temperature;
-      
-      console.log('Asking question with options:', options);
-      const response = await apiService.askQuestion(value, options);
+    } catch (error) {
+      console.error('Search error:', error);
+      message.error(t('search.messages.askRequestFailed'));
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!questionQuery.trim()) {
+      message.warning(t('search.messages.emptyQuestion'));
+      return;
+    }
+
+    const selected = searchResults.filter((item) =>
+      selectedChunkIds.includes(item.chunk_record_id)
+    );
+
+    if (selected.length === 0) {
+      message.warning(t('search.messages.noChunksSelected'));
+      return;
+    }
+
+    setAnalyzing(true);
+    try {
+      const selections = selected.map((item) => ({
+        chunk_record_id: item.chunk_record_id,
+        relevance_score: item.relevance_score,
+        match_reason: item.match_reason,
+      }));
+
+      const response = await apiService.analyzeQuestion(questionQuery, selections, {
+        context_limit: contextLimit,
+        similarity_threshold: similarityThreshold,
+        temperature,
+        max_tokens: maxTokens,
+      });
+
       if (response.success) {
         const data = response.data as QuestionResponse;
         setQuestionResult(data);
@@ -188,10 +216,60 @@ const SearchPage = () => {
         message.error(response.message || t('search.messages.askFailed'));
       }
     } catch (error) {
-      console.error('Question error:', error);
+      console.error('Analyze error:', error);
       message.error(t('search.messages.askRequestFailed'));
     } finally {
-      setAsking(false);
+      setAnalyzing(false);
+    }
+  };
+
+  const toggleChunkSelection = (chunkRecordId: number, checked: boolean) => {
+    setSelectedChunkIds((prev) => {
+      if (checked) {
+        return Array.from(new Set([...prev, chunkRecordId]));
+      }
+      return prev.filter((id) => id !== chunkRecordId);
+    });
+  };
+
+  const selectTopChunks = () => {
+    setSelectedChunkIds(
+      searchResults
+        .slice(0, contextLimit)
+        .map((item) => item.chunk_record_id)
+    );
+  };
+
+  const clearSelectedChunks = () => {
+    setSelectedChunkIds([]);
+  };
+
+  const matchReasonLabel = (reason: string) => {
+    switch (reason) {
+      case 'keyword-content':
+        return t('search.qa.matchReason.content');
+      case 'keyword-name':
+        return t('search.qa.matchReason.fileName');
+      case 'keyword-category':
+        return t('search.qa.matchReason.category');
+      case 'keyword-tag':
+        return t('search.qa.matchReason.tag');
+      case 'vector':
+      default:
+        return t('search.qa.matchReason.vector');
+    }
+  };
+
+  const retrievalModeLabel = () => {
+    switch (retrievalMode) {
+      case 'keyword':
+        return t('search.qa.retrievalMode.keyword');
+      case 'vector':
+        return t('search.qa.retrievalMode.vector');
+      case 'manual':
+        return t('search.qa.retrievalMode.manual');
+      default:
+        return t('search.qa.retrievalMode.none');
     }
   };
 
@@ -352,14 +430,129 @@ const SearchPage = () => {
               size="large"
               value={questionQuery}
               onChange={(e) => setQuestionQuery(e.target.value)}
-              onSearch={handleAskQuestion}
-              loading={asking}
+              onSearch={handleSearchCandidates}
+              loading={searching}
             />
           </div>
 
+          {(searching || searchResults.length > 0 || retrievalMode !== 'none') && (
+            <Card
+              size="small"
+              style={{ marginBottom: '16px' }}
+              title={
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>{t('search.qa.searchResultsTitle')}</span>
+                  <Tag color={retrievalMode === 'vector' ? 'purple' : retrievalMode === 'keyword' ? 'blue' : 'default'}>
+                    {retrievalModeLabel()}
+                  </Tag>
+                  <Tag color="geekblue">
+                    {t('search.qa.resultsCount', { count: searchResults.length })}
+                  </Tag>
+                  {searchMetadata && (
+                    <Tag color="default">
+                      {t('search.qa.retrievalTime', { value: searchMetadata.retrieval_time_ms })}
+                    </Tag>
+                  )}
+                </div>
+              }
+              extra={
+                <Space size="small">
+                  <Tag color="green">
+                    {t('search.qa.selectedCount', { count: selectedChunkIds.length })}
+                  </Tag>
+                  <Button size="small" onClick={selectTopChunks} disabled={searchResults.length === 0}>
+                    {t('search.qa.selectTop', { count: contextLimit })}
+                  </Button>
+                  <Button size="small" onClick={clearSelectedChunks} disabled={selectedChunkIds.length === 0}>
+                    {t('search.qa.clearSelection')}
+                  </Button>
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<QuestionCircleOutlined />}
+                    onClick={handleAnalyze}
+                    loading={analyzing}
+                    disabled={selectedChunkIds.length === 0 || searching}
+                  >
+                    {t('search.buttons.analyze')}
+                  </Button>
+                </Space>
+              }
+            >
+              {searching ? (
+                <div style={{ textAlign: 'center', padding: '24px' }}>
+                  <Spin size="large" />
+                </div>
+              ) : searchResults.length === 0 ? (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description={t('search.qa.noResultsPlaceholder')}
+                />
+              ) : (
+                <List
+                  dataSource={searchResults}
+                  renderItem={(item) => {
+                    const checked = selectedChunkIds.includes(item.chunk_record_id);
+                    return (
+                      <List.Item key={item.chunk_record_id} style={{ padding: '12px 0' }}>
+                        <div style={{ display: 'flex', width: '100%', gap: '12px' }}>
+                          <Checkbox
+                            checked={checked}
+                            onChange={(e) => toggleChunkSelection(item.chunk_record_id, e.target.checked)}
+                            style={{ marginTop: 4 }}
+                          />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                              <span style={{ fontWeight: 'bold' }}>{item.file_name}</span>
+                              <Tag color={item.match_reason === 'vector' ? 'purple' : 'blue'}>
+                                {matchReasonLabel(item.match_reason)}
+                              </Tag>
+                              <Tag color="geekblue">
+                                {t('search.qa.relevance', { value: (item.relevance_score * 100).toFixed(1) })}
+                              </Tag>
+                            </div>
+                            <div style={{ color: '#666', fontSize: '12px', marginBottom: '6px' }}>
+                              {item.file_path}
+                            </div>
+                            <div
+                              style={{
+                                color: '#333',
+                                fontSize: '13px',
+                                background: '#f9f9f9',
+                                borderRadius: '4px',
+                                padding: '8px',
+                                border: '1px solid #e8e8e8',
+                                marginBottom: '8px',
+                                whiteSpace: 'pre-wrap',
+                              }}
+                            >
+                              {item.snippet}
+                            </div>
+                            <Space size="small">
+                              <Button size="small" icon={<EyeOutlined />} onClick={() => handlePreviewChunk(item.chunk_id)}>
+                                {t('search.qa.preview')}
+                              </Button>
+                              <Button
+                                size="small"
+                                icon={<FolderOpenOutlined />}
+                                onClick={() => handleOpenFile(item.file_path, item.snippet)}
+                              >
+                                {t('search.qa.openFile')}
+                              </Button>
+                            </Space>
+                          </div>
+                        </div>
+                      </List.Item>
+                    );
+                  }}
+                />
+              )}
+            </Card>
+          )}
+
           {
             <>
-              {asking ? (
+              {analyzing ? (
                 <div style={{ textAlign: 'center', padding: '50px' }}>
                   <Spin size="large" />
                   <div style={{ marginTop: '16px' }}>{t('search.loading.thinking')}</div>

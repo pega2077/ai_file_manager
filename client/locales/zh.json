@@ -484,7 +484,21 @@
     },
     "buttons": {
       "search": "搜索",
-      "ask": "提问"
+      "ask": "提问",
+      "analyze": "生成回答"
+    },
+    "messages": {
+      "emptyQuestion": "请输入问题。",
+      "askFailed": "获取回答失败。",
+      "askRequestFailed": "请求失败，请稍后重试。",
+      "loadReferencedFilesFailed": "引用文件加载失败。",
+      "getChunkFailed": "获取分段内容失败。",
+      "copySuccess": "已复制预览: {text}",
+      "copyFailed": "复制失败。",
+      "openFileFailed": "打开文件失败。",
+      "openFileNotSupported": "当前平台不支持打开文件。",
+      "searchNoResults": "未找到结果，请调整筛选条件或关键字。",
+      "noChunksSelected": "请选择至少一个分段再进行分析。"
     },
     "loading": {
       "searching": "正在搜索中...",
@@ -511,7 +525,28 @@
       "contextLimit": "搜索条数",
       "maxTokens": "最大Token数",
       "temperature": "温度",
-      "referencedFiles": "引用文件"
+      "referencedFiles": "引用文件",
+      "searchResultsTitle": "搜索结果",
+      "resultsCount": "共 {count} 个分段",
+      "retrievalTime": "检索耗时 {value} 毫秒",
+      "selectedCount": "已选 {count}",
+      "selectTop": "选择前 {count} 个",
+      "clearSelection": "清空选择",
+      "noResultsPlaceholder": "暂无相关分段，请尝试重新搜索。",
+      "relevance": "相关度 {value}%",
+      "matchReason": {
+        "content": "内容匹配",
+        "fileName": "文件名匹配",
+        "category": "分类匹配",
+        "tag": "标签匹配",
+        "vector": "向量相似"
+      },
+      "retrievalMode": {
+        "keyword": "关键词匹配",
+        "vector": "向量回退",
+        "manual": "手动选择",
+        "none": "尚未检索"
+      }
     },
     "preview": {
       "contentType": "内容类型:",

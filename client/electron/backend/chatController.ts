@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { Op } from "sequelize";
 import { generateStructuredJson } from "./utils/llm";
 import type { ProviderName } from "./utils/llm";
 import { logger } from "../logger";
@@ -14,6 +15,15 @@ import {
 } from "./utils/promptHelper";
 import { buildVisionDescribePrompt } from "./utils/promptHelper";
 import { describeImage, getActiveModelName } from "./utils/llm";
+import ChunkModel, { type ChunkAttributes } from "./models/chunk";
+import FileModel, { type FileAttributes } from "./models/file";
+import { embedWithOllama } from "./utils/ollama";
+import {
+  isFaissAvailable,
+  globalIndexExists,
+  searchGlobalFaissIndex,
+} from "./utils/vectorStore";
+import faiss from "faiss-node";
 
 export function registerChatRoutes(app: Express) {
   // POST /api/chat/recommend-directory
@@ -24,6 +34,10 @@ export function registerChatRoutes(app: Express) {
   app.post("/api/chat/ask", chatAskHandler);
   // POST /api/chat/describe-image
   app.post("/api/chat/describe-image", chatDescribeImageHandler);
+  // POST /api/chat/search (retrieval-only step)
+  app.post("/api/chat/search", chatSearchHandler);
+  // POST /api/chat/analyze (LLM analysis step)
+  app.post("/api/chat/analyze", chatAnalyzeHandler);
 }
 
 type ChatRecommendBody = {
@@ -391,16 +405,1016 @@ export async function chatDescribeImageHandler(
   }
 }
 
+type ParsedFileFilters = {
+  file_ids?: string[];
+  categories?: string[];
+  tags?: string[];
+};
+
+type MatchReason =
+  | "keyword-content"
+  | "keyword-name"
+  | "keyword-category"
+  | "keyword-tag"
+  | "vector";
+
+interface RawChunkCandidate {
+  chunkRecordId: number;
+  score: number;
+  matchReason: MatchReason;
+  snippet?: string;
+}
+
+interface HydratedChunkRow {
+  id: number;
+  chunk_id: string;
+  file_id: string;
+  chunk_index: number;
+  content: string;
+  file_name: string;
+  file_path: string;
+  file_category: string;
+  file_tags: string | null;
+  tags_array: string[];
+  relevance_score: number;
+  match_reason: MatchReason;
+  snippet: string;
+}
+
+const QA_RESPONSE_FORMAT = {
+  json_schema: {
+    name: "chat_qa_answer_schema",
+    schema: {
+      type: "object",
+      properties: {
+        answer: { type: "string" },
+        confidence: { type: "number" },
+      },
+      required: ["answer", "confidence"],
+    },
+    strict: true,
+  },
+} as const;
+
+function parseFileFilters(input: unknown): ParsedFileFilters {
+  if (!input || typeof input !== "object") return {};
+  const obj = input as Record<string, unknown>;
+  const parseList = (value: unknown): string[] | undefined => {
+    if (!Array.isArray(value)) return undefined;
+    const arr = (value as unknown[])
+      .map((v) => (typeof v === "string" ? v.trim() : ""))
+      .filter((v) => v.length > 0);
+    return arr.length > 0 ? arr : undefined;
+  };
+  return {
+    file_ids: parseList(obj.file_ids),
+    categories: parseList(obj.categories),
+    tags: parseList(obj.tags),
+  };
+}
+
+function normalizeProviderName(raw: unknown): ProviderName | undefined {
+  if (typeof raw !== "string") return undefined;
+  const v = raw.trim().toLowerCase();
+  switch (v) {
+    case "openai":
+      return "openai";
+    case "azure-openai":
+    case "azure":
+    case "azure_openai":
+      return "azure-openai";
+    case "openrouter":
+      return "openrouter";
+    case "bailian":
+    case "aliyun":
+    case "dashscope":
+      return "bailian";
+    case "ollama":
+      return "ollama";
+    default:
+      return undefined;
+  }
+}
+
+function escapeForLike(input: string): string {
+  return input.replace(/[%_\\]/g, (ch) => `\\${ch}`);
+}
+
+function createDefaultSnippet(text: string, maxLength = 240): string {
+  if (!text) return "";
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength)}...`;
+}
+
+function buildSnippet(text: string, keyword?: string, maxLength = 240): string {
+  if (!text) return "";
+  const normalized = keyword?.trim();
+  if (!normalized) {
+    return createDefaultSnippet(text, maxLength);
+  }
+  const lowerText = text.toLowerCase();
+  const lowerKeyword = normalized.toLowerCase();
+  const index = lowerText.indexOf(lowerKeyword);
+  if (index === -1) {
+    return createDefaultSnippet(text, maxLength);
+  }
+  const half = Math.floor(maxLength / 2);
+  const start = Math.max(0, index - half);
+  const end = Math.min(text.length, start + maxLength);
+  const snippet = text.slice(start, end);
+  const prefix = start > 0 ? "..." : "";
+  const suffix = end < text.length ? "..." : "";
+  return `${prefix}${snippet}${suffix}`;
+}
+
+function parseTags(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((v) => (typeof v === "string" ? v.trim() : ""))
+        .filter((v) => v.length > 0);
+    }
+  } catch {
+    // ignore invalid JSON strings
+  }
+  return [];
+}
+
+function keywordScoreForReason(reason: MatchReason): number {
+  switch (reason) {
+    case "keyword-content":
+      return 1.0;
+    case "keyword-name":
+      return 0.95;
+    case "keyword-category":
+      return 0.9;
+    case "keyword-tag":
+      return 0.88;
+    default:
+      return 0.85;
+  }
+}
+
+function determineFileMatchReason(
+  file: FileAttributes,
+  keyword: string
+): MatchReason {
+  const normalized = keyword.trim().toLowerCase();
+  if (!normalized) return "keyword-name";
+  if (file.name?.toLowerCase().includes(normalized)) {
+    return "keyword-name";
+  }
+  if (file.category?.toLowerCase().includes(normalized)) {
+    return "keyword-category";
+  }
+  const tagsArray = parseTags(file.tags);
+  if (tagsArray.some((tag) => tag.toLowerCase().includes(normalized))) {
+    return "keyword-tag";
+  }
+  return "keyword-name";
+}
+
+function filterRowsByFileFilters(
+  rows: HydratedChunkRow[],
+  filters: ParsedFileFilters
+): HydratedChunkRow[] {
+  return rows.filter((row) => {
+    if (filters.file_ids && filters.file_ids.length > 0) {
+      if (!filters.file_ids.includes(row.file_id)) return false;
+    }
+    if (filters.categories && filters.categories.length > 0) {
+      if (!filters.categories.includes(row.file_category)) return false;
+    }
+    if (filters.tags && filters.tags.length > 0) {
+      if (!row.tags_array.some((tag) => filters.tags!.includes(tag))) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+function parseMatchReason(raw: unknown): MatchReason {
+  if (typeof raw !== "string") return "vector";
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "keyword-content") return "keyword-content";
+  if (normalized === "keyword-name") return "keyword-name";
+  if (normalized === "keyword-category") return "keyword-category";
+  if (normalized === "keyword-tag") return "keyword-tag";
+  return "vector";
+}
+
+async function hydrateChunkCandidates(
+  candidates: RawChunkCandidate[],
+  options?: { prefetchedChunks?: Map<number, ChunkAttributes> }
+): Promise<HydratedChunkRow[]> {
+  const unique: RawChunkCandidate[] = [];
+  const seen = new Set<number>();
+  for (const candidate of candidates) {
+    if (!seen.has(candidate.chunkRecordId)) {
+      seen.add(candidate.chunkRecordId);
+      unique.push(candidate);
+    }
+  }
+  if (unique.length === 0) return [];
+
+  const chunkCache = new Map<number, ChunkAttributes>();
+  if (options?.prefetchedChunks) {
+    for (const [id, chunk] of options.prefetchedChunks.entries()) {
+      chunkCache.set(id, chunk);
+    }
+  }
+
+  const missingIds: number[] = [];
+  for (const candidate of unique) {
+    if (!chunkCache.has(candidate.chunkRecordId)) {
+      missingIds.push(candidate.chunkRecordId);
+    }
+  }
+
+  if (missingIds.length > 0) {
+    const fetched = (await ChunkModel.findAll({
+      where: { id: missingIds },
+      raw: true,
+    }).catch(() => [])) as ChunkAttributes[];
+    for (const item of fetched) {
+      chunkCache.set(item.id, item);
+    }
+  }
+
+  const fileIds = new Set<string>();
+  for (const chunk of chunkCache.values()) {
+    if (chunk?.file_id) fileIds.add(chunk.file_id);
+  }
+
+  const files = (await FileModel.findAll({
+    where: { file_id: Array.from(fileIds) },
+    raw: true,
+  }).catch(() => [])) as FileAttributes[];
+  const fileMap = new Map<string, FileAttributes>();
+  for (const file of files) {
+    fileMap.set(file.file_id, file);
+  }
+
+  const hydrated: HydratedChunkRow[] = [];
+  for (const candidate of unique) {
+    const chunk = chunkCache.get(candidate.chunkRecordId);
+    if (!chunk) continue;
+    const file = fileMap.get(chunk.file_id);
+    const tagsArray = parseTags(file?.tags ?? null);
+    hydrated.push({
+      id: chunk.id,
+      chunk_id: chunk.chunk_id,
+      file_id: chunk.file_id,
+      chunk_index: chunk.chunk_index,
+      content: chunk.content,
+      file_name: file?.name ?? "",
+      file_path: file?.path ?? "",
+      file_category: file?.category ?? "",
+      file_tags: file?.tags ?? null,
+      tags_array: tagsArray,
+      relevance_score: candidate.score,
+      match_reason: candidate.matchReason,
+      snippet:
+        candidate.snippet ??
+        createDefaultSnippet(chunk.content),
+    });
+  }
+
+  return hydrated;
+}
+
+async function performKeywordSearch(
+  query: string,
+  contextLimit: number,
+  filters: ParsedFileFilters
+): Promise<{ rows: HydratedChunkRow[]; retrievalTimeMs: number }> {
+  const start = Date.now();
+  const sanitized = query.trim();
+  if (!sanitized) {
+    return { rows: [], retrievalTimeMs: Date.now() - start };
+  }
+
+  const likePattern = `%${escapeForLike(sanitized)}%`;
+  const chunkLimit = Math.max(contextLimit * 6, 10);
+  const fileLimit = Math.max(contextLimit * 4, 5);
+
+  const chunkMatches = (await ChunkModel.findAll({
+    where: { content: { [Op.like]: likePattern } },
+    order: [
+      ["file_id", "ASC"],
+      ["chunk_index", "ASC"],
+    ],
+    limit: chunkLimit,
+    raw: true,
+  }).catch(() => [])) as ChunkAttributes[];
+
+  const prefetched = new Map<number, ChunkAttributes>();
+  const candidates: RawChunkCandidate[] = [];
+  for (const chunk of chunkMatches) {
+    prefetched.set(chunk.id, chunk);
+    candidates.push({
+      chunkRecordId: chunk.id,
+      score: keywordScoreForReason("keyword-content"),
+      matchReason: "keyword-content",
+      snippet: buildSnippet(chunk.content, sanitized),
+    });
+  }
+
+  const fileMatches = (await FileModel.findAll({
+    where: {
+      [Op.or]: [
+        { name: { [Op.like]: likePattern } },
+        { category: { [Op.like]: likePattern } },
+        { tags: { [Op.like]: likePattern } },
+      ],
+    },
+    limit: fileLimit,
+    raw: true,
+  }).catch(() => [])) as FileAttributes[];
+
+  const fileIdSet = new Set<string>();
+  for (const file of fileMatches) {
+    if (file.file_id) {
+      fileIdSet.add(file.file_id);
+    }
+  }
+
+  if (fileIdSet.size > 0) {
+    const fileIds = Array.from(fileIdSet);
+    const fileChunks = (await ChunkModel.findAll({
+      where: { file_id: fileIds },
+      order: [
+        ["file_id", "ASC"],
+        ["chunk_index", "ASC"],
+      ],
+      limit: Math.max(contextLimit * 4, fileIds.length * 2),
+      raw: true,
+    }).catch(() => [])) as ChunkAttributes[];
+
+    const seenFile = new Set<string>();
+    for (const chunk of fileChunks) {
+      if (!chunk.file_id) continue;
+      if (seenFile.has(chunk.file_id)) continue;
+      seenFile.add(chunk.file_id);
+      const fileMeta = fileMatches.find((f) => f.file_id === chunk.file_id);
+      const reason = fileMeta
+        ? determineFileMatchReason(fileMeta, sanitized)
+        : "keyword-name";
+      const score = keywordScoreForReason(reason);
+      if (!prefetched.has(chunk.id)) {
+        prefetched.set(chunk.id, chunk);
+      }
+      candidates.push({
+        chunkRecordId: chunk.id,
+        score,
+        matchReason: reason,
+        snippet: buildSnippet(chunk.content, sanitized),
+      });
+    }
+  }
+
+  candidates.sort((a, b) => {
+    if (b.score === a.score) return a.chunkRecordId - b.chunkRecordId;
+    return b.score - a.score;
+  });
+
+  const hydrated = await hydrateChunkCandidates(candidates, {
+    prefetchedChunks: prefetched,
+  });
+  const filtered = filterRowsByFileFilters(hydrated, filters);
+
+  return {
+    rows: filtered,
+    retrievalTimeMs: Date.now() - start,
+  };
+}
+
+async function performVectorSearch(
+  question: string,
+  contextLimit: number,
+  similarityThreshold: number,
+  filters: ParsedFileFilters
+): Promise<{ rows: HydratedChunkRow[]; retrievalTimeMs: number; embeddingTimeMs: number }> {
+  const start = Date.now();
+  const embeddingStart = Date.now();
+  const emb = await embedWithOllama([question]);
+  const qEmbedding = emb[0] ?? [];
+  if (qEmbedding.length === 0) {
+    throw new Error("empty embedding");
+  }
+  const embeddingTimeMs = Date.now() - embeddingStart;
+
+  if (!isFaissAvailable() || !(await globalIndexExists())) {
+    return { rows: [], retrievalTimeMs: Date.now() - start, embeddingTimeMs };
+  }
+
+  const searchStart = Date.now();
+  const resFaiss = await searchGlobalFaissIndex({
+    query: qEmbedding,
+    k: Math.min(100, contextLimit * 5),
+    oversample: 1.0,
+  });
+  const retrievalTimeMs = Date.now() - searchStart + embeddingTimeMs;
+
+  const ids = resFaiss.ids ?? [];
+  const distances = resFaiss.distances ?? [];
+  if (ids.length === 0) {
+    return { rows: [], retrievalTimeMs, embeddingTimeMs };
+  }
+
+  const candidates: RawChunkCandidate[] = [];
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    if (typeof id !== "number") continue;
+    const distance = distances[i] ?? 0;
+    const similarity = 1 / (1 + distance);
+    candidates.push({
+      chunkRecordId: id,
+      score: similarity,
+      matchReason: "vector",
+    });
+  }
+
+  const hydrated = await hydrateChunkCandidates(candidates);
+  const filtered = filterRowsByFileFilters(hydrated, filters).filter(
+    (row) => row.relevance_score >= similarityThreshold
+  );
+  filtered.sort((a, b) => b.relevance_score - a.relevance_score);
+
+  return { rows: filtered, retrievalTimeMs, embeddingTimeMs };
+}
+
+async function retrieveContextCandidates(params: {
+  question: string;
+  contextLimit: number;
+  similarityThreshold: number;
+  filters: ParsedFileFilters;
+  maxResults?: number;
+}): Promise<{
+  rows: HydratedChunkRow[];
+  mode: "keyword" | "vector" | "none";
+  keywordTimeMs: number;
+  vectorTimeMs?: number;
+}> {
+  const { question, contextLimit, similarityThreshold, filters, maxResults } =
+    params;
+  const keywordRes = await performKeywordSearch(question, contextLimit, filters);
+  let rows = keywordRes.rows;
+  let mode: "keyword" | "vector" | "none" = "none";
+  let vectorTimeMs: number | undefined;
+  if (rows.length > 0) {
+    mode = "keyword";
+  } else {
+    const vectorRes = await performVectorSearch(
+      question,
+      contextLimit,
+      similarityThreshold,
+      filters
+    );
+    rows = vectorRes.rows;
+    vectorTimeMs = vectorRes.retrievalTimeMs;
+    mode = rows.length > 0 ? "vector" : "none";
+  }
+
+  let limited = rows;
+  if (typeof maxResults === "number" && maxResults > 0) {
+    limited = rows.slice(0, maxResults);
+  }
+
+  return {
+    rows: limited,
+    mode,
+    keywordTimeMs: keywordRes.retrievalTimeMs,
+    vectorTimeMs,
+  };
+}
+
+async function resolveChunkRecordIdsByPublicId(
+  chunkIds: string[]
+): Promise<Map<string, number>> {
+  if (chunkIds.length === 0) return new Map<string, number>();
+  const chunks = (await ChunkModel.findAll({
+    where: { chunk_id: chunkIds },
+    raw: true,
+  }).catch(() => [])) as ChunkAttributes[];
+  const map = new Map<string, number>();
+  for (const chunk of chunks) {
+    map.set(chunk.chunk_id, chunk.id);
+  }
+  return map;
+}
+
+async function parseSelectedChunks(
+  raw: unknown
+): Promise<RawChunkCandidate[]> {
+  if (!raw) return [];
+  const candidates: RawChunkCandidate[] = [];
+  if (!Array.isArray(raw)) return candidates;
+
+  const pendingByChunkId: Array<{
+    chunk_id: string;
+    score: number;
+    matchReason: MatchReason;
+  }> = [];
+
+  for (const item of raw) {
+    if (typeof item === "number") {
+      candidates.push({
+        chunkRecordId: item,
+        score: 1.0,
+        matchReason: "vector",
+      });
+      continue;
+    }
+    if (typeof item === "string") {
+      const chunkId = item.trim();
+      if (chunkId) {
+        pendingByChunkId.push({
+          chunk_id: chunkId,
+          score: 1.0,
+          matchReason: "vector",
+        });
+      }
+      continue;
+    }
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+    const idRaw = obj.chunk_record_id ?? obj.id;
+    const scoreRaw =
+      typeof obj.relevance_score === "number"
+        ? obj.relevance_score
+        : typeof obj.score === "number"
+        ? obj.score
+        : undefined;
+    const reasonRaw = obj.match_reason ?? obj.reason;
+    const chunkIdRaw = obj.chunk_id;
+    const matchReason = parseMatchReason(reasonRaw);
+    const score =
+      typeof scoreRaw === "number" && Number.isFinite(scoreRaw)
+        ? scoreRaw
+        : matchReason === "vector"
+        ? 0.75
+        : keywordScoreForReason(matchReason);
+    if (typeof idRaw === "number") {
+      candidates.push({
+        chunkRecordId: idRaw,
+        score,
+        matchReason,
+      });
+    } else if (typeof idRaw === "string" && idRaw.trim()) {
+      const parsed = Number(idRaw);
+      if (!Number.isNaN(parsed)) {
+        candidates.push({
+          chunkRecordId: parsed,
+          score,
+          matchReason,
+        });
+      } else if (typeof chunkIdRaw === "string" && chunkIdRaw.trim()) {
+        pendingByChunkId.push({
+          chunk_id: chunkIdRaw.trim(),
+          score,
+          matchReason,
+        });
+      }
+    } else if (typeof chunkIdRaw === "string" && chunkIdRaw.trim()) {
+      pendingByChunkId.push({
+        chunk_id: chunkIdRaw.trim(),
+        score,
+        matchReason,
+      });
+    }
+  }
+
+  if (pendingByChunkId.length > 0) {
+    const chunkIdSet = Array.from(
+      new Set(pendingByChunkId.map((item) => item.chunk_id))
+    );
+    const resolved = await resolveChunkRecordIdsByPublicId(chunkIdSet);
+    for (const pending of pendingByChunkId) {
+      const recordId = resolved.get(pending.chunk_id);
+      if (typeof recordId === "number") {
+        candidates.push({
+          chunkRecordId: recordId,
+          score: pending.score,
+          matchReason: pending.matchReason,
+        });
+      }
+    }
+  }
+
+  return candidates;
+}
+
+async function generateAnswerFromChunks(options: {
+  question: string;
+  chunks: HydratedChunkRow[];
+  temperature: number;
+  maxTokens: number;
+  provider?: ProviderName;
+  language?: SupportedLang;
+  overrideModel?: string;
+}): Promise<{
+  answer: string;
+  confidence: number;
+  sources: Array<{
+    file_id: string;
+    file_name: string;
+    file_path: string;
+    chunk_id: string;
+    chunk_content: string;
+    chunk_index: number;
+    relevance_score: number;
+    match_reason: MatchReason;
+  }>;
+  generationTimeMs: number;
+  rawResult: Record<string, unknown>;
+}> {
+  const { question, chunks, temperature, maxTokens, provider, language, overrideModel } =
+    options;
+  const contextStr = chunks
+    .map(
+      (row, index) =>
+        `[#${index + 1}] File: ${row.file_name} (${row.file_path})\nChunk ${
+          row.chunk_index
+        }: ${row.content}`
+    )
+    .join("\n\n");
+
+  const messages = buildChatAskMessages({ question, contextStr });
+  const start = Date.now();
+  const result = (await generateStructuredJson(
+    messages,
+    QA_RESPONSE_FORMAT,
+    temperature,
+    maxTokens,
+    overrideModel || "",
+    language,
+    provider
+  )) as Record<string, unknown>;
+  const generationTimeMs = Date.now() - start;
+
+  const answer =
+    typeof result?.answer === "string" ? (result.answer as string) : "";
+  const confidence =
+    typeof result?.confidence === "number"
+      ? (result.confidence as number)
+      : 0.0;
+
+  const sources = chunks.map((row) => ({
+    file_id: row.file_id,
+    file_name: row.file_name,
+    file_path: row.file_path,
+    chunk_id: row.chunk_id,
+    chunk_content: row.content,
+    chunk_index: row.chunk_index,
+    relevance_score: row.relevance_score,
+    match_reason: row.match_reason,
+  }));
+
+  return {
+    answer,
+    confidence: Math.max(0, Math.min(1, confidence)),
+    sources,
+    generationTimeMs,
+    rawResult: result,
+  };
+}
+
 // ------------- Chat Ask (RAG) -------------
-import ChunkModel from "./models/chunk";
-import FileModel from "./models/file";
-import { embedWithOllama } from "./utils/ollama";
-import {
-  isFaissAvailable,
-  globalIndexExists,
-  searchGlobalFaissIndex,
-} from "./utils/vectorStore";
-import faiss from "faiss-node";
+
+type ChatSearchBody = {
+  query?: unknown;
+  question?: unknown;
+  context_limit?: unknown;
+  similarity_threshold?: unknown;
+  max_results?: unknown;
+  file_filters?: unknown;
+};
+
+type ChatAnalyzeBody = {
+  question?: unknown;
+  selected_chunks?: unknown;
+  chunks?: unknown;
+  chunk_ids?: unknown;
+  context_limit?: unknown;
+  temperature?: unknown;
+  max_tokens?: unknown;
+  provider?: unknown;
+  similarity_threshold?: unknown;
+  file_filters?: unknown;
+  override_model?: unknown;
+  language?: unknown;
+};
+
+export async function chatSearchHandler(
+  req: Request,
+  res: Response
+): Promise<void> {
+  const startTs = Date.now();
+  try {
+    const body = req.body as ChatSearchBody | undefined;
+    const queryRaw =
+      typeof body?.query === "string"
+        ? body.query
+        : typeof body?.question === "string"
+        ? body.question
+        : "";
+    const query = queryRaw.trim();
+    if (!query) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "query is required",
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const contextLimitRaw =
+      typeof body?.context_limit === "number" ? body.context_limit : 5;
+    const similarityThresholdRaw =
+      typeof body?.similarity_threshold === "number"
+        ? body.similarity_threshold
+        : 0.7;
+    const maxResultsRaw =
+      typeof body?.max_results === "number" ? body.max_results : undefined;
+
+    const contextLimit = Math.max(
+      1,
+      Math.min(20, Math.floor(contextLimitRaw))
+    );
+    const similarityThreshold = Math.max(
+      0,
+      Math.min(1, similarityThresholdRaw)
+    );
+    const maxResults = Math.max(
+      contextLimit,
+      Math.min(
+        50,
+        maxResultsRaw !== undefined
+          ? Math.max(1, Math.floor(maxResultsRaw))
+          : contextLimit * 4
+      )
+    );
+
+    const filters = parseFileFilters(body?.file_filters);
+
+    const retrieval = await retrieveContextCandidates({
+      question: query,
+      contextLimit: Math.max(contextLimit, Math.min(20, contextLimit * 3)),
+      similarityThreshold,
+      filters,
+      maxResults,
+    });
+
+    const results = retrieval.rows.map((row) => ({
+      chunk_record_id: row.id,
+      chunk_id: row.chunk_id,
+      chunk_index: row.chunk_index,
+      file_id: row.file_id,
+      file_name: row.file_name,
+      file_path: row.file_path,
+      file_category: row.file_category,
+      file_tags: row.tags_array,
+      snippet: row.snippet,
+      relevance_score: row.relevance_score,
+      match_reason: row.match_reason,
+    }));
+
+    const retrievalTimeMs =
+      retrieval.mode === "keyword"
+        ? retrieval.keywordTimeMs
+        : retrieval.vectorTimeMs ?? retrieval.keywordTimeMs;
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        results,
+        retrieval_mode: retrieval.mode,
+        metadata: {
+          query,
+          result_count: results.length,
+          keyword_time_ms: retrieval.keywordTimeMs,
+          vector_time_ms: retrieval.vectorTimeMs ?? null,
+          retrieval_time_ms: retrievalTimeMs,
+          similarity_threshold: similarityThreshold,
+          context_limit: contextLimit,
+          max_results: maxResults,
+          filters_applied: {
+            file_ids: filters.file_ids ?? [],
+            categories: filters.categories ?? [],
+            tags: filters.tags ?? [],
+          },
+          response_time_ms: Date.now() - startTs,
+        },
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/chat/search failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Search retrieval failed",
+        details: null,
+      },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+export async function chatAnalyzeHandler(
+  req: Request,
+  res: Response
+): Promise<void> {
+  const startAll = Date.now();
+  try {
+    const body = req.body as ChatAnalyzeBody | undefined;
+    const questionRaw =
+      typeof body?.question === "string" ? body.question : "";
+    const question = questionRaw.trim();
+    if (!question) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "question is required",
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const contextLimitRaw =
+      typeof body?.context_limit === "number" ? body.context_limit : 5;
+    const temperatureRaw =
+      typeof body?.temperature === "number" ? body.temperature : 0.7;
+    const maxTokensRaw =
+      typeof body?.max_tokens === "number" ? body.max_tokens : 1000;
+    const similarityThresholdRaw =
+      typeof body?.similarity_threshold === "number"
+        ? body.similarity_threshold
+        : 0.7;
+
+    const contextLimit = Math.max(
+      1,
+      Math.min(20, Math.floor(contextLimitRaw))
+    );
+    const temperature = Math.max(0, Math.min(2, temperatureRaw));
+    const maxTokens = Math.max(100, Math.min(4000, Math.floor(maxTokensRaw)));
+    const similarityThreshold = Math.max(
+      0,
+      Math.min(1, similarityThresholdRaw)
+    );
+
+    const filters = parseFileFilters(body?.file_filters);
+    const provider = normalizeProviderName(body?.provider);
+    const overrideModel =
+      typeof body?.override_model === "string" &&
+      body.override_model.trim().length > 0
+        ? body.override_model.trim()
+        : "";
+    const language: SupportedLang | undefined =
+      typeof body?.language === "string"
+        ? normalizeLanguage(body.language)
+        : undefined;
+
+    const rawSelected =
+      body?.selected_chunks ??
+      body?.chunks ??
+      (Array.isArray(body?.chunk_ids) ? body?.chunk_ids : undefined);
+    let candidates = await parseSelectedChunks(rawSelected);
+    let retrievalMode: "keyword" | "vector" | "none" | "manual" = "none";
+    let retrievalTimeMs = 0;
+
+    if (candidates.length > 0) {
+      retrievalMode = "manual";
+    } else {
+      const retrieval = await retrieveContextCandidates({
+        question,
+        contextLimit: Math.max(contextLimit, Math.min(20, contextLimit * 3)),
+        similarityThreshold,
+        filters,
+        maxResults: contextLimit * 4,
+      });
+      candidates = retrieval.rows.map((row) => ({
+        chunkRecordId: row.id,
+        score: row.relevance_score,
+        matchReason: row.match_reason,
+        snippet: row.snippet,
+      }));
+      retrievalMode = retrieval.mode;
+      retrievalTimeMs =
+        retrieval.mode === "keyword"
+          ? retrieval.keywordTimeMs
+          : retrieval.vectorTimeMs ?? retrieval.keywordTimeMs;
+    }
+
+    let hydrated = candidates.length
+      ? await hydrateChunkCandidates(candidates)
+      : [];
+    if (hydrated.length > 0) {
+      hydrated = filterRowsByFileFilters(hydrated, filters);
+      hydrated.sort((a, b) => b.relevance_score - a.relevance_score);
+      hydrated = hydrated.slice(0, contextLimit);
+    }
+
+    const cfg = configManager.getConfig();
+    const modelFromConfig = cfg.ollamaModel || "";
+    const modelUsed =
+      overrideModel || getActiveModelName("chat", provider) || modelFromConfig;
+
+    if (hydrated.length === 0) {
+      res.status(200).json({
+        success: true,
+        message: "no_context",
+        data: {
+          answer:
+            "No relevant context found. Please refine your search or import more documents.",
+          confidence: 0.0,
+          sources: [],
+          metadata: {
+            model_used: modelUsed,
+            tokens_used: 0,
+            response_time_ms: Date.now() - startAll,
+            retrieval_time_ms: retrievalTimeMs,
+            generation_time_ms: 0,
+            retrieval_mode: retrievalMode,
+          },
+        },
+        error: null,
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const answerResult = await generateAnswerFromChunks({
+      question,
+      chunks: hydrated,
+      temperature,
+      maxTokens,
+      provider,
+      language,
+      overrideModel,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        answer: answerResult.answer,
+        confidence: answerResult.confidence,
+        sources: answerResult.sources,
+        metadata: {
+          model_used: modelUsed,
+          tokens_used: 0,
+          response_time_ms: Date.now() - startAll,
+          retrieval_time_ms: retrievalTimeMs,
+          generation_time_ms: answerResult.generationTimeMs,
+          retrieval_mode: retrievalMode,
+        },
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/chat/analyze failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Chat analyze failed",
+        details: null,
+      },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
 
 type ChatAskBody = {
   question?: unknown;
@@ -411,6 +1425,7 @@ type ChatAskBody = {
   stream?: unknown;
   file_filters?: unknown;
   mode?: unknown; // "mode1" or "mode2"
+  provider?: unknown;
 };
 
 export async function chatAskHandler(
@@ -442,42 +1457,15 @@ export async function chatAskHandlerMode1(
     const question =
       typeof body?.question === "string" ? body!.question.trim() : "";
     const contextLimitRaw =
-      typeof body?.context_limit === "number" ? body!.context_limit : undefined;
+      typeof body?.context_limit === "number" ? body!.context_limit : 5;
     const simThreshRaw =
       typeof body?.similarity_threshold === "number"
         ? body!.similarity_threshold
-        : undefined;
-    const temperature =
+        : 0.7;
+    const temperatureRaw =
       typeof body?.temperature === "number" ? body!.temperature : 0.7;
-    const maxTokens =
+    const maxTokensRaw =
       typeof body?.max_tokens === "number" ? body!.max_tokens : 1000;
-    // stream flag is accepted but not supported in current backend; ignore for now to keep API compatibility
-    // const stream = typeof body?.stream === "boolean" ? body!.stream : false;
-    const parsedFileFilters = ((): {
-      file_ids?: string[];
-      categories?: string[];
-      tags?: string[];
-    } => {
-      const fileFilters = body?.file_filters;
-      if (!fileFilters || typeof fileFilters !== "object") return {};
-      const obj = fileFilters as Record<string, unknown>;
-      const ids = Array.isArray(obj.file_ids)
-        ? (obj.file_ids as unknown[])
-            .filter((v) => typeof v === "string")
-            .map((v) => String(v))
-        : undefined;
-      const cats = Array.isArray(obj.categories)
-        ? (obj.categories as unknown[])
-            .filter((v) => typeof v === "string")
-            .map((v) => String(v))
-        : undefined;
-      const tags = Array.isArray(obj.tags)
-        ? (obj.tags as unknown[])
-            .filter((v) => typeof v === "string")
-            .map((v) => String(v))
-        : undefined;
-      return { file_ids: ids, categories: cats, tags };
-    })();
 
     if (!question) {
       res.status(400).json({
@@ -495,54 +1483,36 @@ export async function chatAskHandlerMode1(
       return;
     }
 
-    // Validate numeric ranges
     const contextLimit = Math.max(
       1,
-      Math.min(20, Math.floor(contextLimitRaw ?? 5))
+      Math.min(20, Math.floor(contextLimitRaw))
     );
     const similarityThreshold = Math.max(
       0,
-      Math.min(
-        1,
-        Number.isFinite(simThreshRaw as number) ? (simThreshRaw as number) : 0.7
-      )
+      Math.min(1, Number.isFinite(simThreshRaw as number) ? (simThreshRaw as number) : 0.7)
     );
-    const tempClamped = Math.max(0, Math.min(2, temperature));
+    const tempClamped = Math.max(0, Math.min(2, temperatureRaw));
     const maxTokensClamped = Math.max(
       100,
-      Math.min(4000, Math.floor(maxTokens))
+      Math.min(4000, Math.floor(maxTokensRaw))
     );
 
-    // Embedding for the question
-    const t0 = Date.now();
-    let qEmbedding: number[] = [];
-    try {
-      const emb = await embedWithOllama([question]);
-      qEmbedding = emb[0] ?? [];
-      if (qEmbedding.length === 0) throw new Error("empty embedding");
-    } catch (e) {
-      logger.error("/api/chat/ask embed failed", e as unknown);
-      res.status(500).json({
-        success: false,
-        message: "embedding_error",
-        data: null,
-        error: {
-          code: "EMBED_ERROR",
-          message: (e as Error).message,
-          details: null,
-        },
-        timestamp: new Date().toISOString(),
-        request_id: "",
-      });
-      return;
-    }
-    const embedMs = Date.now() - t0;
+    const provider = normalizeProviderName(body?.provider);
+    const filters = parseFileFilters(body?.file_filters);
 
-    // FAISS search
-    const t1 = Date.now();
-    let chunkIds: number[] = [];
-    let distances: number[] = [];
-    if (!isFaissAvailable() || !(await globalIndexExists())) {
+    const retrieval = await retrieveContextCandidates({
+      question,
+      contextLimit: Math.max(contextLimit, Math.min(20, contextLimit * 3)),
+      similarityThreshold,
+      filters,
+      maxResults: contextLimit * 4,
+    });
+
+    let rows = retrieval.rows;
+    rows.sort((a, b) => b.relevance_score - a.relevance_score);
+    rows = rows.slice(0, contextLimit);
+
+    if (rows.length === 0) {
       res.status(200).json({
         success: true,
         message: "ok",
@@ -551,11 +1521,15 @@ export async function chatAskHandlerMode1(
           confidence: 0.0,
           sources: [],
           metadata: {
-            model_used: configManager.getConfig().ollamaModel || "",
+            model_used: getActiveModelName("chat", provider) || "",
             tokens_used: 0,
             response_time_ms: Date.now() - startAll,
-            retrieval_time_ms: 0,
+            retrieval_time_ms:
+              retrieval.mode === "keyword"
+                ? retrieval.keywordTimeMs
+                : retrieval.vectorTimeMs ?? retrieval.keywordTimeMs,
             generation_time_ms: 0,
+            retrieval_mode: retrieval.mode,
           },
         },
         error: null,
@@ -565,245 +1539,35 @@ export async function chatAskHandlerMode1(
       return;
     }
 
-    try {
-      const resFaiss = await searchGlobalFaissIndex({
-        query: qEmbedding,
-        k: Math.min(100, contextLimit * 5),
-        oversample: 1.0,
-      });
-      chunkIds = resFaiss.ids;
-      distances = resFaiss.distances;
-    } catch (e) {
-      logger.error("/api/chat/ask faiss search failed", e as unknown);
-      res.status(500).json({
-        success: false,
-        message: "search_error",
-        data: null,
-        error: {
-          code: "VECTOR_SEARCH_ERROR",
-          message: (e as Error).message,
-          details: null,
-        },
-        timestamp: new Date().toISOString(),
-        request_id: "",
-      });
-      return;
-    }
-    const retrievalMs = Date.now() - t1 + embedMs;
-
-    // Convert L2 distance to a crude similarity score in [0,1]
-    const simScores = distances.map((d) => 1 / (1 + d));
-
-    // Load chunk rows and join files; then apply file_filters
-    let rows: Array<{
-      id: number;
-      chunk_id: string;
-      file_id: string;
-      chunk_index: number;
-      content: string;
-      file_name: string;
-      file_path: string;
-      file_category: string;
-      file_tags: string | null;
-      relevance_score: number;
-    }> = [];
-    if (chunkIds.length > 0) {
-      const chunks = (await ChunkModel.findAll({
-        where: { id: chunkIds },
-        raw: true,
-      }).catch(() => [])) as Array<{
-        id: number;
-        file_id: string;
-        chunk_index: number;
-        content: string;
-        chunk_id: string;
-      }>;
-
-      // Map by id for quick access
-      const byId = new Map<
-        number,
-        {
-          id: number;
-          file_id: string;
-          chunk_index: number;
-          content: string;
-          chunk_id: string;
-        }
-      >();
-      for (const c of chunks) byId.set(c.id, c);
-
-      // Gather unique file_ids
-      const fileIds = Array.from(new Set(chunks.map((c) => c.file_id)));
-      const files =
-        fileIds.length > 0
-          ? ((await FileModel.findAll({
-              where: { file_id: fileIds },
-              raw: true,
-            }).catch(() => [])) as Array<{
-              file_id: string;
-              name: string;
-              path: string;
-              category: string;
-              tags: string | null;
-            }>)
-          : [];
-      const fileById = new Map<
-        string,
-        {
-          file_id: string;
-          name: string;
-          path: string;
-          category: string;
-          tags: string | null;
-        }
-      >();
-      for (const f of files) fileById.set(f.file_id, f);
-
-      // Assemble rows in the order of faiss ids list, attach similarity
-      for (let i = 0; i < chunkIds.length; i++) {
-        const id = chunkIds[i];
-        const sim = simScores[i] ?? 0;
-        const c = byId.get(id);
-        if (!c) continue;
-        const f = fileById.get(c.file_id);
-        rows.push({
-          id,
-          chunk_id: String(c.chunk_id),
-          file_id: String(c.file_id),
-          chunk_index: Number(c.chunk_index),
-          content: String(c.content),
-          file_name: f ? String(f.name) : "",
-          file_path: f ? String(f.path) : "",
-          file_category: f ? String(f.category) : "",
-          file_tags: f ? (f.tags as string | null) : null,
-          relevance_score: sim,
-        });
-      }
-    }
-
-    // Apply file_filters
-    if (rows.length > 0) {
-      rows = rows.filter((r) => {
-        if (
-          parsedFileFilters.file_ids &&
-          parsedFileFilters.file_ids.length > 0 &&
-          !parsedFileFilters.file_ids.includes(r.file_id)
-        )
-          return false;
-        if (
-          parsedFileFilters.categories &&
-          parsedFileFilters.categories.length > 0 &&
-          !parsedFileFilters.categories.includes(r.file_category)
-        )
-          return false;
-        if (parsedFileFilters.tags && parsedFileFilters.tags.length > 0) {
-          try {
-            const tagsArr = r.file_tags
-              ? (JSON.parse(r.file_tags) as string[])
-              : [];
-            if (!parsedFileFilters.tags.some((t) => tagsArr.includes(t)))
-              return false;
-          } catch {
-            return false;
-          }
-        }
-        return true;
-      });
-    }
-
-    // Similarity threshold
-    rows = rows.filter((r) => r.relevance_score >= similarityThreshold);
-    // Take top-N by score
-    rows.sort((a, b) => b.relevance_score - a.relevance_score);
-    const top = rows.slice(0, contextLimit);
-
-    // Build context string
-    const contextStr = top
-      .map(
-        (r, i) =>
-          `[#${i + 1}] File: ${r.file_name} (${r.file_path})\nChunk ${
-            r.chunk_index
-          }: ${r.content}`
-      )
-      .join("\n\n");
-
-    // LLM prompt for answer generation with JSON schema
-    const messages = buildChatAskMessages({ question, contextStr });
-    const responseFormat = {
-      json_schema: {
-        name: "chat_qa_answer_schema",
-        schema: {
-          type: "object",
-          properties: {
-            answer: { type: "string" },
-            confidence: { type: "number" },
-          },
-          required: ["answer", "confidence"],
-        },
-        strict: true,
-      },
-    } as const;
-
-    const tGen = Date.now();
-    let genObj: Record<string, unknown> = {};
-    try {
-      const result = await generateStructuredJson(
-        messages,
-        responseFormat,
-        tempClamped,
-        maxTokensClamped
-      );
-      genObj = (result as Record<string, unknown>) || {};
-    } catch (e) {
-      logger.error("/api/chat/ask generation failed", e as unknown);
-      res.status(500).json({
-        success: false,
-        message: "llm_error",
-        data: null,
-        error: {
-          code: "LLM_ERROR",
-          message: (e as Error).message,
-          details: null,
-        },
-        timestamp: new Date().toISOString(),
-        request_id: "",
-      });
-      return;
-    }
-    const genMs = Date.now() - tGen;
-
-    const answer =
-      typeof genObj.answer === "string" ? (genObj.answer as string) : "";
-    const conf =
-      typeof genObj.confidence === "number"
-        ? (genObj.confidence as number)
-        : 0.0;
-
-    // Build sources output
-    const sources = top.map((r) => ({
-      file_id: r.file_id,
-      file_name: r.file_name,
-      file_path: r.file_path,
-      chunk_id: r.chunk_id,
-      chunk_content: r.content,
-      chunk_index: r.chunk_index,
-      relevance_score: r.relevance_score,
-    }));
+    const answerResult = await generateAnswerFromChunks({
+      question,
+      chunks: rows,
+      temperature: tempClamped,
+      maxTokens: maxTokensClamped,
+      provider,
+    });
 
     const cfg = configManager.getConfig();
+    const modelUsed =
+      getActiveModelName("chat", provider) || cfg.ollamaModel || "";
+
     res.status(200).json({
       success: true,
       message: "ok",
       data: {
-        answer,
-        confidence: Math.max(0, Math.min(1, conf)),
-        sources,
+        answer: answerResult.answer,
+        confidence: answerResult.confidence,
+        sources: answerResult.sources,
         metadata: {
-          model_used: cfg.ollamaModel || "",
+          model_used: modelUsed,
           tokens_used: 0,
           response_time_ms: Date.now() - startAll,
-          retrieval_time_ms: retrievalMs,
-          generation_time_ms: genMs,
+          retrieval_time_ms:
+            retrieval.mode === "keyword"
+              ? retrieval.keywordTimeMs
+              : retrieval.vectorTimeMs ?? retrieval.keywordTimeMs,
+          generation_time_ms: answerResult.generationTimeMs,
+          retrieval_mode: retrieval.mode,
         },
       },
       error: null,
@@ -847,31 +1611,7 @@ export async function chatAskHandlerMode2(
       typeof body?.temperature === "number" ? body!.temperature : 0.7;
     const maxTokens =
       typeof body?.max_tokens === "number" ? body!.max_tokens : 1000;
-    const parsedFileFilters = ((): {
-      file_ids?: string[];
-      categories?: string[];
-      tags?: string[];
-    } => {
-      const fileFilters = body?.file_filters;
-      if (!fileFilters || typeof fileFilters !== "object") return {};
-      const obj = fileFilters as Record<string, unknown>;
-      const ids = Array.isArray(obj.file_ids)
-        ? (obj.file_ids as unknown[])
-            .filter((v) => typeof v === "string")
-            .map((v) => String(v))
-        : undefined;
-      const cats = Array.isArray(obj.categories)
-        ? (obj.categories as unknown[])
-            .filter((v) => typeof v === "string")
-            .map((v) => String(v))
-        : undefined;
-      const tags = Array.isArray(obj.tags)
-        ? (obj.tags as unknown[])
-            .filter((v) => typeof v === "string")
-            .map((v) => String(v))
-        : undefined;
-      return { file_ids: ids, categories: cats, tags };
-    })();
+    const parsedFileFilters = parseFileFilters(body?.file_filters);
 
     if (!question) {
       res.status(400).json({

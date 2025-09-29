@@ -454,7 +454,6 @@ export async function previewFileHandler(req: Request, res: Response): Promise<v
               const appRoot = app.getAppPath();
               // When packaged with electron-builder, extra resources are placed alongside app.asar
               const candidate = path.resolve(appRoot, '..', 'resources', 'sharp');
-              // eslint-disable-next-line @typescript-eslint/no-var-requires
               sharpMod = require(path.join(candidate, 'lib', 'sharp')); // attempt common path
             } catch {
               throw e;
