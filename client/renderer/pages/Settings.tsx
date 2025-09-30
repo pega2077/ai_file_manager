@@ -188,11 +188,11 @@ const Settings = () => {
       okType: 'danger',
       onOk: async () => {
         try {
+          // Use Electron main process to clear data and relaunch the app
+          await window.electronAPI.clearAllData();
           // Mark app as uninitialized before restarting
           await window.electronAPI.updateAppConfig({ isInitialized: false, workDirectory: '' });
           setSettings((prev) => ({ ...prev, workDirectory: '' }));
-          // Use Electron main process to clear data and relaunch the app
-          await window.electronAPI.clearAllData();
         } catch (error) {
           message.error(t('settings.messages.clearException'));
           console.error('Clear data error:', error);

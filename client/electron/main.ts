@@ -19,6 +19,7 @@ import { logger } from "./logger";
 import { configManager, AppConfig } from "./configManager";
 import { startServer as startLocalExpressServer, stopServer as stopLocalExpressServer } from "./server";
 import { ensureTempDir, getBaseDir, resolveProjectRoot } from "./backend/utils/pathHelper";
+import { closeDB } from "./backend/db";
 import { i18n } from "./languageHelper";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -69,7 +70,19 @@ async function handleClearAllData(): Promise<void> {
   try {
     logger.info("Starting clear-all-data operation");
 
-    // Resolve primary DB path from config
+    // Stop the server and close database connections to free up file locks
+    try {
+      await stopLocalExpressServer();
+      logger.info("Stopped local server");
+    } catch (error) {
+      logger.error("Failed to stop local server", error);
+    }
+    try {
+      await closeDB();
+      logger.info("Closed database connections");
+    } catch (error) {
+      logger.error("Failed to close database connections", error);
+    }
   const dbPathFromConfig = configManager.getDatabaseAbsolutePath();
   const baseDir = getBaseDir();
   const projectRoot = resolveProjectRoot();
@@ -167,9 +180,7 @@ async function handleClearAllData(): Promise<void> {
       // Ignore dialog failures
     }
 
-    logger.info("Relaunching application after data clear");
-    app.relaunch();
-    // Use exit to allow before-quit handlers to run; a small delay helps pending I/O
+    logger.info("Quit application after data clear");
     setTimeout(() => {
       app.exit(0);
     }, 150);

@@ -109,3 +109,12 @@ export async function initializeDB(): Promise<void> {
     throw error;
   }
 }
+
+export async function closeDB(): Promise<void> {
+  try {
+    await sequelize.close();
+    logger.info("Sequelize connection closed");
+  } catch (error) {
+    logger.error("Failed to close Sequelize connection", error as unknown);
+  }
+}

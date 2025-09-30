@@ -95,11 +95,42 @@ export const stopServer = async (): Promise<void> => {
     logger.info("Express server is not running or already stopped.");
     return;
   }
-  await new Promise<void>((resolve) => {
-    server?.close(() => {
-      logger.info("Express server stopped.");
-      server = null;
-      resolve();
+
+  logger.info("Attempting to stop Express server gracefully...",server.address());
+  server.closeAllConnections();
+  const stopPromise = new Promise<void>((resolve, reject) => {
+    server?.close((err?: Error) => {
+      if (err) {
+        logger.error("Error stopping Express server", err);
+        reject(err);
+      } else {
+        logger.info("Express server stopped gracefully.");
+        server = null;
+        resolve();
+      }
     });
   });
+
+  const timeoutPromise = new Promise<void>((resolve) => {
+    setTimeout(() => {
+      logger.warn("Express server stop timed out, forcing shutdown");
+      // Force close all connections if available (Node.js 18.2.0+)
+      if (server && 'closeAllConnections' in server && typeof server.closeAllConnections === 'function') {
+        server.closeAllConnections();
+        logger.info("Forced close of all server connections");
+      }
+      // Clear the reference regardless
+      server = null;
+      resolve(); // Resolve instead of reject to allow continuation
+    }, 2000); // Reduced timeout to 2 seconds
+  });
+
+  try {
+    await Promise.race([stopPromise, timeoutPromise]);
+  } catch (error) {
+    logger.error("Failed to stop Express server", error);
+    // Ensure server reference is cleared even on error
+    server = null;
+    throw error;
+  }
 };
