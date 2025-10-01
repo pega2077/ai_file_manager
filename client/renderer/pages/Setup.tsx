@@ -19,6 +19,14 @@ interface TreeNode {
   children: TreeNode[];
 }
 
+type ProfessionKey = typeof professionOptionKeys[number];
+
+interface ProfessionOption {
+  value: string;
+  label: string;
+  key: ProfessionKey;
+}
+
 const professionOptionKeys = [
   'softwareEngineer',
   'lawyer',
@@ -39,11 +47,15 @@ const Setup = () => {
   const [dirStyle, setDirStyle] = useState<'flat' | 'hierarchical'>('flat');
   const [collapseActiveKeys, setCollapseActiveKeys] = useState<string[]>([]);
 
+  // Provide AutoComplete options that keep the profession key in metadata so we can
+  // map selection back to a known profession and auto-fill the purpose field.
   const professionOptions = useMemo(
     () =>
       professionOptionKeys.map((optionKey) => {
         const label = t(`setup.options.profession.${optionKey}`);
-        return { value: label, label };
+        // value is the localized label shown to user, attach the profession key so
+        // we can determine which profession was selected and look up its purpose.
+        return { value: label, label, key: optionKey } as ProfessionOption;
       }),
     [t],
   );
@@ -57,6 +69,10 @@ const Setup = () => {
       {
         title: t('setup.stepTwoTitle'),
         description: t('setup.stepTwoDescription'),
+      },
+      {
+        title: t('setup.stepThreeTitle'),
+        description: t('setup.stepThreeDescription'),
       },
     ],
     [t],
@@ -137,8 +153,12 @@ const Setup = () => {
     handleGetDirectoryStructure();
   };
 
-  const handleContinue = () => {
+  const handleContinueToProfile = () => {
     setCurrentStep(1);
+  };
+
+  const handleContinueToCreate = () => {
+    setCurrentStep(2);
   };
 
   const handleSelectFolder = async () => {
@@ -169,15 +189,6 @@ const Setup = () => {
 
         if (response.success) {
         await window.electronAPI.updateAppConfig({ isInitialized: true, workDirectory: selectedFolder });
-
-        // // 更新系统配置中的工作目录
-        // try {
-        //   await apiService.updateSystemConfig({ workdir_path: selectedFolder });
-        // } catch (configError) {
-        //   console.warn('Failed to update system config:', configError);
-        //   // 不阻止初始化流程
-        // }
-
         message.success(t('setup.messages.createSuccess'));
         navigate('/files');
       } else {
@@ -195,6 +206,32 @@ const Setup = () => {
       case 0:
         return (
           <Card title={t('setup.cards.stepOne')} style={{ maxWidth: 600, margin: '0 auto' }}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <div>
+                <Button onClick={handleSelectFolder}>
+                  {t('setup.actions.selectTarget')}
+                </Button>
+                {selectedFolder && (
+                  <div style={{ marginTop: 8 }}>
+                    {t('setup.actions.selectedPath', { path: selectedFolder })}
+                  </div>
+                )}
+              </div>
+              <Button
+                type="primary"
+                onClick={handleContinueToProfile}
+                disabled={!selectedFolder}
+                block
+              >
+                {t('setup.actions.continue')}
+              </Button>
+            </Space>
+          </Card>
+        );
+
+      case 1:
+        return (
+          <Card title={t('setup.cards.stepTwo')} style={{ maxWidth: 600, margin: '0 auto' }}>
             <Form form={form} layout="vertical">
               <Form.Item
                 name="profession"
@@ -207,6 +244,24 @@ const Setup = () => {
                   filterOption={(inputValue, option) =>
                     option?.value.toLowerCase().includes(inputValue.toLowerCase()) ?? false
                   }
+                  onSelect={(_value, option) => {
+                    // When user selects a known profession option, auto-fill purpose
+                    // by mapping the profession key to the localized purpose text
+                    const selectedKey = (option as ProfessionOption | undefined)?.key;
+                    if (selectedKey) {
+                      const purpose = t(`setup.options.professionPurposes.${selectedKey}`);
+                      form.setFieldsValue({ purpose });
+                    }
+                  }}
+                  onChange={(value) => {
+                    // If user types a profession that exactly matches a localized option,
+                    // fill purpose as well. Otherwise clear purpose to let user enter custom.
+                    const matching = professionOptions.find((opt) => opt.value === value) as ProfessionOption | undefined;
+                    if (matching?.key) {
+                      const purpose = t(`setup.options.professionPurposes.${matching.key}`);
+                      form.setFieldsValue({ purpose });
+                    }
+                  }}
                 />
               </Form.Item>
 
@@ -288,7 +343,7 @@ const Setup = () => {
                   <Button onClick={handleRegenerate} loading={loading}>
                     {t('setup.actions.regenerate')}
                   </Button>
-                  <Button type="primary" onClick={handleContinue}>
+                  <Button type="primary" onClick={handleContinueToCreate}>
                     {t('setup.actions.continue')}
                   </Button>
                 </Space>
@@ -304,19 +359,12 @@ const Setup = () => {
           </Card>
         );
 
-      case 1:
+      case 2:
         return (
-          <Card title={t('setup.cards.stepTwo')} style={{ maxWidth: 600, margin: '0 auto' }}>
+          <Card title={t('setup.cards.stepThree')} style={{ maxWidth: 600, margin: '0 auto' }}>
             <Space direction="vertical" style={{ width: '100%' }}>
               <div>
-                <Button onClick={handleSelectFolder}>
-                  {t('setup.actions.selectTarget')}
-                </Button>
-                {selectedFolder && (
-                  <div style={{ marginTop: 8 }}>
-                    {t('setup.actions.selectedPath', { path: selectedFolder })}
-                  </div>
-                )}
+                <strong>{t('setup.actions.selectedPath', { path: selectedFolder })}</strong>
               </div>
               <Button
                 type="primary"

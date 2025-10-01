@@ -52,10 +52,12 @@
     "clearFailedMessage": "Failed to clear all data. Please check logs for details."
   },
   "setup": {
-    "stepOneTitle": "Profile Details",
-    "stepOneDescription": "Describe your profession and purpose.",
-    "stepTwoTitle": "Directory Selection",
-    "stepTwoDescription": "Choose a folder and confirm the recommended structure.",
+    "stepOneTitle": "Directory Selection",
+    "stepOneDescription": "Choose a folder and confirm the recommended structure.",
+    "stepTwoTitle": "Professional Information",
+    "stepTwoDescription": "Describe your profession and purpose.",
+    "stepThreeTitle": "Directory Creation",
+    "stepThreeDescription": "Create the directory structure and complete the setup.",
     "generalSettings": "General Settings",
     "optionalSettings": "Advanced Options",
     "form": {
@@ -91,9 +93,10 @@
       "createError": "Failed to generate directory structure"
     },
     "cards": {
-      "stepOne": "Step 1 - Describe Your Needs",
+      "stepOne": "Step 1 - Select Working Directory",
+      "stepTwo": "Step 2 - Describe Your Needs",
+      "stepThree": "Step 3 - Create Directory Structure",
       "recommendations": "Recommended Directory Structure",
-      "stepTwo": "Step 2 - Confirm Target Folder",
       "pending": "Structure To Be Created"
     },
     "placeholders": {
@@ -112,6 +115,14 @@
         "student": "Student",
         "projectManager": "Project Manager",
         "contentCreator": "Content Creator"
+      },
+      "professionPurposes": {
+        "softwareEngineer": "Organize project source code, design documents, technical notes, and deployment scripts.",
+        "lawyer": "Store case files, legal research, contracts, and client correspondence.",
+        "teacher": "Manage lesson plans, lecture notes, student assignments, and grading records.",
+        "student": "Organize study notes, assignments, research papers, and project files.",
+        "projectManager": "Keep project plans, timelines, meeting notes, requirements, and reports.",
+        "contentCreator": "Store drafts, media assets, scripts, publication schedules, and project briefs."
       },
       "style": {
         "flat": "Flat",

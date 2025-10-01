@@ -52,10 +52,12 @@
     "clearFailedMessage": "清除数据失败，请查看日志以获取详情。"
   },
   "setup": {
-    "stepOneTitle": "基础信息",
-    "stepOneDescription": "描述你的职业与目标用途。",
-    "stepTwoTitle": "目录配置",
-    "stepTwoDescription": "选择目标文件夹并确认推荐结构。",
+  "stepOneTitle": "选择目录",
+  "stepOneDescription": "选择一个文件夹并确认推荐的目录结构。",
+  "stepTwoTitle": "职业信息",
+  "stepTwoDescription": "描述您的职业和用途。",
+  "stepThreeTitle": "创建目录",
+  "stepThreeDescription": "创建目录结构并完成设置。",
     "generalSettings": "基础设置",
     "optionalSettings": "高级选项",
     "form": {
@@ -88,10 +90,11 @@
       "createError": "生成目录结构时出现错误"
     },
     "cards": {
-      "stepOne": "步骤 1 - 描述您的需求",
-      "recommendations": "推荐目录结构",
-      "stepTwo": "步骤 2 - 确认目标文件夹",
-      "pending": "待创建结构"
+      "stepOne": "第1步 - 选择工作目录",
+      "stepTwo": "第2步 - 描述需求",
+      "stepThree": "第3步 - 创建目录结构",
+      "recommendations": "推荐的目录结构",
+      "pending": "待创建目录结构"
     },
     "placeholders": {
       "profession": "选择或输入您的职业",
@@ -109,6 +112,14 @@
         "student": "学生",
         "projectManager": "项目经理",
         "contentCreator": "内容创作者"
+      },
+      "professionPurposes": {
+        "softwareEngineer": "组织项目源代码、设计文档、技术笔记和部署脚本。",
+        "lawyer": "存档案件文件、法律研究、合同和客户通信。",
+        "teacher": "管理课程计划、讲义、学生作业和评分记录。",
+        "student": "整理学习笔记、作业、研究论文和项目文件。",
+        "projectManager": "保存项目计划、时间表、会议记录、需求和报告。",
+        "contentCreator": "存储草稿、媒体素材、脚本、发布日程和项目简介。"
       },
       "style": {
         "flat": "扁平风格",
