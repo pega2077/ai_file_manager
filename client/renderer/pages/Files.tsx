@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Layout, Button, message, Select, Table, Input, Tag, Space, Pagination, Modal, Form } from 'antd';
 import type { TableProps } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import { ReloadOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined, QuestionCircleOutlined, FileAddOutlined, FolderAddOutlined, EditOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
@@ -35,7 +36,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
   const navigate = useNavigate();
   const [files, setFiles] = useState<ImportedFileItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [workDirectory, setWorkDirectory] = useState<string>('workdir');
+  // no workDirectory needed in list component
   const [pagination, setPagination] = useState<PaginationInfo>({
     current_page: 1,
     total_pages: 1,
@@ -235,22 +236,6 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
     navigate(`/search?${params.toString()}`);
   };
 
-  // 获取相对于工作目录的路径
-  const getRelativePath = (fullPath: string): string => {
-    // 规范化路径分隔符
-    const normalizedPath = fullPath.replace(/\\/g, '/');
-    const normalizedWorkDir = workDirectory.replace(/\\/g, '/');
-
-    // 如果路径以工作目录开头，返回相对路径
-    if (normalizedPath.startsWith(normalizedWorkDir)) {
-      const relativePath = normalizedPath.substring(normalizedWorkDir.length);
-      return relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
-    }
-
-    // 如果不以工作目录开头，返回原路径
-    return fullPath;
-  };
-
   // 格式化文件大小
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 B';
@@ -261,7 +246,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
   };
 
   // 表格列配置
-  const columns = [
+  const columns: ColumnsType<ImportedFileItem> = [
     {
       title: t('files.table.columns.name'),
       dataIndex: 'name',
@@ -270,10 +255,10 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       width: 200,
       fixed: 'left',
       sorter: true,
-      render: (name: string, path: string) => (
+      render: (name: string, record: ImportedFileItem) => (
         <div>
           <FileTextOutlined style={{ marginRight: 8 }} />
-          <span title={path}>{name}</span>
+          <span title={record.path}>{name}</span>
         </div>
       ),
     },
@@ -454,18 +439,6 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
 
   // 初始化加载
   useEffect(() => {
-    // 获取工作目录设置
-    const loadWorkDirectory = async () => {
-      try {
-  const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
-        const wd = cfg?.workDirectory as string | undefined;
-        if (wd) setWorkDirectory(wd);
-      } catch (error) {
-        console.error('Failed to load workDirectory:', error);
-      }
-    };
-
-    loadWorkDirectory();
     fetchFiles();
   }, [fetchFiles]);
 
