@@ -237,7 +237,8 @@
       "showMain": "显示主窗口",
       "hideBot": "隐藏助手窗口",
       "exitApp": "退出程序",
-      "botImageAlt": "助手机器人"
+      "botImageAlt": "助手机器人",
+      "search": "搜索"
     }
   },
   "convert": {

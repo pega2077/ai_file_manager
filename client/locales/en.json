@@ -240,7 +240,8 @@
       "showMain": "Show Main Window",
       "hideBot": "Hide Bot Window",
       "exitApp": "Exit Application",
-      "botImageAlt": "Assistant Bot"
+      "botImageAlt": "Assistant Bot",
+      "search": "Search"
     }
   },
   "convert": {

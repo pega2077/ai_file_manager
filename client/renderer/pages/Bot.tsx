@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import botLoadingImage from '../assets/mona-loading-default.gif';
 import botStaticImage from '../assets/mona-loading-default-static.png';
-import { message, Menu } from 'antd';
+import { message, Menu, Button, Tooltip } from 'antd';
+import { UploadOutlined, SearchOutlined } from '@ant-design/icons';
 import FileImport, { FileImportRef } from '../components/FileImport';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 
@@ -78,6 +79,26 @@ const Bot: React.FC = () => {
       } catch (error) {
         console.error('Failed to quit application:', error);
       }
+    }
+  };
+
+  const handleImportClick = async () => {
+    setMenuVisible(false);
+    try {
+      await importRef.current?.startImport();
+    } catch (error) {
+      console.error('Failed to import file via button:', error);
+      message.error(t('files.messages.fileImportFailed'));
+    }
+  };
+
+  const handleSearchClick = async () => {
+    setMenuVisible(false);
+    try {
+      // Open the main window where the user can search. If you have a dedicated search API, replace this.
+      await window.electronAPI.showMainWindow();
+    } catch (error) {
+      console.error('Failed to open main window for search:', error);
     }
   };
 
@@ -200,7 +221,30 @@ const Bot: React.FC = () => {
       // Avoid any selection highlight on the whole surface
       userSelect: 'none' as const,
     }}>
-      <div></div>
+      <div style={{
+        display: 'flex',
+        gap: 12,
+        marginBottom: 12,
+        alignItems: 'center',
+      }}>
+        <Tooltip title={t('bot.menu.importFile')}>
+          <Button
+            type="default"
+            icon={<UploadOutlined />}
+            onClick={handleImportClick}
+            aria-label={t('bot.menu.importFile')}
+          />
+        </Tooltip>
+
+        <Tooltip title={t('bot.menu.search') }>
+          <Button
+            type="default"
+            icon={<SearchOutlined />}
+            onClick={handleSearchClick}
+            aria-label={t('bot.menu.search')}
+          />
+        </Tooltip>
+      </div>
       <img
         id="bot-image"
         src={processing ? botLoadingImage : botStaticImage}
