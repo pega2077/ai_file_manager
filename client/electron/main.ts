@@ -281,23 +281,17 @@ function setupIpcHandlers() {
     const result = await dialog.showOpenDialog(win!, {
       properties: ["openFile"],
       filters: [
-        { name: "All Files", extensions: ["*"] },
+        { 
+          name: "All Files", 
+          extensions: ["txt", "md", "doc", "docx", "pdf", "rtf", "odt", "jpg","jpeg","png","gif","bmp","webp","svg","ico","xlsx", "xls", "csv", "ods","pptx", "ppt", "odp","html", "htm", "xhtml","*"]  // Allow all extensions
+        },
         {
           name: "Documents",
           extensions: ["txt", "md", "doc", "docx", "pdf", "rtf", "odt"],
         },
         {
           name: "Images",
-          extensions: [
-            "jpg",
-            "jpeg",
-            "png",
-            "gif",
-            "bmp",
-            "webp",
-            "svg",
-            "ico",
-          ],
+          extensions: ["jpg","jpeg","png","gif","bmp","webp","svg","ico"],
         },
         { name: "Spreadsheets", extensions: ["xlsx", "xls", "csv", "ods"] },
         { name: "Presentations", extensions: ["pptx", "ppt", "odp"] },
