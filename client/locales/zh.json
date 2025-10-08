@@ -223,7 +223,21 @@
       "getRecommendationFailed": "获取推荐目录失败",
       "fileAutoSavedTo": "文件已自动保存到: {path}",
       "fileImportFailed": "文件导入失败",
-      "errorProcessingFiles": "处理文件时出错"
+      "errorProcessingFiles": "处理文件时出错",
+      "workdirNotSet": "工作目录未设置",
+      "openWorkdirFailed": "打开工作目录失败",
+      "openFolderNotSupported": "当前环境不支持打开目录",
+      "droppedFilePath": "文件路径: {path}",
+      "filesDroppedCount": "已放置 {count} 个文件"
+    }
+    ,
+    "menu": {
+      "importFile": "导入文件",
+      "openWorkdir": "打开工作目录",
+      "showMain": "显示主窗口",
+      "hideBot": "隐藏助手窗口",
+      "exitApp": "退出程序",
+      "botImageAlt": "助手机器人"
     }
   },
   "convert": {

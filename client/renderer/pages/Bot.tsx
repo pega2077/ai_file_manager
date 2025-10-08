@@ -57,20 +57,20 @@ const Bot: React.FC = () => {
   const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
         const workDir = cfg?.workDirectory as string | undefined;
         if (!workDir) {
-          message.error('工作目录未设置');
+          message.error(t('bot.messages.workdirNotSet'));
           return;
         }
         if (window.electronAPI?.openFolder) {
           const ok = await window.electronAPI.openFolder(workDir);
           if (!ok) {
-            message.error('打开工作目录失败');
+            message.error(t('bot.messages.openWorkdirFailed'));
           }
         } else {
-          message.error('当前环境不支持打开目录');
+          message.error(t('bot.messages.openFolderNotSupported'));
         }
       } catch (error) {
         console.error('Failed to open work directory:', error);
-        message.error('打开工作目录失败');
+        message.error(t('bot.messages.openWorkdirFailed'));
       }
     } else if (key === 'exitApp') {
       try {
@@ -134,9 +134,9 @@ const Bot: React.FC = () => {
 
       if (filePaths.length > 0) {
         console.log('Dropped files:', filePaths);
-        const toastMessage = files.length === 1
-          ? `FilePath: ${filePaths[0]}`
-          : `${files.length} files dropped`;
+        const toastMessage = filePaths.length === 1
+          ? t('bot.messages.droppedFilePath', { path: filePaths[0] })
+          : t('bot.messages.filesDroppedCount', { count: filePaths.length });
 
         message.info(toastMessage);
 
@@ -168,7 +168,7 @@ const Bot: React.FC = () => {
     };
   }, []);
 
-  // 处理点击其他区域隐藏菜单
+  // Hide context menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuVisible) {
@@ -200,10 +200,11 @@ const Bot: React.FC = () => {
       // Avoid any selection highlight on the whole surface
       userSelect: 'none' as const,
     }}>
+      <div></div>
       <img
         id="bot-image"
         src={processing ? botLoadingImage : botStaticImage}
-        alt="Bot"
+        alt={t('bot.menu.botImageAlt')}
         onDoubleClick={handleDoubleClick}
         onMouseDown={handleMouseDown}
         onContextMenu={handleContextMenu}
@@ -243,12 +244,12 @@ const Bot: React.FC = () => {
           onClick={() => setMenuVisible(false)}
         >
           <Menu onClick={({ key }) => handleMenuClick(key as string)}>
-            <Menu.Item key="importFile">导入文件</Menu.Item>
-            <Menu.Item key="openWorkdir">打开工作目录</Menu.Item>
-            <Menu.Item key="showMain">显示主窗口</Menu.Item>
-            <Menu.Item key="hideBot">隐藏机器人</Menu.Item>
+            <Menu.Item key="importFile">{t('bot.menu.importFile')}</Menu.Item>
+            <Menu.Item key="openWorkdir">{t('bot.menu.openWorkdir')}</Menu.Item>
+            <Menu.Item key="showMain">{t('bot.menu.showMain')}</Menu.Item>
+            <Menu.Item key="hideBot">{t('bot.menu.hideBot')}</Menu.Item>
             <Menu.Divider />
-            <Menu.Item danger key="exitApp">退出程序</Menu.Item>
+            <Menu.Item danger key="exitApp">{t('bot.menu.exitApp')}</Menu.Item>
           </Menu>
         </div>
       )}

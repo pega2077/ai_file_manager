@@ -226,7 +226,21 @@
       "getRecommendationFailed": "Failed to get recommendation",
       "fileAutoSavedTo": "File automatically saved to: {path}",
       "fileImportFailed": "File import failed",
-      "errorProcessingFiles": "Error processing files"
+      "errorProcessingFiles": "Error processing files",
+      "workdirNotSet": "Work directory is not configured",
+      "openWorkdirFailed": "Failed to open work directory",
+      "openFolderNotSupported": "Opening folders is not supported in this environment",
+      "droppedFilePath": "FilePath: {path}",
+      "filesDroppedCount": "{count} files dropped"
+    }
+    ,
+    "menu": {
+      "importFile": "Import File",
+      "openWorkdir": "Open Workdir",
+      "showMain": "Show Main Window",
+      "hideBot": "Hide Bot Window",
+      "exitApp": "Exit Application",
+      "botImageAlt": "Assistant Bot"
     }
   },
   "convert": {
