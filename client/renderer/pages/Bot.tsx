@@ -10,11 +10,11 @@ const Bot: React.FC = () => {
   const { t } = useTranslation();
   const isDragging = useRef(false);
   const startPos = useRef({ x: 0, y: 0 });
-  // const [debugMessage, setDebugMessage] = useState<string>('');
   const [processing, setProcessing] = useState<boolean>(false);
   const importRef = useRef<FileImportRef>(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
 
   // Work directory handling moved into FileImport component.
 
@@ -251,6 +251,8 @@ const Bot: React.FC = () => {
         alt={t('bot.menu.botImageAlt')}
         onDoubleClick={handleDoubleClick}
         onMouseDown={handleMouseDown}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         onContextMenu={handleContextMenu}
         onDragStart={(e) => e.preventDefault()}
         onDragOver={handleDragOver}
@@ -266,6 +268,7 @@ const Bot: React.FC = () => {
           // Note: avoid unsupported vendor props to satisfy typings
           outline: 'none',
           WebkitTapHighlightColor: 'transparent',
+          ...(isHovered ? { filter: 'drop-shadow(0px 0px 5px #000000ff)' } : {}),
         }}
       />
       {/* <div>{debugMessage}</div> */}
