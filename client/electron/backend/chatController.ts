@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { Op } from "sequelize";
-import { generateStructuredJson } from "./utils/llm";
+import { generateStructuredJson, describeImage, getActiveModelName, embedText } from "./utils/llm";
 import type { ProviderName } from "./utils/llm";
 import { logger } from "../logger";
 import { configManager } from "../configManager";
@@ -14,10 +14,8 @@ import {
   type SupportedLang,
 } from "./utils/promptHelper";
 import { buildVisionDescribePrompt } from "./utils/promptHelper";
-import { describeImage, getActiveModelName } from "./utils/llm";
 import ChunkModel, { type ChunkAttributes } from "./models/chunk";
 import FileModel, { type FileAttributes } from "./models/file";
-import { embedWithOllama } from "./utils/ollama";
 import {
   isFaissAvailable,
   globalIndexExists,
@@ -800,7 +798,7 @@ async function performVectorSearch(
 ): Promise<{ rows: HydratedChunkRow[]; retrievalTimeMs: number; embeddingTimeMs: number }> {
   const start = Date.now();
   const embeddingStart = Date.now();
-  const emb = await embedWithOllama([question]);
+  const emb = await embedText([question]);
   const qEmbedding = emb[0] ?? [];
   if (qEmbedding.length === 0) {
     throw new Error("empty embedding");
@@ -1738,7 +1736,7 @@ export async function chatAskHandlerMode2(
     const t0 = Date.now();
     let qEmbedding: number[] = [];
     try {
-      const emb = await embedWithOllama([question]);
+  const emb = await embedText([question]);
       qEmbedding = emb[0] ?? [];
       if (qEmbedding.length === 0) throw new Error("empty embedding");
     } catch (e) {
@@ -1767,7 +1765,7 @@ export async function chatAskHandlerMode2(
 
     let vectors: number[][] = [];
     try {
-      vectors = await embedWithOllama(texts);
+  vectors = await embedText(texts);
     } catch (e) {
       logger.error("/api/chat/ask(mode2) chunk embedding failed", e as unknown);
       res.status(500).json({

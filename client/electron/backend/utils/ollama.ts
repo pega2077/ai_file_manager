@@ -1,8 +1,43 @@
 import { configManager } from "../../configManager";
+import type { AppConfig } from "../../configManager";
 import { httpPostJson } from "./httpClient";
 import { logger } from "../../logger";
 import type { SupportedLang } from "./promptHelper";
 import { normalizeLanguage } from "./promptHelper";
+
+export type OllamaLikeProvider = "ollama" | "pega";
+
+interface OllamaResolvedConfig {
+  endpoint: string;
+  chatModel?: string;
+  embedModel?: string;
+  visionModel?: string;
+  apiKey?: string;
+}
+
+const trimEndpoint = (value?: string): string => (value ?? "").replace(/\/+$/, "");
+
+function resolveOllamaLikeConfig(provider: OllamaLikeProvider, cfg: AppConfig): OllamaResolvedConfig {
+  if (provider === "pega") {
+    const section = cfg.pega ?? {};
+    return {
+      endpoint: trimEndpoint(section.pegaEndpoint || cfg.pegaEndpoint),
+      chatModel: section.pegaModel || cfg.pegaModel,
+      embedModel: section.pegaEmbedModel || cfg.pegaEmbedModel,
+      visionModel: section.pegaVisionModel || cfg.pegaVisionModel,
+      apiKey: section.pegaApiKey || cfg.pegaApiKey || section.pegaAuthToken || cfg.pegaAuthToken,
+    };
+  }
+
+  const section = cfg.ollama ?? {};
+  return {
+    endpoint: trimEndpoint(section.ollamaEndpoint || cfg.ollamaEndpoint),
+    chatModel: section.ollamaModel || cfg.ollamaModel,
+    embedModel: section.ollamaEmbedModel || cfg.ollamaEmbedModel,
+    visionModel: section.ollamaVisionModel || cfg.ollamaVisionModel,
+    apiKey: section.ollamaApiKey || cfg.ollamaApiKey,
+  };
+}
 
 export interface OllamaEmbedRequest {
   input: string[];
@@ -19,32 +54,35 @@ export interface OllamaEmbedResponse {
 
 export async function embedWithOllama(
   inputs: string[],
-  overrideModel?: string
+  overrideModel?: string,
+  provider: OllamaLikeProvider = "ollama"
 ): Promise<number[][]> {
   if (!Array.isArray(inputs) || inputs.length === 0) {
     return [];
   }
   const cfg = configManager.getConfig();
-  const oc = cfg.ollama || {};
-  const endpoint = ((oc.ollamaEndpoint || cfg.ollamaEndpoint) || "").replace(/\/$/, "");
-  const model = overrideModel || oc.ollamaEmbedModel || cfg.ollamaEmbedModel || "bge-m3";
+  const resolved = resolveOllamaLikeConfig(provider, cfg);
+  const endpoint = resolved.endpoint;
+  const providerLabel = provider === "pega" ? "Pega" : "Ollama";
   if (!endpoint) {
-    throw new Error("Ollama endpoint not configured");
+    throw new Error(`${providerLabel} endpoint not configured`);
   }
+  const fallbackModel = provider === "pega" ? "pega-embed" : "bge-m3";
+  const model = overrideModel || resolved.embedModel || resolved.chatModel || fallbackModel;
   const url = `${endpoint}/api/embed`;
   const payload = { model, input: inputs } satisfies OllamaEmbedRequest;
-  const apiKey = oc.ollamaApiKey || cfg.ollamaApiKey;
+  const apiKey = resolved.apiKey;
   const resp = await httpPostJson<OllamaEmbedResponse>(url, payload, {
     Accept: "application/json",
   }, undefined, apiKey);
   if (!resp.ok || !resp.data) {
     const msg =
-      resp.error?.message || `Failed embedding via Ollama: HTTP ${resp.status}`;
+      resp.error?.message || `Failed embedding via ${providerLabel}: HTTP ${resp.status}`;
     logger.error("embedWithOllama failed", msg);
     throw new Error(msg);
   }
   if (!resp.data.embeddings || !Array.isArray(resp.data.embeddings)) {
-    throw new Error("Invalid Ollama embedding response");
+    throw new Error(`Invalid ${providerLabel} embedding response`);
   }
   return resp.data.embeddings;
 }
@@ -144,30 +182,31 @@ export async function generateStructuredJsonWithOllama(
   temperature = 0.7,
   maxTokens = 3000,
   overrideModel = "",
-  lang?: SupportedLang
+  lang?: SupportedLang,
+  provider: OllamaLikeProvider = "ollama"
 ): Promise<unknown> {
   if (!Array.isArray(messages) || messages.length === 0) {
     throw new Error("messages are required");
   }
   const cfg = configManager.getConfig();
-  const oc = cfg.ollama || {};
-  const endpoint = ((oc.ollamaEndpoint || cfg.ollamaEndpoint) || "").replace(/\/$/, "");
-  const model = overrideModel || oc.ollamaModel || cfg.ollamaModel ;
+  const resolved = resolveOllamaLikeConfig(provider, cfg);
+  const endpoint = resolved.endpoint;
+  const providerLabel = provider === "pega" ? "Pega" : "Ollama";
   if (!endpoint) {
-    throw new Error("Ollama endpoint not configured");
+    throw new Error(`${providerLabel} endpoint not configured`);
   }
+  const fallbackModel = provider === "pega" ? "pega-chat" : "qwen3:8b";
+  const model = overrideModel || resolved.chatModel || fallbackModel;
   if (!model) {
-    throw new Error("Ollama model not configured");
+    throw new Error(`${providerLabel} model not configured`);
   }
 
   const url = `${endpoint}/api/generate`;
   // Fallback to system-configured language when not explicitly provided
   const usedLang = normalizeLanguage(lang ?? cfg.language ?? "en", "en");
   logger.info(
-    "Ollama generateStructuredJsonWithOllama, lang:",
-    usedLang,
-    "model:",
-    model
+    `${providerLabel} structured JSON request`,
+    { lang: usedLang, model }
   );
   const prompt = messagesToPrompt(messages, responseFormat?.json_schema, usedLang);
   const payload: OllamaGeneratePayload = {
@@ -182,7 +221,7 @@ export async function generateStructuredJsonWithOllama(
     payload.format = "json";
   }
   // logger.info("Ollama generate payload prepared", JSON.stringify(payload));
-  const apiKey = oc.ollamaApiKey || cfg.ollamaApiKey;
+  const apiKey = resolved.apiKey;
   const resp = await httpPostJson<OllamaGenerateResponseBody>(
     url,
     payload,
@@ -192,7 +231,7 @@ export async function generateStructuredJsonWithOllama(
   );
   if (!resp.ok || !resp.data) {
     const msg =
-      resp.error?.message || `Failed generate via Ollama: HTTP ${resp.status}`;
+      resp.error?.message || `Failed generate via ${providerLabel}: HTTP ${resp.status}`;
     throw new Error(msg);
   }
   //console.log("Ollama raw response:", resp.data);
@@ -202,7 +241,7 @@ export async function generateStructuredJsonWithOllama(
     res.payload = payload;
     return res;
   } catch (e) {
-    console.error("Failed to parse JSON from Ollama response", {
+    console.error(`Failed to parse JSON from ${providerLabel} response`, {
       snippet: raw.slice(0, 200),
     });
     // If model returned text with extra notes, try to extract JSON
@@ -214,7 +253,7 @@ export async function generateStructuredJsonWithOllama(
         /* fallthrough */
       }
     }
-    console.error("Failed to parse JSON from Ollama response", {
+    console.error(`Failed to parse JSON from ${providerLabel} response`, {
       snippet: raw.slice(0, 200),
     });
     throw new Error("Invalid JSON returned by model");
@@ -228,17 +267,20 @@ export async function generateStructuredJsonWithOllama(
  */
 export async function describeImageWithOllama(
   images: string | string[],
-  options?: { prompt?: string; overrideModel?: string; timeoutMs?: number; maxTokens?: number }
+  options?: { prompt?: string; overrideModel?: string; timeoutMs?: number; maxTokens?: number; provider?: OllamaLikeProvider }
 ): Promise<string> {
   const imgs = Array.isArray(images) ? images : [images];
   if (imgs.length === 0) return "";
 
   const cfg = configManager.getConfig();
-  const oc2 = cfg.ollama || {};
-  const endpoint = ((oc2.ollamaEndpoint || cfg.ollamaEndpoint) || "").replace(/\/$/, "");
-  const model = options?.overrideModel || oc2.ollamaVisionModel || oc2.ollamaModel || cfg.ollamaVisionModel || cfg.ollamaModel;
-  if (!endpoint) throw new Error("Ollama endpoint not configured");
-  if (!model) throw new Error("Ollama vision model not configured");
+  const provider = options?.provider ?? "ollama";
+  const resolved = resolveOllamaLikeConfig(provider, cfg);
+  const endpoint = resolved.endpoint;
+  const providerLabel = provider === "pega" ? "Pega" : "Ollama";
+  if (!endpoint) throw new Error(`${providerLabel} endpoint not configured`);
+  const fallbackModel = provider === "pega" ? "pega-vision" : "qwen3:8b";
+  const model = options?.overrideModel || resolved.visionModel || resolved.chatModel || fallbackModel;
+  if (!model) throw new Error(`${providerLabel} vision model not configured`);
 
   const url = `${endpoint}/api/generate`;
   const payload: OllamaVisionGeneratePayload = {
@@ -252,7 +294,7 @@ export async function describeImageWithOllama(
     payload.options = { ...(payload.options || {}), num_predict: options.maxTokens };
   }
 
-  const apiKey = oc2.ollamaApiKey || cfg.ollamaApiKey;
+  const apiKey = resolved.apiKey;
   const resp = await httpPostJson<OllamaGenerateResponseBody>(
     url,
     payload,
@@ -261,7 +303,7 @@ export async function describeImageWithOllama(
     apiKey
   );
   if (!resp.ok || !resp.data) {
-    const msg = resp.error?.message || `Failed vision generate via Ollama: HTTP ${resp.status}`;
+    const msg = resp.error?.message || `Failed vision generate via ${providerLabel}: HTTP ${resp.status}`;
     logger.error("describeImageWithOllama failed", msg);
     throw new Error(msg);
   }

@@ -6,6 +6,7 @@ import {
   embedWithOllama,
   type StructuredResponseFormat,
   type OllamaMessage,
+  type OllamaLikeProvider,
 } from "./ollama";
 import {
   embedWithOpenAI,
@@ -27,12 +28,12 @@ export type LlmMessage = OllamaMessage; // role + string content
 
 export type LlmTask = "chat" | "embed" | "vision";
 
-export type ProviderName = "ollama" | "openai" | "azure-openai" | "openrouter" | "bailian";
+export type ProviderName = "ollama" | "openai" | "azure-openai" | "openrouter" | "bailian" | "pega";
 
 export function getActiveProvider(): ProviderName {
   const cfg = configManager.getConfig();
   const p = cfg.llmProvider || "ollama";
-  if (p === "openai" || p === "azure-openai" || p === "openrouter" || p === "bailian") {
+  if (p === "openai" || p === "azure-openai" || p === "openrouter" || p === "bailian" || p === "pega") {
     return p;
   }
   return "ollama";
@@ -60,6 +61,12 @@ export function getActiveModelName(task: LlmTask, providerOverride?: ProviderNam
     if (task === "vision") return bc.bailianVisionModel || bc.bailianModel || cfg.bailianVisionModel || cfg.bailianModel || "";
     return bc.bailianModel || cfg.bailianModel || "";
   }
+  if (provider === "pega") {
+    const pc = cfg.pega || {};
+    if (task === "embed") return pc.pegaEmbedModel || cfg.pegaEmbedModel || "";
+    if (task === "vision") return pc.pegaVisionModel || pc.pegaModel || cfg.pegaVisionModel || cfg.pegaModel || "";
+    return pc.pegaModel || cfg.pegaModel || "";
+  }
   // default to ollama
   const oc = cfg.ollama || {};
   if (task === "embed") return oc.ollamaEmbedModel || cfg.ollamaEmbedModel || "";
@@ -78,7 +85,8 @@ export async function embedText(inputs: string[], overrideModel?: string): Promi
   if (provider === "bailian") {
     return embedWithBailian(inputs, overrideModel);
   }
-  return embedWithOllama(inputs, overrideModel);
+  const ollamaProvider: OllamaLikeProvider = provider === "pega" ? "pega" : "ollama";
+  return embedWithOllama(inputs, overrideModel, ollamaProvider);
 }
 
 export async function generateStructuredJson(
@@ -107,13 +115,25 @@ export async function generateStructuredJson(
     const schema = responseFormat?.json_schema?.schema as Record<string, unknown> | undefined;
     return generateStructuredJsonWithBailian(oaMessages, schema, temperature, maxTokens, overrideModel || undefined);
   }
+  if (provider === "pega") {
+    return generateStructuredJsonWithOllama(
+      messages,
+      responseFormat,
+      temperature,
+      maxTokens,
+      overrideModel,
+      lang,
+      "pega"
+    );
+  }
   return generateStructuredJsonWithOllama(
     messages,
     responseFormat,
     temperature,
     maxTokens,
     overrideModel,
-    lang
+    lang,
+    "ollama"
   );
 }
 
@@ -141,10 +161,12 @@ export async function describeImage(
     return describeImageWithBailian(img, options?.prompt, options?.overrideModel, options?.timeoutMs, options?.maxTokens);
   }
   const imgs = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
+  const providerOverride: OllamaLikeProvider = provider === "pega" ? "pega" : "ollama";
   return describeImageWithOllama(imgs, {
     prompt: options?.prompt,
     overrideModel: options?.overrideModel,
     timeoutMs: options?.timeoutMs,
     maxTokens: options?.maxTokens,
+    provider: providerOverride,
   });
 }

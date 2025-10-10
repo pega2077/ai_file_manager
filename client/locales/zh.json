@@ -10,9 +10,9 @@
     "select": "选择",
     "loading": "加载中...",
     "retry": "重试",
-    "success": "操作成功",
-    "error": "发生错误",
-    "optional": "选填"
+    "success": "成功",
+    "error": "错误",
+    "optional": "可选"
   },
   "menu": {
     "file": "文件",
@@ -43,24 +43,26 @@
   },
   "dialogs": {
     "clearConfirmTitle": "确认清除所有数据",
-    "clearConfirmMessage": "此操作将永久删除数据库、向量库和临时文件，应用将会重启。",
+    "clearConfirmMessage": "这将永久删除数据库、向量和临时文件，然后应用会重新启动。",
     "clearConfirmCancel": "取消",
     "clearConfirmOk": "删除并重启",
     "clearDoneTitle": "数据已清除",
-    "clearDoneMessage": "应用数据已清除，程序将立即重启。",
+    "clearDoneMessage": "所有应用数据已清除，应用将重新启动。",
     "clearFailedTitle": "清除数据失败",
-    "clearFailedMessage": "清除数据失败，请查看日志以获取详情。"
+    "clearFailedMessage": "未能清除所有数据，请查看日志了解详情。"
   },
   "setup": {
-  "stepOneTitle": "选择目录",
-  "stepOneDescription": "选择一个文件夹并确认推荐的目录结构。",
-  "stepTwoTitle": "职业信息",
-  "stepTwoDescription": "描述您的职业和用途。",
-  "stepThreeTitle": "创建目录",
-  "stepThreeDescription": "创建目录结构并完成设置。",
+    "stepOneTitle": "目录选择",
+    "stepOneDescription": "选择一个文件夹并确认推荐的目录结构。",
+    "stepTwoTitle": "职业信息",
+    "stepTwoDescription": "描述您的职业和用途。",
+    "stepThreeTitle": "目录创建",
+    "stepThreeDescription": "创建目录结构并完成设置。",
     "generalSettings": "基础设置",
     "optionalSettings": "高级选项",
     "form": {
+      "pageTitle": "文件管理",
+      "pageDescription": "查看和管理已导入到系统的文件",
       "professionLabel": "职业",
       "purposeLabel": "用途",
       "keywordsLabel": "关键词",
@@ -70,7 +72,8 @@
       "minDirectories": "最少目录数量",
       "maxDirectories": "最多目录数量",
       "temperature": "温度",
-      "directoryStyle": "目录风格"
+      "directoryStyle": "目录风格",
+      "llmProviderLabel": "大模型提供商"
     },
     "actions": {
       "fetchRecommendation": "获取推荐目录结构",
@@ -81,13 +84,18 @@
       "pendingStructure": "待创建目录结构",
       "selectedPath": "已选择：{path}"
     },
+    "descriptions": {
+      "llmProvider": "选择用于目录推荐和分析的大模型提供商。"
+    },
     "messages": {
       "fetchSuccess": "已生成目录结构推荐",
       "fetchError": "获取目录结构失败",
       "selectFolderError": "选择文件夹失败",
       "missingTarget": "请先选择目标文件夹",
       "createSuccess": "目录结构已生成并初始化完成",
-      "createError": "生成目录结构时出现错误"
+      "createError": "生成目录结构时出现错误",
+      "providerUpdated": "已更新大模型提供商",
+      "providerUpdateError": "更新大模型提供商失败"
     },
     "cards": {
       "stepOne": "第1步 - 选择工作目录",
@@ -124,6 +132,14 @@
       "style": {
         "flat": "扁平风格",
         "hierarchical": "多层级风格"
+      },
+      "llmProviders": {
+        "ollama": "Ollama（本地/网关）",
+        "pega": "Pega 平台",
+        "openai": "OpenAI",
+        "openrouter": "OpenRouter",
+        "bailian": "阿里百炼",
+        "azureOpenai": "Azure OpenAI"
       }
     }
   },
@@ -148,8 +164,9 @@
     "pageTitle": "设置",
     "sections": {
       "general": "通用",
-      "workDirectory": "工作区",
+      "workDirectory": "工作空间",
       "api": "API 配置",
+      "llm": "大模型设置",
       "actions": "操作"
     },
     "labels": {
@@ -163,18 +180,22 @@
       "tagSummaryMaxLength": "标签摘要最大长度",
       "autoClassify": "自动分类无需确认",
       "useLocalService": "使用本地服务",
-      "workDirectory": "当前工作区",
-      "apiBaseUrl": "API 基础 URL"
+      "workDirectory": "当前工作空间",
+      "apiBaseUrl": "API 基础地址",
+      "llmProvider": "大模型提供商",
+      "pegaApiKey": "Pega API Key"
     },
     "descriptions": {
       "enablePreview": "双击文件以在打开默认应用前预览。",
       "autoSaveRAG": "自动将导入的文件添加到 RAG 知识库。",
       "autoTagEnabled": "在导入或处理文件时自动提取标签。",
       "tagSummaryMaxLength": "生成标签摘要时使用的最大字符数（影响自动打标签）。",
-      "autoClassify": "保存文件到推荐目录时跳过确认对话框。",
-      "useLocalService": "启用后使用本地 Python 服务（通常为 http://localhost:8000 ）。关闭后可手动配置远程 API 地址。",
-      "workDirectory": "工作区文件夹在设置期间定义。重新运行设置向导以更改。",
-      "apiBaseUrl": "Python 后端的基准 URL，包括协议（例如 http://localhost:8000）。"
+      "autoClassify": "保存文件到推荐目录时跳过确认步骤。",
+      "useLocalService": "启用后使用本地 Python 服务（通常为 http://localhost:8000），关闭后可配置远程 API 地址。",
+      "workDirectory": "工作空间在初始化流程中设置，可通过重新运行向导进行修改。",
+      "apiBaseUrl": "Python 后端的基础地址（包含协议，例如 http://localhost:8000）。",
+      "llmProvider": "影响目录推荐、嵌入与智能分析所使用的大模型来源。",
+      "pegaApiKey": "保存在配置文件中，如已失效请重新登录获取。"
     },
     "placeholders": {
       "apiBaseUrl": "http://localhost:8000"
@@ -183,31 +204,92 @@
       "light": "浅色",
       "dark": "深色"
     },
+    "options": {
+      "llmProviders": {
+        "ollama": "Ollama（本地/网关）",
+        "pega": "Pega 平台",
+        "openai": "OpenAI",
+        "openrouter": "OpenRouter",
+        "bailian": "阿里百炼",
+        "azureOpenai": "Azure OpenAI"
+      }
+    },
     "common": {
       "enabled": "启用",
       "disabled": "禁用"
     },
     "actions": {
       "save": "保存设置",
-      "reset": "重置为默认",
+      "reset": "恢复默认",
       "clear": "清除所有数据",
       "back": "返回文件",
-      "saveApiBaseUrl": "保存 API URL"
+      "saveApiBaseUrl": "保存 API 地址",
+      "managePegaAccount": "管理 Pega 账号"
     },
     "messages": {
       "saveSuccess": "设置已保存",
       "saveError": "保存设置失败",
-      "apiSuccess": "API 基础 URL 已保存",
-      "apiError": "更新 API 基础 URL 失败",
-      "resetSuccess": "设置已重置",
+      "apiSuccess": "API 地址已保存",
+      "apiError": "更新 API 地址失败",
+      "resetSuccess": "设置已恢复",
       "clearConfirmTitle": "清除所有数据？",
-      "clearConfirmContent": "这将删除导入的文件、数据库记录和聊天历史。此操作无法撤销。",
+      "clearConfirmContent": "此操作会删除导入文件、数据库记录和聊天记录，且无法撤销。",
       "clearConfirmOk": "立即清除",
       "clearConfirmCancel": "取消",
       "clearSuccess": "所有数据已清除",
       "clearError": "清除数据失败：{reason}",
-      "clearException": "清除数据时发生意外错误。",
-      "unknownError": "未知错误"
+      "clearException": "清除数据时发生异常。",
+      "unknownError": "未知错误",
+      "providerUpdated": "已更新大模型提供商",
+      "providerUpdateError": "更新大模型提供商失败",
+      "pegaKeyMissing": "尚未保存 API Key"
+    }
+  },
+  "pegaAuth": {
+    "pageTitle": "Pega 平台账号",
+    "description": "登录或注册以获取 Pega 大模型网关的 API Key。",
+    "tabs": {
+      "login": "登录",
+      "register": "注册"
+    },
+    "form": {
+      "email": "邮箱",
+      "phone": "手机号",
+      "password": "密码",
+      "confirmPassword": "确认密码",
+      "identifier": "邮箱或手机号"
+    },
+    "actions": {
+      "login": "登录",
+      "register": "创建账号",
+      "back": "返回",
+      "backToSettings": "返回设置"
+    },
+    "status": {
+      "activeProvider": "Pega 提供商状态",
+      "notice": "登录成功后，工作空间会自动切换为 Pega 提供商。",
+      "apiKey": "当前 API Key",
+      "token": "当前会话 Token"
+    },
+    "messages": {
+      "registerSuccess": "注册成功，请使用新账号登录。",
+      "registerFailed": "注册失败，请重试。",
+      "loginSuccess": "登录成功",
+      "loginFailed": "登录失败，请检查凭证后重试。",
+      "apiKeySuccess": "API Key 获取并保存成功",
+      "apiKeyFailed": "获取 API Key 失败",
+      "noApiKey": "暂无 API Key",
+      "noToken": "暂无 Token"
+    },
+    "validation": {
+      "emailRequired": "请输入邮箱",
+      "emailFormat": "请输入有效的邮箱地址",
+      "phoneRequired": "请输入手机号",
+      "passwordRequired": "请输入密码",
+      "passwordLength": "密码至少需要 6 个字符",
+      "confirmPasswordRequired": "请确认密码",
+      "passwordMismatch": "两次输入的密码不一致",
+      "identifierRequired": "请输入邮箱或手机号"
     }
   },
   "bot": {
@@ -364,6 +446,9 @@
     },
     "pagination": {
       "showTotal": "第 {start}-{end} 条，共 {total} 条"
+    },
+    "descriptions": {
+      "llmProvider": "用于目录推荐与分析的大模型来源。"
     },
     "messages": {
       "fetchFilesFailed": "获取文件列表失败",

@@ -1,12 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Steps, Form, Input, Button, Card, Space, message, AutoComplete, Tree, Collapse, Select } from 'antd';
+import { Layout, Steps, Form, Input, Button, Card, Space, message, AutoComplete, Tree, Collapse, Select, Typography } from 'antd';
 import { apiService } from '../services/api';
 import { useTranslation } from '../shared/i18n/I18nProvider';
+import type { AppConfig } from '../shared/types';
 
 const { Content } = Layout;
 const { Step } = Steps;
 const { TextArea } = Input;
+const { Text } = Typography;
 
 interface DirectoryStructure {
   path: string;
@@ -36,6 +38,8 @@ const professionOptionKeys = [
   'contentCreator',
 ] as const;
 
+type LlmProvider = NonNullable<AppConfig['llmProvider']>;
+
 const Setup = () => {
   const navigate = useNavigate();
   const { t, setLocale, locale, availableLocales, localeLabels } = useTranslation();
@@ -46,6 +50,32 @@ const Setup = () => {
   const [loading, setLoading] = useState(false);
   const [dirStyle, setDirStyle] = useState<'flat' | 'hierarchical'>('flat');
   const [collapseActiveKeys, setCollapseActiveKeys] = useState<string[]>([]);
+  const [llmProvider, setLlmProvider] = useState<LlmProvider>('ollama');
+
+  useEffect(() => {
+    let mounted = true;
+    const loadConfig = async () => {
+      try {
+        const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+        if (!mounted || !cfg) {
+          return;
+        }
+        const provider = (cfg.llmProvider ?? 'ollama') as LlmProvider;
+        setLlmProvider(provider);
+        apiService.setProvider(provider);
+      } catch (error) {
+        console.error('Failed to load app config for setup:', error);
+      }
+    };
+    void loadConfig();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    apiService.setProvider(llmProvider);
+  }, [llmProvider]);
 
   // Provide AutoComplete options that keep the profession key in metadata so we can
   // map selection back to a known profession and auto-fill the purpose field.
@@ -153,6 +183,30 @@ const Setup = () => {
     handleGetDirectoryStructure();
   };
 
+  const providerOptions = useMemo(
+    () => [
+      { value: 'ollama', label: t('setup.options.llmProviders.ollama') },
+      { value: 'pega', label: t('setup.options.llmProviders.pega') },
+      { value: 'openai', label: t('setup.options.llmProviders.openai') },
+      { value: 'openrouter', label: t('setup.options.llmProviders.openrouter') },
+      { value: 'bailian', label: t('setup.options.llmProviders.bailian') },
+      { value: 'azure-openai', label: t('setup.options.llmProviders.azureOpenai') },
+    ],
+    [t],
+  );
+
+  const handleProviderChange = async (value: LlmProvider) => {
+    setLlmProvider(value);
+    apiService.setProvider(value);
+    try {
+      await window.electronAPI.updateAppConfig({ llmProvider: value });
+      message.success(t('setup.messages.providerUpdated'));
+    } catch (error) {
+      message.error(t('setup.messages.providerUpdateError'));
+      console.error('Failed to update provider:', error);
+    }
+  };
+
   const handleContinueToProfile = () => {
     setCurrentStep(1);
   };
@@ -216,6 +270,18 @@ const Setup = () => {
                     {t('setup.actions.selectedPath', { path: selectedFolder })}
                   </div>
                 )}
+              </div>
+              <div>
+                <Text strong>{t('setup.form.llmProviderLabel')}</Text>
+                <Select
+                  style={{ width: '100%', marginTop: 8 }}
+                  value={llmProvider}
+                  options={providerOptions}
+                  onChange={(value) => handleProviderChange(value as LlmProvider)}
+                />
+                <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
+                  {t('setup.descriptions.llmProvider')}
+                </Text>
               </div>
               <Button
                 type="primary"

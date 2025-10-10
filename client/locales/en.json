@@ -73,7 +73,8 @@
       "minDirectories": "Minimum Directories",
       "maxDirectories": "Maximum Directories",
       "temperature": "Temperature",
-      "directoryStyle": "Directory Style"
+      "directoryStyle": "Directory Style",
+      "llmProviderLabel": "LLM Provider"
     },
     "actions": {
       "fetchRecommendation": "Fetch Recommended Structure",
@@ -84,13 +85,18 @@
       "pendingStructure": "Pending Directory Structure",
       "selectedPath": "Selected: {path}"
     },
+    "descriptions": {
+      "llmProvider": "Choose which LLM provider to use for directory suggestions and analysis."
+    },
     "messages": {
       "fetchSuccess": "Directory recommendation generated successfully",
       "fetchError": "Failed to fetch the directory structure",
       "selectFolderError": "Failed to select folder",
       "missingTarget": "Please choose a destination folder",
       "createSuccess": "Directory structure created successfully",
-      "createError": "Failed to generate directory structure"
+      "createError": "Failed to generate directory structure",
+      "providerUpdated": "LLM provider updated",
+      "providerUpdateError": "Failed to update LLM provider"
     },
     "cards": {
       "stepOne": "Step 1 - Select Working Directory",
@@ -127,6 +133,14 @@
       "style": {
         "flat": "Flat",
         "hierarchical": "Hierarchical"
+      },
+      "llmProviders": {
+        "ollama": "Ollama (local or gateway)",
+        "pega": "Pega Platform",
+        "openai": "OpenAI",
+        "openrouter": "OpenRouter",
+        "bailian": "Alibaba Bailian",
+        "azureOpenai": "Azure OpenAI"
       }
     }
   },
@@ -153,6 +167,7 @@
       "general": "General",
       "workDirectory": "Workspace",
       "api": "API Configuration",
+      "llm": "LLM Provider",
       "actions": "Actions"
     },
     "labels": {
@@ -167,7 +182,9 @@
       "autoClassify": "Auto classify without confirmation",
       "useLocalService": "Use local service",
       "workDirectory": "Current workspace",
-      "apiBaseUrl": "API base URL"
+      "apiBaseUrl": "API base URL",
+      "llmProvider": "LLM provider",
+      "pegaApiKey": "Stored Pega API key"
     },
     "descriptions": {
       "enablePreview": "Double-click files to preview them before opening the default app.",
@@ -177,7 +194,9 @@
       "autoClassify": "Skip confirmation dialogs when saving files to recommended directories.",
       "useLocalService": "When enabled, use the local Python service (typically http://localhost:8000). When disabled, you can configure a remote API URL.",
       "workDirectory": "The workspace folder is defined during setup. Re-run the setup wizard to change it.",
-      "apiBaseUrl": "Base URL of the Python backend, including protocol (e.g. http://localhost:8000)."
+      "apiBaseUrl": "Base URL of the Python backend, including protocol (e.g. http://localhost:8000).",
+      "llmProvider": "Applies to intelligent directory suggestions, embeddings, and chat analysis.",
+      "pegaApiKey": "Stored securely in config.json. Update it by signing in below when it expires."
     },
     "placeholders": {
       "apiBaseUrl": "http://localhost:8000"
@@ -185,6 +204,16 @@
     "themeOptions": {
       "light": "Light",
       "dark": "Dark"
+    },
+    "options": {
+      "llmProviders": {
+        "ollama": "Ollama (local)",
+        "pega": "Pega Platform",
+        "openai": "OpenAI",
+        "openrouter": "OpenRouter",
+        "bailian": "Alibaba Bailian",
+        "azureOpenai": "Azure OpenAI"
+      }
     },
     "common": {
       "enabled": "Enabled",
@@ -195,7 +224,8 @@
       "reset": "Reset to defaults",
       "clear": "Clear all data",
       "back": "Back to files",
-      "saveApiBaseUrl": "Save API URL"
+      "saveApiBaseUrl": "Save API URL",
+      "managePegaAccount": "Manage Pega account"
     },
     "messages": {
       "saveSuccess": "Settings saved",
@@ -210,7 +240,57 @@
       "clearSuccess": "All data cleared",
       "clearError": "Failed to clear data: {reason}",
       "clearException": "An unexpected error occurred while clearing data.",
-      "unknownError": "Unknown error"
+      "unknownError": "Unknown error",
+      "providerUpdated": "LLM provider updated",
+      "providerUpdateError": "Failed to update LLM provider",
+      "pegaKeyMissing": "No API key saved"
+    }
+  },
+  "pegaAuth": {
+    "pageTitle": "Pega Platform Account",
+    "description": "Sign in or register to retrieve your API key for the Pega LLM gateway.",
+    "tabs": {
+      "login": "Sign in",
+      "register": "Register"
+    },
+    "form": {
+      "email": "Email",
+      "phone": "Phone",
+      "password": "Password",
+      "confirmPassword": "Confirm password",
+      "identifier": "Email or phone"
+    },
+    "actions": {
+      "login": "Sign in",
+      "register": "Create account",
+      "back": "Back",
+      "backToSettings": "Return to Settings"
+    },
+    "status": {
+      "activeProvider": "Pega provider status",
+      "notice": "After a successful login your workspace automatically switches to the Pega provider.",
+      "apiKey": "Current API key",
+      "token": "Current session token"
+    },
+    "messages": {
+      "registerSuccess": "Registration successful. You can now sign in.",
+      "registerFailed": "Registration failed. Please try again.",
+      "loginSuccess": "Login successful",
+      "loginFailed": "Login failed. Check your credentials and try again.",
+      "apiKeySuccess": "API key retrieved and saved",
+      "apiKeyFailed": "Failed to fetch API key",
+      "noApiKey": "No API key",
+      "noToken": "No token"
+    },
+    "validation": {
+      "emailRequired": "Please enter your email",
+      "emailFormat": "Please enter a valid email",
+      "phoneRequired": "Please enter your phone number",
+      "passwordRequired": "Please enter a password",
+      "passwordLength": "Password should be at least 6 characters",
+      "confirmPasswordRequired": "Please confirm your password",
+      "passwordMismatch": "Passwords do not match",
+      "identifierRequired": "Please enter your email or phone"
     }
   },
   "bot": {

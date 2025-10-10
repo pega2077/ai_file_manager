@@ -2,13 +2,15 @@
 import { Layout, Card, Typography, Switch, Input, Button, message, Modal, Select, InputNumber } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { updateApiBaseUrl } from '../services/api';
+import { apiService, updateApiBaseUrl } from '../services/api';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 import { defaultLocale, normalizeLocale, type SupportedLocale } from '../shared/i18n';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 const { TextArea } = Input;
+
+type LlmProvider = 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega';
 
 interface SettingsState {
   theme: 'light' | 'dark';
@@ -22,6 +24,8 @@ interface SettingsState {
   autoClassifyWithoutConfirmation: boolean;
   workDirectory: string;
   useLocalService: boolean;
+  llmProvider: LlmProvider;
+  pegaApiKey: string;
 }
 
 const DEFAULT_SETTINGS: SettingsState = {
@@ -36,6 +40,8 @@ const DEFAULT_SETTINGS: SettingsState = {
   autoClassifyWithoutConfirmation: false,
   workDirectory: '',
   useLocalService: true,
+  llmProvider: 'ollama',
+  pegaApiKey: '',
 };
 
 const Settings = () => {
@@ -56,6 +62,29 @@ const Settings = () => {
     [availableLocales, localeLabels],
   );
 
+  const providerOptions = useMemo(
+    () => [
+      { value: 'ollama', label: t('settings.options.llmProviders.ollama') },
+      { value: 'pega', label: t('settings.options.llmProviders.pega') },
+      { value: 'openai', label: t('settings.options.llmProviders.openai') },
+      { value: 'openrouter', label: t('settings.options.llmProviders.openrouter') },
+      { value: 'bailian', label: t('settings.options.llmProviders.bailian') },
+      { value: 'azure-openai', label: t('settings.options.llmProviders.azureOpenai') },
+    ],
+    [t],
+  );
+
+  const truncatedPegaKey = useMemo(() => {
+    const key = settings.pegaApiKey.trim();
+    if (!key) {
+      return t('settings.messages.pegaKeyMissing');
+    }
+    if (key.length <= 8) {
+      return key;
+    }
+    return `${key.slice(0, 4)}...${key.slice(-4)}`;
+  }, [settings.pegaApiKey, t]);
+
   useEffect(() => {
     const loadSettings = async () => {
       let nextState: SettingsState = { ...DEFAULT_SETTINGS, language: locale };
@@ -64,6 +93,8 @@ const Settings = () => {
   const appConfig = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
         if (appConfig) {
           const normalizedLanguage = normalizeLocale(appConfig.language ?? defaultLocale);
+          const provider = (appConfig.llmProvider ?? DEFAULT_SETTINGS.llmProvider) as LlmProvider;
+          const pegaKey = typeof appConfig.pega?.pegaApiKey === 'string' ? appConfig.pega.pegaApiKey : '';
           nextState = {
             ...nextState,
             theme: appConfig.theme ?? DEFAULT_SETTINGS.theme,
@@ -79,11 +110,15 @@ const Settings = () => {
             autoClassifyWithoutConfirmation: Boolean(appConfig.autoClassifyWithoutConfirmation ?? DEFAULT_SETTINGS.autoClassifyWithoutConfirmation),
             workDirectory: String(appConfig.workDirectory ?? DEFAULT_SETTINGS.workDirectory),
             useLocalService: Boolean(appConfig.useLocalService ?? DEFAULT_SETTINGS.useLocalService),
+            llmProvider: provider,
+            pegaApiKey: pegaKey,
           };
 
           if (normalizedLanguage !== locale) {
             setLocale(normalizedLanguage);
           }
+
+          apiService.setProvider(provider);
         }
       } catch (error) {
         console.error('Failed to load app config:', error);
@@ -133,6 +168,21 @@ const Settings = () => {
     }
   };
 
+  const handleProviderChange = async (value: LlmProvider) => {
+    apiService.setProvider(value);
+    setSettings((prev) => ({
+      ...prev,
+      llmProvider: value,
+    }));
+    try {
+      await window.electronAPI.updateAppConfig({ llmProvider: value });
+      message.success(t('settings.messages.providerUpdated'));
+    } catch (error) {
+      message.error(t('settings.messages.providerUpdateError'));
+      console.error('Failed to update provider:', error);
+    }
+  };
+
   const handleSaveSettings = async () => {
     try {
       await window.electronAPI.updateAppConfig({
@@ -176,6 +226,7 @@ const Settings = () => {
     };
     setSettings(nextState);
     setLocale(defaultLocale);
+    apiService.setProvider(nextState.llmProvider);
     message.success(t('settings.messages.resetSuccess'));
   };
 
@@ -324,6 +375,38 @@ const Settings = () => {
                   {t('settings.descriptions.autoClassify')}
                 </Text>
               </div>
+            </div>
+          </Card>
+
+          <Card title={t('settings.sections.llm')} style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <Text strong>{t('settings.labels.llmProvider')}</Text>
+                <Select
+                  style={{ marginLeft: 16, minWidth: 200 }}
+                  value={settings.llmProvider}
+                  options={providerOptions}
+                  onChange={(value) => handleProviderChange(value as LlmProvider)}
+                />
+                <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+                  {t('settings.descriptions.llmProvider')}
+                </Text>
+              </div>
+
+              {settings.llmProvider === 'pega' && (
+                <div>
+                  <Text strong>{t('settings.labels.pegaApiKey')}</Text>
+                  <div style={{ marginTop: 8 }}>
+                    <Text code>{truncatedPegaKey}</Text>
+                  </div>
+                  <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+                    {t('settings.descriptions.pegaApiKey')}
+                  </Text>
+                  <Button type="primary" style={{ marginTop: 12 }} onClick={() => navigate('/settings/pega-auth')}>
+                    {t('settings.actions.managePegaAccount')}
+                  </Button>
+                </div>
+              )}
             </div>
           </Card>
 

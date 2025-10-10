@@ -16,6 +16,14 @@ export interface AppConfig {
     ollamaVisionModel?: string;
     ollamaApiKey?: string;
   };
+  pega?: {
+    pegaEndpoint?: string;
+    pegaModel?: string;
+    pegaEmbedModel?: string;
+    pegaVisionModel?: string;
+    pegaApiKey?: string;
+    pegaAuthToken?: string;
+  };
   bailian?: {
     /** Bailian (DashScope) OpenAI-compatible endpoint */
     bailianEndpoint?: string;
@@ -28,8 +36,8 @@ export interface AppConfig {
     /** Default multimodal/vision model */
     bailianVisionModel?: string;
   };
-  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' */
-  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian';
+  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' */
+  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega';
   openai?: {
     /** OpenAI compatible endpoint (e.g., https://api.openai.com/v1 or custom) */
     openaiEndpoint?: string;
@@ -64,6 +72,12 @@ export interface AppConfig {
   ollamaEmbedModel?: string;
   ollamaVisionModel?: string;
   ollamaApiKey?: string;
+  pegaEndpoint?: string;
+  pegaModel?: string;
+  pegaEmbedModel?: string;
+  pegaVisionModel?: string;
+  pegaApiKey?: string;
+  pegaAuthToken?: string;
   openaiEndpoint?: string;
   openaiApiKey?: string;
   openaiModel?: string;
@@ -118,6 +132,14 @@ const DEFAULT_CONFIG: AppConfig = {
     ollamaEmbedModel: "bge-m3",
     ollamaVisionModel: "qwen2.5vl:7b",
     ollamaApiKey: undefined,
+  },
+  pega: {
+    pegaEndpoint: "https://llm.pegamob.com",
+    pegaModel: "qwen3:8b",
+    pegaEmbedModel: "bge-m3",
+    pegaVisionModel: "qwen2.5vl:7b",
+    pegaApiKey: undefined,
+    pegaAuthToken: undefined,
   },
   openai: {
     openaiEndpoint: "https://api.openai.com/v1",
@@ -204,6 +226,7 @@ export class ConfigManager {
           ...DEFAULT_CONFIG,
           ...userConfig,
           ollama: { ...(DEFAULT_CONFIG.ollama || {}), ...(userConfig.ollama || {}) },
+          pega: { ...(DEFAULT_CONFIG.pega || {}), ...(userConfig.pega || {}) },
           openai: { ...(DEFAULT_CONFIG.openai || {}), ...(userConfig.openai || {}) },
           openrouter: { ...(DEFAULT_CONFIG.openrouter || {}), ...(userConfig.openrouter || {}) },
           bailian: { ...(DEFAULT_CONFIG.bailian || {}), ...(userConfig.bailian || {}) },
@@ -224,6 +247,24 @@ export class ConfigManager {
             ollamaEmbedModel: userConfig.ollamaEmbedModel ?? merged.ollama?.ollamaEmbedModel,
             ollamaVisionModel: userConfig.ollamaVisionModel ?? merged.ollama?.ollamaVisionModel,
             ollamaApiKey: userConfig.ollamaApiKey ?? merged.ollama?.ollamaApiKey,
+          };
+        }
+        if (
+          userConfig.pegaEndpoint ||
+          userConfig.pegaModel ||
+          userConfig.pegaEmbedModel ||
+          userConfig.pegaVisionModel ||
+          userConfig.pegaApiKey ||
+          userConfig.pegaAuthToken
+        ) {
+          merged.pega = {
+            ...(merged.pega || {}),
+            pegaEndpoint: userConfig.pegaEndpoint ?? merged.pega?.pegaEndpoint,
+            pegaModel: userConfig.pegaModel ?? merged.pega?.pegaModel,
+            pegaEmbedModel: userConfig.pegaEmbedModel ?? merged.pega?.pegaEmbedModel,
+            pegaVisionModel: userConfig.pegaVisionModel ?? merged.pega?.pegaVisionModel,
+            pegaApiKey: userConfig.pegaApiKey ?? merged.pega?.pegaApiKey,
+            pegaAuthToken: userConfig.pegaAuthToken ?? merged.pega?.pegaAuthToken,
           };
         }
         if (
@@ -285,6 +326,26 @@ export class ConfigManager {
             merged.bailian = { ...(merged.bailian || {}), bailianApiKey: envKey };
           }
         }
+
+        if (!merged.pega?.pegaApiKey) {
+          const envKey = process.env.PEGA_API_KEY || process.env.PEGA_TOKEN || process.env.PEGA_LLM_API_KEY;
+          if (envKey) {
+            merged.pega = { ...(merged.pega || {}), pegaApiKey: envKey };
+          }
+        }
+
+        if (!merged.pega?.pegaAuthToken) {
+          const envToken = process.env.PEGA_AUTH_TOKEN || process.env.PEGA_JWT_TOKEN;
+          if (envToken) {
+            merged.pega = { ...(merged.pega || {}), pegaAuthToken: envToken };
+          }
+        }
+
+        // Ensure pega endpoint always use default endpoint
+        // if (!merged.pega) {
+        //   merged.pega = { ...DEFAULT_CONFIG.pega };
+        // }
+        // merged.pega.pegaEndpoint = DEFAULT_CONFIG.pega?.pegaEndpoint;
 
         // Sanitize new options
         if (merged.tagSummaryMaxLength == null || Number.isNaN(Number(merged.tagSummaryMaxLength))) {

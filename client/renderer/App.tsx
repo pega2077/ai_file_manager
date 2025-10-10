@@ -7,6 +7,7 @@ import Setup from './pages/Setup';
 import Settings from './pages/Settings';
 import Bot from './pages/Bot';
 import Convert from './pages/Convert';
+import PegaAuth from './pages/PegaAuth';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/search" element={<Search />} />
         <Route path="/setup" element={<Setup />} />
         <Route path="/settings" element={<Settings />} />
+  <Route path="/settings/pega-auth" element={<PegaAuth />} />
         <Route path="/bot" element={<Bot />} />
         <Route path="/convert" element={<Convert />} />
       </Routes>

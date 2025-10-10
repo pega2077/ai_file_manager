@@ -108,11 +108,19 @@ export interface AppConfig {
   localServicePort: number;
   localServiceHost: string;
   /** Selected LLM provider for chat/completions */
-  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian';
+  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega';
   ollamaEndpoint?: string;
   ollamaModel?: string;
   ollamaEmbedModel?: string;
   ollamaVisionModel?: string;
+  pega?: {
+    pegaEndpoint?: string;
+    pegaModel?: string;
+    pegaEmbedModel?: string;
+    pegaVisionModel?: string;
+    pegaApiKey?: string;
+    pegaAuthToken?: string;
+  };
   fileConvertEndpoint?: string;
   sqliteDbPath: string;
   language?: string;

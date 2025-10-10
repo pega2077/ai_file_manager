@@ -1,11 +1,15 @@
 // Dynamic API base URL - will be initialized from electron store
-let API_BASE_URL = 'http://localhost:8000/api';
+let ROOT_BASE_URL = 'http://localhost:8000';
+let API_BASE_URL = `${ROOT_BASE_URL}/api`;
 
 import { FileConversionResult, StageFileResponse } from '../shared/types';
+import type { AppConfig } from '../shared/types';
 
 // Function to update API base URL
 export const updateApiBaseUrl = (url: string) => {
-  API_BASE_URL = `${url}/api`;
+  const normalized = url.replace(/\/+$/, '');
+  ROOT_BASE_URL = normalized;
+  API_BASE_URL = `${normalized}/api`;
 };
 
 // Initialize API base URL from electron store
@@ -16,7 +20,8 @@ const initializeApiBaseUrl = async () => {
       updateApiBaseUrl(url);
     } catch (error) {
       console.warn('Failed to get API base URL from store, using default:', error);
-      API_BASE_URL = 'http://localhost:8000/api';
+      ROOT_BASE_URL = 'http://localhost:8000';
+      API_BASE_URL = `${ROOT_BASE_URL}/api`;
     }
   }
 };
@@ -173,16 +178,19 @@ interface SystemConfigUpdate {
   workdir_path?: string;
 }
 
+type ProviderName = 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega';
+
 class ApiService {
   private locale = 'en';
-  private provider: string | null = null;
+  private provider: ProviderName | null = null;
+  private pegaBaseUrl: string | null = null;
 
-  private async ensureProvider(): Promise<string> {
+  private async ensureProvider(): Promise<ProviderName> {
     // Load once from app config via IPC and cache locally
     if (this.provider !== null) return this.provider;
     try {
       const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig | undefined;
-      const p = cfg?.llmProvider ?? 'ollama';
+      const p = (cfg?.llmProvider ?? 'ollama') as ProviderName;
       this.provider = p;
       return p;
     } catch (err) {
@@ -191,6 +199,16 @@ class ApiService {
       this.provider = 'ollama';
       return 'ollama';
     }
+  }
+
+  setProvider(provider: ProviderName) {
+    this.provider = provider;
+    this.pegaBaseUrl = null;
+  }
+
+  clearProviderCache() {
+    this.provider = null;
+    this.pegaBaseUrl = null;
   }
 
   setLocale(locale: string) {
@@ -244,6 +262,117 @@ class ApiService {
     }
 
     return response.json();
+  }
+
+  private async requestFromRoot<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = `${ROOT_BASE_URL}${endpoint}`;
+    const mergedHeaders = this.mergeHeaders(options.headers);
+    const response = await fetch(url, {
+      ...options,
+      headers: mergedHeaders,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json() as Promise<T>;
+  }
+
+  private async ensurePegaBaseUrl(): Promise<string> {
+    if (this.pegaBaseUrl) {
+      return this.pegaBaseUrl;
+    }
+
+    if (!window.electronAPI) {
+      throw new Error('Electron API is unavailable; cannot resolve Pega endpoint');
+    }
+
+    try {
+      const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const endpoint = cfg?.pega?.pegaEndpoint;
+      if (typeof endpoint === 'string' && endpoint.trim().length > 0) {
+        const normalized = endpoint.replace(/\/+$/, '');
+        this.pegaBaseUrl = normalized;
+        return normalized;
+      }
+      throw new Error('Pega endpoint not configured');
+    } catch (error) {
+      console.warn('Failed to resolve Pega endpoint from config, using default http://127.0.0.1:3300:', error);
+      const fallback = 'http://127.0.0.1:3300';
+      this.pegaBaseUrl = fallback;
+      return fallback;
+    }
+  }
+
+  private async requestFromPega<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const baseUrl = await this.ensurePegaBaseUrl();
+    const url = `${baseUrl}${endpoint}`;
+    const mergedHeaders = this.mergeHeaders(options.headers);
+    const response = await fetch(url, {
+      ...options,
+      headers: mergedHeaders,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json() as Promise<T>;
+  }
+
+  private extractToken(payload: unknown): string | undefined {
+    if (!payload || typeof payload !== 'object') {
+      return undefined;
+    }
+    const base = payload as Record<string, unknown>;
+    if (typeof base.token === 'string') {
+      return base.token;
+    }
+    const data = base.data;
+    if (data && typeof data === 'object') {
+      const token = (data as Record<string, unknown>).token;
+      if (typeof token === 'string') {
+        return token;
+      }
+    }
+    return undefined;
+  }
+
+  private extractApiKey(payload: unknown): string | undefined {
+    if (!payload || typeof payload !== 'object') {
+      return undefined;
+    }
+    const base = payload as Record<string, unknown>;
+    if (typeof base.apiKey === 'string') {
+      return base.apiKey;
+    }
+    const data = base.data;
+    if (data && typeof data === 'object') {
+      const apiKey = (data as Record<string, unknown>).apiKey;
+      if (typeof apiKey === 'string') {
+        return apiKey;
+      }
+    }
+    return undefined;
+  }
+
+  private extractMessage(payload: unknown): string | undefined {
+    if (!payload || typeof payload !== 'object') {
+      return undefined;
+    }
+    const base = payload as Record<string, unknown>;
+    if (typeof base.message === 'string') {
+      return base.message;
+    }
+    const data = base.data;
+    if (data && typeof data === 'object') {
+      const msg = (data as Record<string, unknown>).message;
+      if (typeof msg === 'string') {
+        return msg;
+      }
+    }
+    return undefined;
   }
 
   // 获取目录结构推荐
@@ -688,6 +817,54 @@ class ApiService {
       similarity_threshold: similarityThreshold,
       providerOverride: provider,
     });
+  }
+
+  async registerPegaAccount(payload: { email: string; phone?: string; password: string }) {
+    const body = JSON.stringify({
+      email: payload.email,
+      phone: payload.phone ?? '',
+      password: payload.password,
+    });
+    const response = await this.requestFromPega<Record<string, unknown>>('/auth/register', {
+      method: 'POST',
+      body,
+    });
+    return {
+      token: this.extractToken(response),
+      message: this.extractMessage(response),
+      raw: response,
+    };
+  }
+
+  async loginPegaAccount(payload: { identifier: string; password: string }) {
+    const body = JSON.stringify({
+      identifier: payload.identifier,
+      password: payload.password,
+    });
+    const response = await this.requestFromPega<Record<string, unknown>>('/auth/login', {
+      method: 'POST',
+      body,
+    });
+    return {
+      token: this.extractToken(response),
+      message: this.extractMessage(response),
+      raw: response,
+    };
+  }
+
+  async fetchPegaApiKey(token: string) {
+    const response = await this.requestFromPega<Record<string, unknown>>('/auth/apikey', {
+      method: 'POST',
+      body: JSON.stringify({}),
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return {
+      apiKey: this.extractApiKey(response),
+      message: this.extractMessage(response),
+      raw: response,
+    };
   }
 }
 

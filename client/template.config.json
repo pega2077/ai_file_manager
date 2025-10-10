@@ -10,6 +10,14 @@
     "ollamaVisionModel": "qwen2.5vl:7b",
     "ollamaApiKey": "your_api_key_here"
   },
+  "pega": {
+    "pegaEndpoint": "https://llm.pega.example.com",
+    "pegaModel": "pega-chat",
+    "pegaEmbedModel": "pega-embed",
+    "pegaVisionModel": "pega-vision",
+    "pegaApiKey": "",
+    "pegaAuthToken": ""
+  },
   "openai": {
     "openaiEndpoint": "https://api.openai.com/v1",
     "openaiApiKey": "",
