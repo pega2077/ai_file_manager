@@ -12,6 +12,7 @@ import type {
   DirectoryStructureResponse,
   RecommendDirectoryResponse,
   TreeNode,
+  StageFileResponse,
 } from "../shared/types";
 
 type FileImportProps = {
@@ -34,6 +35,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       useState(false);
     const [selectedDirectory, setSelectedDirectory] = useState<string>("");
     const [importFilePath, setImportFilePath] = useState<string>("");
+  const [stagedFileId, setStagedFileId] = useState<string | null>(null);
     const [directoryOptions, setDirectoryOptions] = useState<TreeNode[]>([]);
     const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
 
@@ -271,7 +273,39 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           setWorkDirectory(cfg.workDirectory);
         }
         const lang = (cfg?.language || "en") as "zh" | "en";
-        
+
+        // Stage file into temp directory and record DB entry
+        let stagedFileInfo: StageFileResponse | null = null;
+        let hideStaging: undefined | (() => void);
+        try {
+          hideStaging = message.loading(t("files.messages.preparingFile"), 0);
+          const stageResponse = await apiService.stageFileToTemp(filePath);
+          if (!stageResponse.success) {
+            hideStaging?.();
+            message.error(
+              stageResponse.message || t("files.messages.stageFailed")
+            );
+            return;
+          }
+          stagedFileInfo = stageResponse.data as StageFileResponse;
+        } catch (err) {
+          hideStaging?.();
+          message.error(t("files.messages.stageFailed"));
+          window.electronAPI?.logError?.("stageFileToTemp failed", {
+            err: String(err),
+          });
+          return;
+        } finally {
+          hideStaging?.();
+        }
+
+        if (!stagedFileInfo) return;
+
+        const stagedPath = stagedFileInfo.staged_path;
+        const stagedId = stagedFileInfo.file_id;
+        setImportFilePath(stagedPath);
+        setStagedFileId(stagedId);
+
         // 1) Load directory structure with error handling
         let directoryStructureResponse: Awaited<
           ReturnType<typeof apiService.listDirectoryRecursive>
@@ -302,9 +336,9 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         // If image, get description first via /api/chat/describe-image
         let contentForAnalysis: string | undefined = undefined;
         try {
-          if (isImagePath(filePath)) {
+          if (isImagePath(stagedPath)) {
             message.info(t("files.messages.describingImage"));
-            const dataUrl = await fileToBase64(filePath);
+            const dataUrl = await fileToBase64(stagedPath);
             if (dataUrl) {
               const descResp = await apiService.describeImage(dataUrl, lang);
               if (
@@ -340,7 +374,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         >;
         try {
           recommendResponse = await apiService.recommendDirectory(
-            filePath,
+            stagedPath,
             directories,
             contentForAnalysis
           );
@@ -384,9 +418,10 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
               )}`;
 
           const saveResponse = await apiService.saveFile(
-            filePath,
+            stagedPath,
             fullTargetDirectory,
-            false
+            false,
+            stagedId
           );
           if (saveResponse.success) {
             message.success(
@@ -434,6 +469,9 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
                 );
               }
             }
+            setStagedFileId(null);
+            setImportFilePath("");
+            setSelectedDirectory("");
           } else {
             message.error(
               saveResponse.message || t("files.messages.fileSaveFailed")
@@ -441,7 +479,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           }
         } else {
           await showImportConfirmationDialog(
-            filePath,
+            stagedPath,
             recommendedDirectory,
             alternatives,
             directoryStructureResponse.data as DirectoryStructureResponse
@@ -468,6 +506,9 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         }
         const filePath = await window.electronAPI.selectFile();
         if (!filePath) return;
+        setStagedFileId(null);
+        setImportFilePath("");
+        setSelectedDirectory("");
         await processFile(filePath);
       } catch (error) {
         message.error(t("files.messages.fileImportFailed"));
@@ -489,6 +530,10 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         message.error(t("files.import.selectSaveDirectory"));
         return;
       }
+      if (!importFilePath || !stagedFileId) {
+        message.error(t("files.messages.stageMissing"));
+        return;
+      }
       try {
         const separator = getPathSeparator();
         const fullTargetDirectory = selectedDirectory.startsWith(workDirectory)
@@ -501,13 +546,17 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         const saveResponse = await apiService.saveFile(
           importFilePath,
           fullTargetDirectory,
-          false
+          false,
+          stagedFileId
         );
         if (saveResponse.success) {
           message.success(
             t("files.import.fileSavedTo", { path: selectedDirectory })
           );
           setImportModalVisible(false);
+          setStagedFileId(null);
+          setImportFilePath("");
+          setSelectedDirectory("");
           onImported?.();
           const fileId = (saveResponse.data as { file_id?: string } | undefined)
             ?.file_id;
@@ -598,6 +647,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       setImportModalVisible(false);
       setSelectedDirectory("");
       setImportFilePath("");
+      setStagedFileId(null);
     };
 
     const handleManualSelectDirectory = () => {
@@ -608,6 +658,10 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
     const handleManualSelectConfirm = async () => {
       if (!selectedDirectory) {
         message.error(t("files.import.selectSaveDirectory"));
+        return;
+      }
+      if (!importFilePath || !stagedFileId) {
+        message.error(t("files.messages.stageMissing"));
         return;
       }
       try {
@@ -622,13 +676,17 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         const saveResponse = await apiService.saveFile(
           importFilePath,
           fullTargetDirectory,
-          false
+          false,
+          stagedFileId
         );
         if (saveResponse.success) {
           message.success(
             t("files.import.fileSavedTo", { path: selectedDirectory })
           );
           setManualSelectModalVisible(false);
+          setStagedFileId(null);
+          setImportFilePath("");
+          setSelectedDirectory("");
           onImported?.();
           const fileId = (saveResponse.data as { file_id?: string } | undefined)
             ?.file_id;
@@ -652,6 +710,9 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
 
     const handleManualSelectCancel = () => {
       setManualSelectModalVisible(false);
+      setStagedFileId(null);
+      setImportFilePath("");
+      setSelectedDirectory("");
     };
 
     return (

@@ -1004,24 +1004,29 @@ export async function deleteFileHandler(req: Request, res: Response): Promise<vo
   }
 }
 
-export async function saveFileHandler(req: Request, res: Response): Promise<void> {
+export async function stageFileHandler(req: Request, res: Response): Promise<void> {
   try {
-    const body = req.body as {
-      source_file_path?: unknown;
-      target_directory?: unknown;
-      overwrite?: unknown;
-    } | undefined;
-
+    const body = req.body as { source_file_path?: unknown } | undefined;
     const source = typeof body?.source_file_path === "string" ? body.source_file_path : undefined;
-    const targetDirInput = typeof body?.target_directory === "string" ? body.target_directory : undefined;
-    const overwrite = typeof body?.overwrite === "boolean" ? body.overwrite : false;
 
-    if (!source || !targetDirInput) {
+    if (!source) {
       res.status(400).json({
         success: false,
         message: "invalid_request",
         data: null,
-        error: { code: "INVALID_REQUEST", message: "source_file_path and target_directory are required", details: null },
+        error: { code: "INVALID_REQUEST", message: "source_file_path is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    if (!path.isAbsolute(source)) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "source_file_path must be an absolute path", details: null },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -1030,9 +1035,228 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
 
     const srcStat = await fsp.stat(source).catch(() => null);
     if (!srcStat || !srcStat.isFile()) {
+      res.status(404).json({
+        success: false,
+        message: "not_found",
+        data: null,
+        error: { code: "RESOURCE_NOT_FOUND", message: "source file does not exist", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const tempDir = await ensureTempDir();
+    const originalName = path.basename(source);
+    const ext = path.extname(originalName).replace(/^\./, "").toLowerCase();
+    const mime = getMimeByExt(ext);
+    let category = "other";
+    for (const [cat, exts] of Object.entries(CATEGORY_EXTENSIONS)) {
+      if (cat === "other") continue;
+      if (exts.includes(ext)) {
+        category = cat;
+        break;
+      }
+    }
+
+    const uniquePrefix = `${Date.now()}_${randomUUID().slice(0, 8)}`;
+    const stagedFileName = `${uniquePrefix}_${originalName}`;
+    const stagedPath = path.join(tempDir, stagedFileName);
+
+    try {
+      await fsp.copyFile(source, stagedPath);
+    } catch (e) {
+      logger.error("Failed to copy file into temp directory", e as unknown);
+      res.status(500).json({
+        success: false,
+        message: "internal_error",
+        data: null,
+        error: { code: "TEMP_COPY_FAILED", message: "Failed to stage file into temp directory", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const destStat = await fsp.stat(stagedPath).catch(() => null);
+    if (!destStat || !destStat.isFile()) {
+      try {
+        await fsp.unlink(stagedPath);
+      } catch {
+        // ignore cleanup failure
+      }
+      res.status(500).json({
+        success: false,
+        message: "internal_error",
+        data: null,
+        error: { code: "TEMP_COPY_INVALID", message: "Staged file validation failed", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const stagedFileId = randomUUID();
+    try {
+      await FileModel.create({
+        file_id: stagedFileId,
+        path: stagedPath,
+        name: originalName,
+        type: mime,
+        category,
+        summary: null,
+        tags: JSON.stringify([]),
+        size: destStat.size,
+        created_at: nowIso,
+        updated_at: null,
+        processed: false,
+      });
+    } catch (e) {
+      logger.error("DB insert failed for staged file", e as unknown);
+      try {
+        await fsp.unlink(stagedPath);
+      } catch {
+        // ignore cleanup failure
+      }
+      res.status(500).json({
+        success: false,
+        message: "internal_error",
+        data: null,
+        error: { code: "DB_INSERT_ERROR", message: "Failed to record staged file", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        file_id: stagedFileId,
+        staged_path: stagedPath,
+        filename: originalName,
+        type: mime,
+        category,
+        size: destStat.size,
+        created_at: nowIso,
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/files/stage-temp failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Failed to stage file", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+export async function saveFileHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as {
+      source_file_path?: unknown;
+      target_directory?: unknown;
+      overwrite?: unknown;
+      file_id?: unknown;
+    } | undefined;
+
+    const fileIdInputRaw = typeof body?.file_id === "string" ? body.file_id.trim() : undefined;
+    const sourceInput = typeof body?.source_file_path === "string" ? body.source_file_path : undefined;
+    const targetDirInput = typeof body?.target_directory === "string" ? body.target_directory : undefined;
+    const overwrite = typeof body?.overwrite === "boolean" ? body.overwrite : false;
+    let sourcePath = sourceInput;
+    const fileIdInput = fileIdInputRaw && fileIdInputRaw.length > 0 ? fileIdInputRaw : undefined;
+    if (!targetDirInput) {
       res.status(400).json({
         success: false,
         message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "target_directory is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    let existingRecord:
+      | {
+          file_id: string;
+          path: string;
+          name: string;
+          type: string;
+          category: string;
+          size: number;
+        }
+      | null = null;
+    if (fileIdInput) {
+      existingRecord = (await FileModel.findOne({
+        where: { file_id: fileIdInput },
+        raw: true,
+      }).catch(() => null)) as
+        | {
+            file_id: string;
+            path: string;
+            name: string;
+            type: string;
+            category: string;
+            size: number;
+          }
+        | null;
+
+      if (!existingRecord) {
+        res.status(404).json({
+          success: false,
+          message: "not_found",
+          data: null,
+          error: { code: "RESOURCE_NOT_FOUND", message: "file record not found", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+
+      if (!sourcePath) {
+        sourcePath = existingRecord.path;
+      }
+    }
+
+    if (!sourcePath) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "source_file_path is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    if (!path.isAbsolute(sourcePath)) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "source_file_path must be an absolute path", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const srcStat = await fsp.stat(sourcePath).catch(() => null);
+    if (!srcStat || !srcStat.isFile()) {
+      res.status(404).json({
+        success: false,
+        message: "not_found",
         data: null,
         error: { code: "RESOURCE_NOT_FOUND", message: "source file does not exist", details: null },
         timestamp: new Date().toISOString(),
@@ -1054,11 +1278,11 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
     }
 
     const absTargetDir = path.normalize(targetDirInput);
-
     await fsp.mkdir(absTargetDir, { recursive: true });
 
-    const baseName = path.basename(source);
-    let destPath = path.join(absTargetDir, baseName);
+    const preferredName = existingRecord?.name ?? path.basename(sourcePath);
+    let destFileName = preferredName;
+    let destPath = path.join(absTargetDir, destFileName);
     let overwritten = false;
 
     const exists = await fsp
@@ -1070,26 +1294,27 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
       if (overwrite) {
         overwritten = true;
       } else {
-        const ext = path.extname(baseName);
-        const nameOnly = path.basename(baseName, ext);
+        const ext = path.extname(destFileName);
+        const nameOnly = path.basename(destFileName, ext);
         const now = new Date();
         const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
-        destPath = path.join(absTargetDir, `${nameOnly}_${ts}${ext}`);
+        destFileName = `${nameOnly}_${ts}${ext}`;
+        destPath = path.join(absTargetDir, destFileName);
       }
     }
 
-    // Copy file
-    await fsp.copyFile(source, destPath);
+    await fsp.copyFile(sourcePath, destPath);
 
-    // After successful copy, insert a record into database
-    // Determine file metadata
     let destStat: fs.Stats | null = null;
     try {
       destStat = await fsp.stat(destPath);
     } catch (e) {
-      // If we cannot stat, treat as error and attempt cleanup
       logger.error("Stat on saved file failed", e as unknown);
-      try { await fsp.unlink(destPath); } catch { /* ignore */ }
+      try {
+        await fsp.unlink(destPath);
+      } catch {
+        // ignore cleanup failure
+      }
       res.status(500).json({
         success: false,
         message: "internal_error",
@@ -1101,47 +1326,94 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
       return;
     }
 
-    const ext = path.extname(baseName).replace(/^\./, "").toLowerCase();
-    const mime = getMimeByExt(ext);
-    // Infer category by extension
+    const finalExt = path.extname(destFileName).replace(/^\./, "").toLowerCase();
+    const mime = getMimeByExt(finalExt);
     let category = "other";
     for (const [cat, exts] of Object.entries(CATEGORY_EXTENSIONS)) {
       if (cat === "other") continue;
-      if (exts.includes(ext)) { category = cat; break; }
+      if (exts.includes(finalExt)) {
+        category = cat;
+        break;
+      }
     }
 
     const nowIso = new Date().toISOString();
-    const newFileId = randomUUID();
-    try {
-      await FileModel.create({
-        file_id: newFileId,
-        path: destPath,
-        name: path.basename(destPath),
-        type: mime,
-        category,
-        summary: null,
-        tags: JSON.stringify([]),
-        size: destStat.size,
-        created_at: nowIso,
-        updated_at: null,
-        processed: false,
-      });
-    } catch (e) {
-      logger.error("DB insert failed after saving file", e as unknown);
-      // Best effort rollback: remove the copied file to keep consistency
-      try { await fsp.unlink(destPath); } catch { /* ignore */ }
-      res.status(500).json({
-        success: false,
-        message: "internal_error",
-        data: null,
-        error: { code: "DB_INSERT_ERROR", message: "Failed to insert file record", details: null },
-        timestamp: new Date().toISOString(),
-        request_id: "",
-      });
-      return;
+    let effectiveFileId = fileIdInput;
+
+    if (fileIdInput) {
+      try {
+        await FileModel.update(
+          {
+            path: destPath,
+            name: destFileName,
+            type: mime,
+            category,
+            size: destStat.size,
+            updated_at: nowIso,
+          },
+          { where: { file_id: fileIdInput } }
+        );
+      } catch (e) {
+        logger.error("DB update failed after saving staged file", e as unknown);
+        try {
+          await fsp.unlink(destPath);
+        } catch {
+          // ignore cleanup failure
+        }
+        res.status(500).json({
+          success: false,
+          message: "internal_error",
+          data: null,
+          error: { code: "DB_UPDATE_ERROR", message: "Failed to update file record", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+    } else {
+      const newFileId = randomUUID();
+      try {
+        await FileModel.create({
+          file_id: newFileId,
+          path: destPath,
+          name: destFileName,
+          type: mime,
+          category,
+          summary: null,
+          tags: JSON.stringify([]),
+          size: destStat.size,
+          created_at: nowIso,
+          updated_at: null,
+          processed: false,
+        });
+      } catch (e) {
+        logger.error("DB insert failed after saving file", e as unknown);
+        try {
+          await fsp.unlink(destPath);
+        } catch {
+          // ignore cleanup failure
+        }
+        res.status(500).json({
+          success: false,
+          message: "internal_error",
+          data: null,
+          error: { code: "DB_INSERT_ERROR", message: "Failed to insert file record", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+      effectiveFileId = newFileId;
     }
 
-    // Auto-tagging and summary (document/image) per configuration
+    if (fileIdInput && sourcePath && path.normalize(sourcePath) !== path.normalize(destPath)) {
+      try {
+        await fsp.unlink(sourcePath);
+      } catch {
+        // ignore cleanup failure
+      }
+    }
+
     let autoTags: string[] = [];
     let autoSummary: string | null = null;
     try {
@@ -1232,7 +1504,7 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
           if (autoSummary && autoSummary.length > 0) update.summary = autoSummary;
           if (autoTags && autoTags.length > 0) update.tags = JSON.stringify(autoTags);
           try {
-            await FileModel.update(update, { where: { file_id: newFileId } });
+            await FileModel.update(update, { where: { file_id: effectiveFileId } });
           } catch (e) {
             logger.warn("Failed to update file with auto tags/summary", e as unknown);
           }
@@ -1246,11 +1518,11 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
       success: true,
       message: "ok",
       data: {
-        source_file_path: source,
+        source_file_path: sourcePath,
         saved_path: destPath,
-        filename: path.basename(destPath),
+        filename: destFileName,
         overwritten,
-        file_id: newFileId,
+        file_id: effectiveFileId,
         // optional enrichment for caller convenience
         tags: autoTags,
         summary: autoSummary ?? undefined,
@@ -1816,6 +2088,8 @@ export function registerFilesRoutes(app: Express) {
   app.post("/api/files/list", listFilesHandler);
   // POST /api/files/preview
   app.post("/api/files/preview", previewFileHandler);
+  // POST /api/files/stage
+  app.post("/api/files/stage", stageFileHandler);
   // POST /api/files/save-file
   app.post("/api/files/save-file", saveFileHandler);
   // POST /api/files/update

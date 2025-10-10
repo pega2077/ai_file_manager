@@ -57,6 +57,16 @@ export interface DirectoryResponse {
   total_count: number;
 }
 
+export interface StageFileResponse {
+  file_id: string;
+  staged_path: string;
+  filename: string;
+  type: string;
+  category: string;
+  size: number;
+  created_at: string;
+}
+
 export interface ImportFileResponse {
   file_id: string;
   name: string;

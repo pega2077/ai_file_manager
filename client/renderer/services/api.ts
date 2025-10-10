@@ -1,7 +1,7 @@
 // Dynamic API base URL - will be initialized from electron store
 let API_BASE_URL = 'http://localhost:8000/api';
 
-import { FileConversionResult } from '../shared/types';
+import { FileConversionResult, StageFileResponse } from '../shared/types';
 
 // Function to update API base URL
 export const updateApiBaseUrl = (url: string) => {
@@ -339,13 +339,23 @@ class ApiService {
   }
 
   // 保存文件到目录
-  async saveFile(sourceFilePath: string, targetDirectory: string, overwrite: boolean = false) {
+  async stageFileToTemp(sourceFilePath: string) {
+    return this.request<StageFileResponse>('/files/stage', {
+      method: 'POST',
+      body: JSON.stringify({
+        source_file_path: sourceFilePath,
+      }),
+    });
+  }
+
+  async saveFile(sourceFilePath: string, targetDirectory: string, overwrite: boolean = false, fileId?: string) {
     return this.request('/files/save-file', {
       method: 'POST',
       body: JSON.stringify({
         source_file_path: sourceFilePath,
         target_directory: targetDirectory,
         overwrite,
+        ...(fileId ? { file_id: fileId } : {}),
       }),
     });
   }

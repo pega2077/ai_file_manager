@@ -14,7 +14,6 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { promises as fs } from "node:fs";
-import { ImportService } from "./importService";
 import { logger } from "./logger";
 import { configManager, AppConfig } from "./configManager";
 import { startServer as startLocalExpressServer, stopServer as stopLocalExpressServer } from "./server";
@@ -59,7 +58,6 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 
 let win: BrowserWindow | null;
 let botWin: BrowserWindow | null;
-let importService: ImportService;
 let tray: Tray | null;
 
 /**
@@ -315,9 +313,6 @@ function setupIpcHandlers() {
 
   // IPC handler for importing file
   ipcMain.handle("import-file", async () => {
-    if (importService) {
-      return await importService.addFileToQueue();
-    }
     return { success: false, message: "Import service not initialized" };
   });
 
@@ -363,7 +358,7 @@ function setupIpcHandlers() {
     configManager.updateConfig(updates);
     // Reinitialize import service with potentially new base URL
     const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
-  importService = new ImportService(win ?? null, apiBaseUrl);
+  // importService = new ImportService(win ?? null, apiBaseUrl);
     return configManager.getConfig();
   });
 
@@ -371,8 +366,8 @@ function setupIpcHandlers() {
   ipcMain.handle("set-api-base-url", (_event, url: string) => {
     const normalized = typeof url === 'string' ? url.replace(/\/$/, '') : 'http://localhost:8000';
     configManager.updateConfig({ apiBaseUrl: normalized, useLocalService: false });
-    const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
-  importService = new ImportService(win ?? null, apiBaseUrl);
+  //   const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
+  // importService = new ImportService(win ?? null, apiBaseUrl);
     return true;
   });
 
@@ -468,8 +463,8 @@ function createWindow() {
   // Create application menu
   createMenu();
   // Initialize import service
-  const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
-  importService = new ImportService(win ?? null, apiBaseUrl);
+  // const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
+  // importService = new ImportService(win ?? null, apiBaseUrl);
   // void syncWorkDirectoryConfig();
   // void syncLanguageConfig();
 }
@@ -553,9 +548,9 @@ function createMenu() {
             });
 
             if (!result.canceled && result.filePaths[0]) {
-              if (importService) {
-                importService.addFileToQueue();
-              }
+              // if (importService) {
+              //   importService.addFileToQueue();
+              // }
             }
           },
         },
