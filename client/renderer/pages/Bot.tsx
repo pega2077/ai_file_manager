@@ -216,6 +216,18 @@ const Bot: React.FC = () => {
   }, [t]);
 
   useEffect(() => {
+    if (!statusMessage) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setStatusMessage(null);
+    }, 2000);
+
+    return () => window.clearTimeout(timer);
+  }, [statusMessage]);
+
+  useEffect(() => {
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 
