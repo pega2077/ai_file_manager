@@ -19,6 +19,13 @@ declare global {
       getPreferredLocale: () => Promise<string>
       setPreferredLocale: (locale: string) => Promise<string>
       getSystemLocale: () => Promise<string>
+      logError: (message: string, meta?: unknown) => Promise<boolean>
+      quitApp: () => Promise<boolean>
+      clearAllData: () => Promise<boolean>
+      sendFileImportNotification: (payload: import('./shared/events/fileImportEvents').FileImportNotification) => void
+      onFileImportNotification: (
+        callback: (payload: import('./shared/events/fileImportEvents').FileImportNotification) => void,
+      ) => () => void
     }
     webUtils: typeof import('electron').webUtils
   }
