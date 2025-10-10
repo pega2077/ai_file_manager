@@ -4,6 +4,7 @@ import React, {
   forwardRef,
   useImperativeHandle,
   useCallback,
+  useRef,
 } from "react";
 import { Button, Modal, Select, TreeSelect, message } from "antd";
 import { useTranslation } from "../shared/i18n/I18nProvider";
@@ -14,6 +15,11 @@ import type {
   TreeNode,
   StageFileResponse,
 } from "../shared/types";
+import {
+  dispatchFileImportNotification,
+  FileImportStep,
+  FileImportStepState,
+} from "../shared/events/fileImportEvents";
 
 type FileImportProps = {
   onImported?: () => void;
@@ -35,9 +41,97 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       useState(false);
     const [selectedDirectory, setSelectedDirectory] = useState<string>("");
     const [importFilePath, setImportFilePath] = useState<string>("");
-  const [stagedFileId, setStagedFileId] = useState<string | null>(null);
+    const [stagedFileId, setStagedFileId] = useState<string | null>(null);
     const [directoryOptions, setDirectoryOptions] = useState<TreeNode[]>([]);
     const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
+    const taskIdRef = useRef<string | null>(null);
+
+    const createTaskId = useCallback(
+      () =>
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `import-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      [],
+    );
+
+    const notifyStart = useCallback(
+      (filePath: string) => {
+        const taskId = createTaskId();
+        taskIdRef.current = taskId;
+        const filename = filePath.split(/[/\\]/).pop();
+        dispatchFileImportNotification({
+          status: "start",
+          taskId,
+          filePath,
+          filename,
+        });
+      },
+      [createTaskId],
+    );
+
+    const notifyProgress = useCallback(
+      (
+        step: FileImportStep,
+        state: FileImportStepState,
+        message?: string,
+      ) => {
+        const taskId = taskIdRef.current;
+        if (!taskId) return;
+        dispatchFileImportNotification({
+          status: "progress",
+          taskId,
+          step,
+          state,
+          message,
+        });
+      },
+      [],
+    );
+
+    const notifySuccess = useCallback(
+      (message?: string) => {
+        const taskId = taskIdRef.current;
+        if (!taskId) return;
+        dispatchFileImportNotification({
+          status: "success",
+          taskId,
+          message,
+        });
+        taskIdRef.current = null;
+      },
+      [],
+    );
+
+    const notifyError = useCallback(
+      (error: unknown, fallbackMessage?: string) => {
+        const taskId = taskIdRef.current;
+        if (!taskId) return;
+        const errorMessage =
+          error instanceof Error ? error.message : String(error ?? "Unknown error");
+        dispatchFileImportNotification({
+          status: "error",
+          taskId,
+          error: errorMessage,
+          message: fallbackMessage,
+        });
+        taskIdRef.current = null;
+      },
+      [],
+    );
+
+    const notifyCancelled = useCallback(
+      (message?: string) => {
+        const taskId = taskIdRef.current;
+        if (!taskId) return;
+        dispatchFileImportNotification({
+          status: "cancelled",
+          taskId,
+          message,
+        });
+        taskIdRef.current = null;
+      },
+      [],
+    );
 
     useEffect(() => {
       const loadWorkDirectory = async () => {
@@ -150,6 +244,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           let hideLoading: undefined | (() => void);
           try {
             if (cfg?.autoSaveRAG) {
+              notifyProgress("import-rag", "start", t("files.messages.importingRag"));
               hideLoading = message.loading(
                 t("files.messages.importingRag"),
                 0
@@ -159,8 +254,10 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
                 noSaveDb
               );
               if (ragResponse.success) {
+                notifyProgress("import-rag", "success", t("files.messages.importedRagSuccess"));
                 message.success(t("files.messages.importedRagSuccess"));
               } else {
+                notifyProgress("import-rag", "success", t("files.messages.saveSuccessRagFailed"));
                 message.warning(t("files.messages.saveSuccessRagFailed"));
               }
             }
@@ -168,6 +265,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             if (hideLoading) hideLoading();
           }
         } catch (error) {
+          notifyProgress("import-rag", "success", t("files.messages.saveSuccessRagFailed"));
           message.warning(t("files.messages.saveSuccessRagFailed"));
           window.electronAPI?.logError?.(
             "importToRag (handleRagImport) failed",
@@ -175,7 +273,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           );
         }
       },
-      [t]
+      [t, notifyProgress]
     );
 
     const showImportConfirmationDialog = useCallback(
@@ -264,80 +362,92 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
 
     const processFile = useCallback(
       async (filePath: string) => {
-        // Always refresh latest config at the start of an import
+        notifyStart(filePath);
+
+        let cfg: import("../shared/types").AppConfig | undefined;
         let latestWorkDir = workDirectory;
-        const cfg = (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
-        if (cfg?.workDirectory && cfg.workDirectory !== workDirectory) {
-          latestWorkDir = cfg.workDirectory;
-          // keep state in sync for subsequent UI steps (confirm dialogs use state)
-          setWorkDirectory(cfg.workDirectory);
+        try {
+          cfg = (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
+          if (cfg?.workDirectory && cfg.workDirectory !== workDirectory) {
+            latestWorkDir = cfg.workDirectory;
+            setWorkDirectory(cfg.workDirectory);
+          }
+        } catch (error) {
+          message.error(t("files.messages.fileImportFailed"));
+          window.electronAPI?.logError?.("processFile getAppConfig failed", {
+            err: String(error),
+          });
+          notifyError(error, t("files.messages.fileImportFailed"));
+          return;
         }
         const lang = (cfg?.language || "en") as "zh" | "en";
 
-        // Stage file into temp directory and record DB entry
+        notifyProgress("stage-file", "start", t("files.messages.preparingFile"));
         let stagedFileInfo: StageFileResponse | null = null;
         let hideStaging: undefined | (() => void);
         try {
           hideStaging = message.loading(t("files.messages.preparingFile"), 0);
           const stageResponse = await apiService.stageFileToTemp(filePath);
           if (!stageResponse.success) {
-            hideStaging?.();
-            message.error(
-              stageResponse.message || t("files.messages.stageFailed")
-            );
+            const errMsg = stageResponse.message || t("files.messages.stageFailed");
+            message.error(errMsg);
+            notifyError(new Error(errMsg), errMsg);
             return;
           }
           stagedFileInfo = stageResponse.data as StageFileResponse;
+          notifyProgress("stage-file", "success", t("common.success"));
         } catch (err) {
-          hideStaging?.();
           message.error(t("files.messages.stageFailed"));
           window.electronAPI?.logError?.("stageFileToTemp failed", {
             err: String(err),
           });
+          notifyError(err, t("files.messages.stageFailed"));
           return;
         } finally {
           hideStaging?.();
         }
 
-        if (!stagedFileInfo) return;
+        if (!stagedFileInfo) {
+          notifyError("stageFileToTemp returned empty", t("files.messages.stageFailed"));
+          return;
+        }
 
         const stagedPath = stagedFileInfo.staged_path;
         const stagedId = stagedFileInfo.file_id;
         setImportFilePath(stagedPath);
         setStagedFileId(stagedId);
 
-        // 1) Load directory structure with error handling
-        let directoryStructureResponse: Awaited<
-          ReturnType<typeof apiService.listDirectoryRecursive>
-        >;
+        notifyProgress("list-directory", "start");
+        let directoryStructureResponse: Awaited<ReturnType<typeof apiService.listDirectoryRecursive>>;
         try {
-          directoryStructureResponse = await apiService.listDirectoryRecursive(
-            latestWorkDir
-          );
+          directoryStructureResponse = await apiService.listDirectoryRecursive(latestWorkDir);
         } catch (err) {
           message.error(t("files.messages.getDirectoryStructureFailed"));
           window.electronAPI?.logError?.("listDirectoryRecursive failed", {
             err: String(err),
           });
+          notifyError(err, t("files.messages.getDirectoryStructureFailed"));
           return;
         }
         if (!directoryStructureResponse.success) {
-          message.error(
+          const errMsg =
             directoryStructureResponse.message ||
-              t("files.messages.getDirectoryStructureFailed")
-          );
+            t("files.messages.getDirectoryStructureFailed");
+          message.error(errMsg);
+          notifyError(new Error(errMsg), errMsg);
           return;
         }
+        notifyProgress("list-directory", "success");
 
         const directories = extractDirectoriesFromStructure(
           directoryStructureResponse.data as DirectoryStructureResponse
         );
 
-        // If image, get description first via /api/chat/describe-image
-        let contentForAnalysis: string | undefined = undefined;
-        try {
-          if (isImagePath(stagedPath)) {
-            message.info(t("files.messages.describingImage"));
+        let contentForAnalysis: string | undefined;
+        if (isImagePath(stagedPath)) {
+          notifyProgress("describe-image", "start", t("files.messages.describingImage"));
+          message.info(t("files.messages.describingImage"));
+          try {
             const dataUrl = await fileToBase64(stagedPath);
             if (dataUrl) {
               const descResp = await apiService.describeImage(dataUrl, lang);
@@ -347,31 +457,22 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
                 typeof descResp.data.description === "string"
               ) {
                 contentForAnalysis = descResp.data.description;
-                try {
-                  // Show the description segmented for readability
-                  showSegmentedInfo(contentForAnalysis);
-                } catch {
-                  // best-effort UI feedback
-                }
+                showSegmentedInfo(contentForAnalysis);
               }
             }
+            notifyProgress("describe-image", "success");
+          } catch (e) {
+            notifyProgress("describe-image", "success", t("common.error"));
+            window.electronAPI?.logError?.(
+              "describe-image failed, continuing without content override",
+              { err: String(e) }
+            );
           }
-        } catch (e) {
-          // Non-blocking; continue without description
-          window.electronAPI?.logError?.(
-            "describe-image failed, continuing without content override",
-            { err: String(e) }
-          );
         }
 
-        // 2) Recommend directory with error handling
-        const loadingKey = message.loading(
-          t("files.messages.analyzingFile"),
-          0
-        );
-        let recommendResponse: Awaited<
-          ReturnType<typeof apiService.recommendDirectory>
-        >;
+        notifyProgress("recommend-directory", "start", t("files.messages.analyzingFile"));
+        const loadingKey = message.loading(t("files.messages.analyzingFile"), 0);
+        let recommendResponse: Awaited<ReturnType<typeof apiService.recommendDirectory>>;
         try {
           recommendResponse = await apiService.recommendDirectory(
             stagedPath,
@@ -384,23 +485,25 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           window.electronAPI?.logError?.("recommendDirectory HTTP error", {
             err: String(err),
           });
+          notifyError(err, t("files.messages.getRecommendationFailed"));
           return;
         }
         loadingKey();
         if (!recommendResponse.success) {
-          message.error(
+          const errMsg =
             recommendResponse.message ||
-              t("files.messages.getRecommendationFailed")
-          );
+            t("files.messages.getRecommendationFailed");
+          message.error(errMsg);
+          notifyError(new Error(errMsg), errMsg);
           return;
         }
+        notifyProgress("recommend-directory", "success");
 
         const recommendedDirectory = (
           recommendResponse.data as RecommendDirectoryResponse
         )?.recommended_directory;
         const alternatives =
-          (recommendResponse.data as RecommendDirectoryResponse)
-            ?.alternatives || [];
+          (recommendResponse.data as RecommendDirectoryResponse)?.alternatives || [];
 
         const autoClassifyWithoutConfirmation = Boolean(
           cfg?.autoClassifyWithoutConfirmation
@@ -408,83 +511,95 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
 
         if (autoClassifyWithoutConfirmation) {
           const separator = getPathSeparator();
-          const fullTargetDirectory = recommendedDirectory.startsWith(
-            latestWorkDir
-          )
+          const fullTargetDirectory = recommendedDirectory.startsWith(latestWorkDir)
             ? recommendedDirectory
-            : `${latestWorkDir}${separator}${recommendedDirectory.replace(
-                /\//g,
-                separator
-              )}`;
+            : `${latestWorkDir}${separator}${recommendedDirectory.replace(/\//g, separator)}`;
 
+          notifyProgress("save-file", "start");
           const saveResponse = await apiService.saveFile(
             stagedPath,
             fullTargetDirectory,
             false,
             stagedId
           );
-          if (saveResponse.success) {
-            message.success(
-              t("files.messages.fileAutoSavedTo", {
-                path: recommendedDirectory,
-              })
-            );
-            onImported?.();
-            const fileId = (
-              saveResponse.data as { file_id?: string } | undefined
-            )?.file_id;
-            if (fileId) {
-              // Pass content override if we obtained image description
+          if (!saveResponse.success) {
+            const errMsg = saveResponse.message || t("files.messages.fileSaveFailed");
+            message.error(errMsg);
+            notifyError(new Error(errMsg), errMsg);
+            return;
+          }
+          notifyProgress("save-file", "success");
+          message.success(
+            t("files.messages.fileAutoSavedTo", {
+              path: recommendedDirectory,
+            })
+          );
+          onImported?.();
+          const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
+          if (fileId) {
+            const descForRag =
+              contentForAnalysis && contentForAnalysis.trim()
+                ? contentForAnalysis
+                : undefined;
+            if (cfg?.autoSaveRAG) {
+              notifyProgress("import-rag", "start", t("files.messages.importingRag"));
+              let hideLoadingRag: undefined | (() => void);
               try {
-                const descForRag =
-                  contentForAnalysis && contentForAnalysis.trim()
-                    ? contentForAnalysis
-                    : undefined;
-                let hideLoading: undefined | (() => void);
-                try {
-                  if (cfg?.autoSaveRAG) {
-                    hideLoading = message.loading(
-                      t("files.messages.importingRag"),
-                      0
-                    );
-                    const ragResponse = await apiService.importToRag(
-                      fileId,
-                      true,
-                      descForRag
-                    );
-                    if (ragResponse.success) {
-                      message.success(t("files.messages.importedRagSuccess"));
-                    } else {
-                      message.warning(t("files.messages.saveSuccessRagFailed"));
-                    }
-                  }
-                } finally {
-                  if (hideLoading) hideLoading();
+                hideLoadingRag = message.loading(t("files.messages.importingRag"), 0);
+                const ragResponse = await apiService.importToRag(
+                  fileId,
+                  true,
+                  descForRag
+                );
+                if (ragResponse.success) {
+                  notifyProgress(
+                    "import-rag",
+                    "success",
+                    t("files.messages.importedRagSuccess")
+                  );
+                  message.success(t("files.messages.importedRagSuccess"));
+                } else {
+                  notifyProgress(
+                    "import-rag",
+                    "success",
+                    t("files.messages.saveSuccessRagFailed")
+                  );
+                  message.warning(t("files.messages.saveSuccessRagFailed"));
                 }
               } catch (e) {
+                notifyProgress(
+                  "import-rag",
+                  "success",
+                  t("files.messages.saveSuccessRagFailed")
+                );
                 message.warning(t("files.messages.saveSuccessRagFailed"));
                 window.electronAPI?.logError?.(
                   "importToRag (auto classify) failed",
                   { err: String(e) }
                 );
+              } finally {
+                hideLoadingRag?.();
               }
             }
-            setStagedFileId(null);
-            setImportFilePath("");
-            setSelectedDirectory("");
-          } else {
-            message.error(
-              saveResponse.message || t("files.messages.fileSaveFailed")
-            );
           }
-        } else {
-          await showImportConfirmationDialog(
-            stagedPath,
-            recommendedDirectory,
-            alternatives,
-            directoryStructureResponse.data as DirectoryStructureResponse
+          setStagedFileId(null);
+          setImportFilePath("");
+          setSelectedDirectory("");
+          notifySuccess(
+            t("files.messages.fileAutoSavedTo", {
+              path: recommendedDirectory,
+            })
           );
+          return;
         }
+
+        await showImportConfirmationDialog(
+          stagedPath,
+          recommendedDirectory,
+          alternatives,
+          directoryStructureResponse.data as DirectoryStructureResponse
+        );
+        notifyProgress("await-confirmation", "start", t("files.import.selectTargetPrompt"));
       },
       [
         workDirectory,
@@ -493,6 +608,10 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         showImportConfirmationDialog,
         onImported,
         showSegmentedInfo,
+        notifyStart,
+        notifyProgress,
+        notifySuccess,
+        notifyError,
       ]
     );
 
@@ -535,6 +654,8 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         return;
       }
       try {
+        notifyProgress("await-confirmation", "success");
+        notifyProgress("save-file", "start");
         const separator = getPathSeparator();
         const fullTargetDirectory = selectedDirectory.startsWith(workDirectory)
           ? selectedDirectory
@@ -550,6 +671,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           stagedFileId
         );
         if (saveResponse.success) {
+          notifyProgress("save-file", "success");
           message.success(
             t("files.import.fileSavedTo", { path: selectedDirectory })
           );
@@ -566,6 +688,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             let contentForAnalysis: string | undefined = undefined;
             try {
               if (isImagePath(importFilePath)) {
+                notifyProgress("describe-image", "start", t("files.messages.describingImage"));
                 const dataUrl = await fileToBase64(importFilePath);
                 if (dataUrl) {
                   const cfg4 =
@@ -588,8 +711,10 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
                     }
                   }
                 }
+                notifyProgress("describe-image", "success");
               }
             } catch (e) {
+              notifyProgress("describe-image", "success", t("common.error"));
               window.electronAPI?.logError?.(
                 "describe-image (confirm) failed, continuing",
                 { err: String(e) }
@@ -605,6 +730,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
               let hideLoading: undefined | (() => void);
               try {
                 if (cfg5?.autoSaveRAG) {
+                  notifyProgress("import-rag", "start", t("files.messages.importingRag"));
                   hideLoading = message.loading(
                     t("files.messages.importingRag"),
                     0
@@ -615,8 +741,18 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
                     descForRag
                   );
                   if (ragResponse.success) {
+                    notifyProgress(
+                      "import-rag",
+                      "success",
+                      t("files.messages.importedRagSuccess")
+                    );
                     message.success(t("files.messages.importedRagSuccess"));
                   } else {
+                    notifyProgress(
+                      "import-rag",
+                      "success",
+                      t("files.messages.saveSuccessRagFailed")
+                    );
                     message.warning(t("files.messages.saveSuccessRagFailed"));
                   }
                 }
@@ -624,22 +760,30 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
                 if (hideLoading) hideLoading();
               }
             } catch (e) {
+              notifyProgress(
+                "import-rag",
+                "success",
+                t("files.messages.saveSuccessRagFailed")
+              );
               message.warning(t("files.messages.saveSuccessRagFailed"));
               window.electronAPI?.logError?.("importToRag (confirm) failed", {
                 err: String(e),
               });
             }
           }
+          notifySuccess(t("files.import.fileSavedTo", { path: selectedDirectory }));
         } else {
-          message.error(
-            saveResponse.message || t("files.messages.fileSaveFailed")
-          );
+          const errMsg =
+            saveResponse.message || t("files.messages.fileSaveFailed");
+          message.error(errMsg);
+          notifyError(new Error(errMsg), errMsg);
         }
       } catch (error) {
         message.error(t("files.messages.fileSaveFailed"));
         window.electronAPI?.logError?.("handleImportConfirm saveFile failed", {
           err: String(error),
         });
+        notifyError(error, t("files.messages.fileSaveFailed"));
       }
     };
 
@@ -648,6 +792,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       setSelectedDirectory("");
       setImportFilePath("");
       setStagedFileId(null);
+      notifyCancelled(t("common.cancel"));
     };
 
     const handleManualSelectDirectory = () => {
@@ -665,6 +810,8 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         return;
       }
       try {
+        notifyProgress("await-confirmation", "success");
+        notifyProgress("save-file", "start");
         const separator = getPathSeparator();
         const fullTargetDirectory = selectedDirectory.startsWith(workDirectory)
           ? selectedDirectory
@@ -680,6 +827,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           stagedFileId
         );
         if (saveResponse.success) {
+          notifyProgress("save-file", "success");
           message.success(
             t("files.import.fileSavedTo", { path: selectedDirectory })
           );
@@ -694,10 +842,12 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             // The file has been saved and recorded in DB; avoid duplicate DB insert in RAG import
             await handleRagImport(fileId, true);
           }
+          notifySuccess(t("files.import.fileSavedTo", { path: selectedDirectory }));
         } else {
-          message.error(
-            saveResponse.message || t("files.messages.fileSaveFailed")
-          );
+          const errMsg =
+            saveResponse.message || t("files.messages.fileSaveFailed");
+          message.error(errMsg);
+          notifyError(new Error(errMsg), errMsg);
         }
       } catch (error) {
         message.error(t("files.messages.fileSaveFailed"));
@@ -705,6 +855,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           "handleManualSelectConfirm saveFile failed",
           { err: String(error) }
         );
+        notifyError(error, t("files.messages.fileSaveFailed"));
       }
     };
 
@@ -713,6 +864,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       setStagedFileId(null);
       setImportFilePath("");
       setSelectedDirectory("");
+      notifyCancelled(t("common.cancel"));
     };
 
     return (

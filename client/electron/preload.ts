@@ -1,5 +1,6 @@
 import { ipcRenderer, contextBridge } from 'electron'
 import { webUtils } from 'electron'
+import type { FileImportNotification } from '../renderer/shared/events/fileImportEvents'
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
@@ -41,6 +42,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   logError: (message: string, meta?: unknown) => ipcRenderer.invoke('log:error', message, meta),
   quitApp: () => ipcRenderer.invoke('quit-app'),
   clearAllData: () => ipcRenderer.invoke('clear-all-data'),
+  sendFileImportNotification: (payload: FileImportNotification) =>
+    ipcRenderer.send('file-import:notify', payload),
+  onFileImportNotification: (
+    callback: (payload: FileImportNotification) => void,
+  ) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      data: FileImportNotification,
+    ) => {
+      callback(data);
+    };
+    ipcRenderer.on('file-import:notification', listener);
+    return () => {
+      ipcRenderer.removeListener('file-import:notification', listener);
+    };
+  },
 })
 
 // Legacy electronStore bridge removed in favor of ConfigManager via IPC

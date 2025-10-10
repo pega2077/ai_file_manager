@@ -1,5 +1,7 @@
 /// <reference types="vite-plugin-electron/electron-env" />
 
+import type { FileImportNotification } from '../renderer/shared/events/fileImportEvents'
+
 declare namespace NodeJS {
   interface ProcessEnv {
     /**
@@ -44,6 +46,10 @@ interface Window {
     logError: (message: string, meta?: unknown) => Promise<boolean>
     quitApp: () => Promise<boolean>
     clearAllData: () => Promise<boolean>
+    sendFileImportNotification: (payload: FileImportNotification) => void
+    onFileImportNotification: (
+      callback: (payload: FileImportNotification) => void,
+    ) => () => void
   }
 }
 

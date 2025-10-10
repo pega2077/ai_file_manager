@@ -5,6 +5,10 @@ import { message, Menu, Button, Tooltip } from 'antd';
 import { UploadOutlined, SearchOutlined } from '@ant-design/icons';
 import FileImport, { FileImportRef } from '../components/FileImport';
 import { useTranslation } from '../shared/i18n/I18nProvider';
+import {
+  FileImportNotification,
+  subscribeFileImportNotifications,
+} from '../shared/events/fileImportEvents';
 
 const Bot: React.FC = () => {
   const { t } = useTranslation();
@@ -15,6 +19,7 @@ const Bot: React.FC = () => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Work directory handling moved into FileImport component.
 
@@ -123,10 +128,12 @@ const Bot: React.FC = () => {
   // Use FileImport to process files
   const handleFileImport = async (filePath: string) => {
     try {
-      setProcessing(true);
       await importRef.current?.importFile(filePath);
-    } finally {
-      setProcessing(false);
+    } catch (error) {
+      window.electronAPI?.logError?.('bot-handle-file-import-failed', {
+        err: String(error),
+      });
+      message.error(t('files.messages.fileImportFailed'));
     }
   };
 
@@ -161,23 +168,52 @@ const Bot: React.FC = () => {
 
         message.info(toastMessage);
 
-        // Set processing state
-        setProcessing(true);
-
         // Process the dropped files
         for (const filePath of filePaths) {
           await handleFileImport(filePath);
         }
-
-        // Reset processing state after all files are processed
-        setProcessing(false);
       }
     } catch (error) {
       console.error('Error processing dropped files:', error);
       message.error(t('bot.messages.errorProcessingFiles'));
-      setProcessing(false);
     }
   };
+
+  useEffect(() => {
+    const unsubscribe = subscribeFileImportNotifications((detail: FileImportNotification) => {
+      switch (detail.status) {
+        case 'start':
+          setProcessing(true);
+          setStatusMessage(detail.filename ?? t('files.messages.preparingFile'));
+          break;
+        case 'progress':
+          if (detail.message) {
+            setStatusMessage(detail.message);
+          } else if (detail.step === 'await-confirmation' && detail.state === 'start') {
+            setStatusMessage(t('files.import.selectTargetPrompt'));
+          }
+          break;
+        case 'success':
+          setProcessing(false);
+          setStatusMessage(detail.message ?? t('common.success'));
+          break;
+        case 'error':
+          setProcessing(false);
+          setStatusMessage(detail.message ?? detail.error ?? t('common.error'));
+          break;
+        case 'cancelled':
+          setProcessing(false);
+          setStatusMessage(detail.message ?? null);
+          break;
+        default:
+          break;
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [t]);
 
   useEffect(() => {
     document.addEventListener('mousemove', handleMouseMove);
@@ -271,6 +307,20 @@ const Bot: React.FC = () => {
           ...(isHovered ? { filter: 'drop-shadow(0px 0px 5px #000000ff)' } : {}),
         }}
       />
+      {statusMessage && (
+        <div
+          style={{
+            marginTop: 12,
+            maxWidth: 220,
+            textAlign: 'center',
+            color: '#555',
+            fontSize: 14,
+            lineHeight: 1.4,
+          }}
+        >
+          {statusMessage}
+        </div>
+      )}
       {/* <div>{debugMessage}</div> */}
       {/* FileImport renders its own modals; hidden trigger via ref */}
       <FileImport ref={importRef} onImported={() => { /* optional: toast/refresh */ }} />

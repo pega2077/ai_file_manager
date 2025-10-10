@@ -20,6 +20,7 @@ import { startServer as startLocalExpressServer, stopServer as stopLocalExpressS
 import { ensureTempDir, getBaseDir, resolveProjectRoot } from "./backend/utils/pathHelper";
 import { closeDB } from "./backend/db";
 import { i18n } from "./languageHelper";
+import type { FileImportNotification } from '../renderer/shared/events/fileImportEvents';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Config is managed via ConfigManager (JSON file), electron-store removed
@@ -357,7 +358,6 @@ function setupIpcHandlers() {
   ipcMain.handle("update-app-config", (_event, updates: Partial<AppConfig>) => {
     configManager.updateConfig(updates);
     // Reinitialize import service with potentially new base URL
-    const apiBaseUrl = configManager.getEffectiveApiBaseUrl();
   // importService = new ImportService(win ?? null, apiBaseUrl);
     return configManager.getConfig();
   });
@@ -374,6 +374,21 @@ function setupIpcHandlers() {
   // IPC handler for getting API base URL
   ipcMain.handle("get-api-base-url", () => {
     return configManager.getEffectiveApiBaseUrl();
+  });
+
+  ipcMain.on('file-import:notify', (_event, payload: FileImportNotification) => {
+    try {
+      const windows = BrowserWindow.getAllWindows();
+      for (const winItem of windows) {
+        if (!winItem.isDestroyed()) {
+          winItem.webContents.send('file-import:notification', payload);
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to broadcast file import notification', {
+        err: String(error),
+      });
+    }
   });
 
   // IPC handler for clearing all data and relaunching the app
