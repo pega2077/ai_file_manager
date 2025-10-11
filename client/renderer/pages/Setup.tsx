@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Layout, Steps, Form, Input, Button, Card, Space, message, AutoComplete, Tree, Collapse, Select, Typography } from 'antd';
 import { apiService } from '../services/api';
 import { useTranslation } from '../shared/i18n/I18nProvider';
+import { findDirectoryStructurePreset } from '../shared/directoryPresets';
+import type { DirectoryStructureEntry } from '../shared/directoryPresets';
 import type { AppConfig } from '../shared/types';
 
 const { Content } = Layout;
@@ -10,10 +12,7 @@ const { Step } = Steps;
 const { TextArea } = Input;
 const { Text } = Typography;
 
-interface DirectoryStructure {
-  path: string;
-  description: string;
-}
+type DirectoryStructure = DirectoryStructureEntry;
 
 interface TreeNode {
   title: string;
@@ -152,6 +151,19 @@ const Setup = () => {
     try {
       setLoading(true);
       const values = await form.validateFields();
+      const presetDirectories = findDirectoryStructurePreset({
+        profession: values.profession,
+        purpose: values.purpose,
+        style: dirStyle,
+        language: locale,
+      });
+
+      if (presetDirectories && presetDirectories.length > 0) {
+        setDirectoryStructure(presetDirectories);
+        setCollapseActiveKeys([]);
+        message.success(t('setup.messages.fetchPresetSuccess'));
+        return;
+      }
       const response = await apiService.getDirectoryStructure({
         profession: values.profession,
         purpose: values.purpose,
@@ -165,7 +177,7 @@ const Setup = () => {
       });
 
       if (response.success) {
-        setDirectoryStructure((response.data as { directories: DirectoryStructure[] }).directories);
+  setDirectoryStructure((response.data as { directories: DirectoryStructure[] }).directories);
         // auto-collapse advanced options after successful fetch
         setCollapseActiveKeys([]);
         message.success(t('setup.messages.fetchSuccess'));

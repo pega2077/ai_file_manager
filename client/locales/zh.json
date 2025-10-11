@@ -89,6 +89,7 @@
     },
     "messages": {
       "fetchSuccess": "已生成目录结构推荐",
+      "fetchPresetSuccess": "已从本地预设加载目录结构",
       "fetchError": "获取目录结构失败",
       "selectFolderError": "选择文件夹失败",
       "missingTarget": "请先选择目标文件夹",

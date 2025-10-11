@@ -1,0 +1,705 @@
+[
+  {
+    "id": "software-engineer-project-flat-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "flat",
+    "professionKeywords": [
+      "software engineer",
+      "developer",
+      "programmer",
+      "engineering"
+    ],
+    "purposeKeywords": [
+      "project documentation",
+      "project management",
+      "software project",
+      "product development",
+      "project source code",
+      "design documents",
+      "technical notes",
+      "deployment scripts"
+    ],
+    "directories": [
+      {
+        "path": "01_Planning",
+        "description": "Roadmaps, requirement drafts, and OKR documents"
+      },
+      {
+        "path": "02_Design",
+        "description": "System architecture diagrams and design decisions"
+      },
+      {
+        "path": "03_Development",
+        "description": "Source code modules and implementation notes"
+      },
+      {
+        "path": "04_Testing",
+        "description": "Test plans, cases, and QA reports"
+      },
+      {
+        "path": "05_Release",
+        "description": "Deployment guides, release notes, and rollback plans"
+      },
+      {
+        "path": "06_Retrospective",
+        "description": "Post-mortems, metrics, and improvement action items"
+      }
+    ]
+  },
+  {
+    "id": "software-engineer-project-hierarchical-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "software engineer",
+      "developer",
+      "program manager",
+      "scrum"
+    ],
+    "purposeKeywords": [
+      "project management",
+      "agile delivery",
+      "team collaboration",
+      "software project",
+      "project source code",
+      "design documents",
+      "technical notes",
+      "deployment scripts"
+    ],
+    "directories": [
+      {
+        "path": "Planning/Stakeholder_Briefs",
+        "description": "Business context, stakeholder maps, and briefs"
+      },
+      {
+        "path": "Planning/Requirements",
+        "description": "User stories, backlog items, and acceptance criteria"
+      },
+      {
+        "path": "Execution/Architecture",
+        "description": "Architecture decisions, diagrams, and ADRs"
+      },
+      {
+        "path": "Execution/Implementation/Frontend",
+        "description": "Frontend related code guidelines and documentation"
+      },
+      {
+        "path": "Execution/Implementation/Backend",
+        "description": "Service contracts, APIs, and backend references"
+      },
+      {
+        "path": "Execution/Quality/Tests",
+        "description": "Manual and automated test assets"
+      },
+      {
+        "path": "Delivery/Release_Notes",
+        "description": "Release communication and change logs"
+      },
+      {
+        "path": "Delivery/Operations",
+        "description": "Runbooks, monitoring dashboards, and on-call notes"
+      }
+    ]
+  },
+  {
+    "id": "teacher-course-materials-flat-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "flat",
+    "professionKeywords": [
+      "教师",
+      "老师",
+      "教育工作者"
+    ],
+    "purposeKeywords": [
+      "课程资料",
+      "教学",
+      "课堂管理",
+      "教学准备",
+      "课程计划",
+      "讲义",
+      "学生作业",
+      "评分记录"
+    ],
+    "directories": [
+      {
+        "path": "课程规划",
+        "description": "学期教学计划、课程目标和重点安排"
+      },
+      {
+        "path": "教案课件",
+        "description": "课程教案、PPT课件以及课堂脚本"
+      },
+      {
+        "path": "作业与练习",
+        "description": "课堂练习、课后作业及答案解析"
+      },
+      {
+        "path": "学生反馈",
+        "description": "学生问卷、课堂反馈与改进记录"
+      },
+      {
+        "path": "评估与成绩",
+        "description": "考试试卷、评分标准和成绩单"
+      },
+      {
+        "path": "教学反思",
+        "description": "教学日志、课堂表现记录和改进计划"
+      }
+    ]
+  },
+  {
+    "id": "teacher-course-materials-hierarchical-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "教师",
+      "老师",
+      "教学主管"
+    ],
+    "purposeKeywords": [
+      "课程设计",
+      "教学研究",
+      "学科建设",
+      "教学管理",
+      "课程计划",
+      "讲义",
+      "学生作业",
+      "评分记录"
+    ],
+    "directories": [
+      {
+        "path": "教学管理/年度计划",
+        "description": "年度教学目标、主题以及关键日程"
+      },
+      {
+        "path": "教学管理/月度安排",
+        "description": "每月课程主题与活动安排"
+      },
+      {
+        "path": "课堂资源/教案",
+        "description": "详细教案、教学素材和案例"
+      },
+      {
+        "path": "课堂资源/课件",
+        "description": "课堂演示文稿和演示素材"
+      },
+      {
+        "path": "课堂资源/拓展资料",
+        "description": "延伸阅读、补充习题和多媒体资源"
+      },
+      {
+        "path": "学生发展/作业与测试",
+        "description": "作业要求、测试题目、评分标准"
+      },
+      {
+        "path": "学生发展/评语反馈",
+        "description": "学生表现评语、家校沟通记录"
+      },
+      {
+        "path": "教研提升/研讨记录",
+        "description": "教研活动纪要和教学反思"
+      }
+    ]
+  },
+  {
+    "id": "teacher-course-materials-flat-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "flat",
+    "professionKeywords": [
+      "teacher",
+      "educator",
+      "instructor",
+      "professor"
+    ],
+    "purposeKeywords": [
+      "lesson plans",
+      "lecture notes",
+      "student assignments",
+      "grading records",
+      "teaching materials",
+      "classroom management"
+    ],
+    "directories": [
+      {
+        "path": "Course_Planning",
+        "description": "Semester teaching plans, course objectives, and key milestones"
+      },
+      {
+        "path": "Lesson_Materials",
+        "description": "Detailed lesson plans, handouts, and classroom resources"
+      },
+      {
+        "path": "Assessments",
+        "description": "Assignments, quizzes, and rubrics"
+      },
+      {
+        "path": "Student_Progress",
+        "description": "Grading sheets, feedback notes, and performance reports"
+      },
+      {
+        "path": "Classroom_Management",
+        "description": "Class policies, seating charts, and communication logs"
+      },
+      {
+        "path": "Professional_Development",
+        "description": "Training materials, workshop notes, and certifications"
+      }
+    ]
+  },
+  {
+    "id": "teacher-course-materials-hierarchical-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "teacher",
+      "educator",
+      "teaching lead",
+      "academic coordinator"
+    ],
+    "purposeKeywords": [
+      "lesson plans",
+      "lecture notes",
+      "student assignments",
+      "grading records",
+      "teaching materials",
+      "classroom management"
+    ],
+    "directories": [
+      {
+        "path": "Administration/Annual_Plans",
+        "description": "Yearly goals, key dates, and curriculum maps"
+      },
+      {
+        "path": "Administration/Monthly_Schedules",
+        "description": "Monthly lesson themes and activity calendars"
+      },
+      {
+        "path": "Classroom/Plans",
+        "description": "Daily lesson plans and instructional strategies"
+      },
+      {
+        "path": "Classroom/Materials/Handouts",
+        "description": "Printable materials, worksheets, and slides"
+      },
+      {
+        "path": "Classroom/Materials/Extensions",
+        "description": "Supplemental readings, enrichment activities, and media"
+      },
+      {
+        "path": "Students/Assessments",
+        "description": "Quizzes, exams, grading rubrics, and submissions"
+      },
+      {
+        "path": "Students/Feedback",
+        "description": "Parent communication logs and progress feedback"
+      },
+      {
+        "path": "Development/Research",
+        "description": "Teaching reflections, PD records, and research notes"
+      }
+    ]
+  },
+  {
+    "id": "lawyer-case-management-flat-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "flat",
+    "professionKeywords": [
+      "lawyer",
+      "attorney",
+      "legal advisor",
+      "law firm"
+    ],
+    "purposeKeywords": [
+      "case management",
+      "legal research",
+      "client documents",
+      "compliance",
+      "case files",
+      "contracts",
+      "client correspondence"
+    ],
+    "directories": [
+      {
+        "path": "01_Client_Intake",
+        "description": "Engagement letters, conflict checks, and onboarding forms"
+      },
+      {
+        "path": "02_Case_Files",
+        "description": "Active matter files organized by client and case"
+      },
+      {
+        "path": "03_Legal_Research",
+        "description": "Memoranda, citations, and precedent summaries"
+      },
+      {
+        "path": "04_Pleadings",
+        "description": "Court submissions, motions, and briefs"
+      },
+      {
+        "path": "05_Contracts",
+        "description": "Drafts, executed agreements, and negotiation notes"
+      },
+      {
+        "path": "06_Compliance",
+        "description": "Regulatory updates, policies, and audit reports"
+      }
+    ]
+  },
+  {
+    "id": "lawyer-case-management-hierarchical-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "lawyer",
+      "attorney",
+      "litigation",
+      "legal counsel"
+    ],
+    "purposeKeywords": [
+      "case management",
+      "legal operations",
+      "client service",
+      "law practice",
+      "case files",
+      "legal research",
+      "contracts",
+      "client correspondence"
+    ],
+    "directories": [
+      {
+        "path": "Clients/Intake",
+        "description": "Retainer agreements, KYC documents, and onboarding records"
+      },
+      {
+        "path": "Clients/Matters/Active",
+        "description": "Active case folders with pleadings and discovery"
+      },
+      {
+        "path": "Clients/Matters/Closed",
+        "description": "Archived matters with closure summaries"
+      },
+      {
+        "path": "Research/Case_Law",
+        "description": "Indexed case law, citations, and legal arguments"
+      },
+      {
+        "path": "Research/Statutes",
+        "description": "Regulations, statutes, and compliance guides"
+      },
+      {
+        "path": "Operations/Billing",
+        "description": "Invoices, timesheets, and expense reports"
+      },
+      {
+        "path": "Operations/Policies",
+        "description": "Firm policies, templates, and standard procedures"
+      }
+    ]
+  },
+  {
+    "id": "student-academic-success-flat-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "flat",
+    "professionKeywords": [
+      "student",
+      "undergraduate",
+      "graduate",
+      "learner"
+    ],
+    "purposeKeywords": [
+      "study organization",
+      "academic planning",
+      "coursework",
+      "research",
+      "study notes",
+      "assignments",
+      "research papers",
+      "project files"
+    ],
+    "directories": [
+      {
+        "path": "01_Schedule",
+        "description": "Semester calendars, deadlines, and timetable"
+      },
+      {
+        "path": "02_Lectures",
+        "description": "Lecture notes, slides, and summaries"
+      },
+      {
+        "path": "03_Assignments",
+        "description": "Homework, essays, and submission receipts"
+      },
+      {
+        "path": "04_Exams",
+        "description": "Past papers, revision guides, and practice tests"
+      },
+      {
+        "path": "05_Projects",
+        "description": "Group projects, research proposals, and lab reports"
+      },
+      {
+        "path": "06_Resources",
+        "description": "Reference articles, textbooks, and study aids"
+      }
+    ]
+  },
+  {
+    "id": "student-academic-success-hierarchical-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "student",
+      "postgraduate",
+      "college",
+      "university"
+    ],
+    "purposeKeywords": [
+      "academic planning",
+      "course management",
+      "studies",
+      "research",
+      "study notes",
+      "assignments",
+      "research papers",
+      "project files"
+    ],
+    "directories": [
+      {
+        "path": "Courses/Current/Lectures",
+        "description": "Current semester lecture notes and materials"
+      },
+      {
+        "path": "Courses/Current/Assignments",
+        "description": "Assignments in progress with grading rubrics"
+      },
+      {
+        "path": "Courses/Past",
+        "description": "Archived courses, notes, and final grades"
+      },
+      {
+        "path": "Research/Ideas",
+        "description": "Brainstorming documents and literature scans"
+      },
+      {
+        "path": "Research/Sources",
+        "description": "Articles, citations, and annotated bibliographies"
+      },
+      {
+        "path": "Career/Applications",
+        "description": "Resumes, cover letters, and internship records"
+      },
+      {
+        "path": "Personal/Finance",
+        "description": "Budget tracking, scholarships, and receipts"
+      }
+    ]
+  },
+  {
+    "id": "project-manager-operations-flat-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "flat",
+    "professionKeywords": [
+      "project manager",
+      "program manager",
+      "delivery manager",
+      "pm"
+    ],
+    "purposeKeywords": [
+      "project coordination",
+      "delivery management",
+      "stakeholder reporting",
+      "operations",
+      "project plans",
+      "timelines",
+      "meeting notes",
+      "requirements",
+      "reports"
+    ],
+    "directories": [
+      {
+        "path": "01_Initiation",
+        "description": "Charters, stakeholder matrices, and kickoff notes"
+      },
+      {
+        "path": "02_Planning",
+        "description": "Project plans, timelines, and resource allocations"
+      },
+      {
+        "path": "03_Execution",
+        "description": "Status reports, action logs, and risk registers"
+      },
+      {
+        "path": "04_Communication",
+        "description": "Meeting minutes and stakeholder updates"
+      },
+      {
+        "path": "05_Financials",
+        "description": "Budgets, forecasts, and expense trackers"
+      },
+      {
+        "path": "06_Closure",
+        "description": "Post-project reviews, lessons learned, and archives"
+      }
+    ]
+  },
+  {
+    "id": "project-manager-operations-hierarchical-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "project manager",
+      "program manager",
+      "scrum master",
+      "delivery lead"
+    ],
+    "purposeKeywords": [
+      "project delivery",
+      "portfolio management",
+      "operations",
+      "governance",
+      "project plans",
+      "timelines",
+      "meeting notes",
+      "requirements",
+      "reports"
+    ],
+    "directories": [
+      {
+        "path": "Portfolio/Programs/Active",
+        "description": "Program-level dashboards and governance artifacts"
+      },
+      {
+        "path": "Portfolio/Programs/Archived",
+        "description": "Completed initiatives and closure documents"
+      },
+      {
+        "path": "Projects/Initiation",
+        "description": "Project proposals, business cases, and approvals"
+      },
+      {
+        "path": "Projects/Delivery/Sprint_Plans",
+        "description": "Sprint plans, burndown charts, and task boards"
+      },
+      {
+        "path": "Projects/Delivery/Risks_Issues",
+        "description": "Risk logs, mitigation plans, and issue trackers"
+      },
+      {
+        "path": "Reporting/Stakeholders",
+        "description": "Executive summaries and stakeholder communications"
+      },
+      {
+        "path": "Reporting/Metrics",
+        "description": "KPIs, OKRs, and performance dashboards"
+      }
+    ]
+  },
+  {
+    "id": "content-creator-production-flat-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "flat",
+    "professionKeywords": [
+      "content creator",
+      "influencer",
+      "blogger",
+      "creative"
+    ],
+    "purposeKeywords": [
+      "content calendar",
+      "production workflow",
+      "digital assets",
+      "marketing",
+      "drafts",
+      "media assets",
+      "scripts",
+      "publication schedules",
+      "project briefs"
+    ],
+    "directories": [
+      {
+        "path": "01_Strategy",
+        "description": "Audience research, brand guidelines, and campaign goals"
+      },
+      {
+        "path": "02_Ideation",
+        "description": "Brainstorming notes, idea banks, and briefs"
+      },
+      {
+        "path": "03_Pre-Production",
+        "description": "Scripts, shot lists, and production checklists"
+      },
+      {
+        "path": "04_Production",
+        "description": "Raw footage, photoshoots, and recording assets"
+      },
+      {
+        "path": "05_Post-Production",
+        "description": "Edits, graphics, and review versions"
+      },
+      {
+        "path": "06_Publishing",
+        "description": "Content calendar, scheduling, and final exports"
+      },
+      {
+        "path": "07_Performance",
+        "description": "Analytics reports, feedback, and optimization notes"
+      }
+    ]
+  },
+  {
+    "id": "content-creator-production-hierarchical-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "content creator",
+      "video producer",
+      "podcaster",
+      "digital marketer"
+    ],
+    "purposeKeywords": [
+      "content workflow",
+      "campaign management",
+      "creative production",
+      "social media",
+      "drafts",
+      "media assets",
+      "scripts",
+      "publication schedules",
+      "project briefs"
+    ],
+    "directories": [
+      {
+        "path": "Planning/Strategy",
+        "description": "Channel strategy, personas, and messaging frameworks"
+      },
+      {
+        "path": "Planning/Calendar",
+        "description": "Editorial calendar, launch dates, and milestones"
+      },
+      {
+        "path": "Production/Pre-Production",
+        "description": "Storyboards, scripts, and asset checklists"
+      },
+      {
+        "path": "Production/Assets/Raw",
+        "description": "Raw recordings, photos, and design files"
+      },
+      {
+        "path": "Production/Assets/Final",
+        "description": "Final deliverables ready for publishing"
+      },
+      {
+        "path": "Distribution/Channels",
+        "description": "Platform-specific export packages and metadata"
+      },
+      {
+        "path": "Distribution/Partnerships",
+        "description": "Sponsored content agreements and collaboration briefs"
+      },
+      {
+        "path": "Insights/Analytics",
+        "description": "Performance dashboards, learnings, and iteration plans"
+      }
+    ]
+  }
+]

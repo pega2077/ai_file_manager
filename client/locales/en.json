@@ -90,6 +90,7 @@
     },
     "messages": {
       "fetchSuccess": "Directory recommendation generated successfully",
+      "fetchPresetSuccess": "Loaded preset directory structure from local configuration",
       "fetchError": "Failed to fetch the directory structure",
       "selectFolderError": "Failed to select folder",
       "missingTarget": "Please choose a destination folder",

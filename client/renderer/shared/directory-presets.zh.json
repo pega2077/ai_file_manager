@@ -1,0 +1,582 @@
+[
+  {
+    "id": "software-engineer-project-flat-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "flat",
+    "professionKeywords": [
+      "软件工程师",
+      "开发者",
+      "程序员",
+      "研发"
+    ],
+    "purposeKeywords": [
+      "项目源代码",
+      "设计文档",
+      "技术笔记",
+      "部署脚本",
+      "项目文档",
+      "项目管理"
+    ],
+    "directories": [
+      {
+        "path": "01_需求规划",
+        "description": "项目需求文档、里程碑计划与OKR"
+      },
+      {
+        "path": "02_架构设计",
+        "description": "系统架构图、技术方案与设计决策"
+      },
+      {
+        "path": "03_开发实现",
+        "description": "模块代码、实现说明与代码评审记录"
+      },
+      {
+        "path": "04_测试验证",
+        "description": "测试计划、用例、覆盖率与缺陷记录"
+      },
+      {
+        "path": "05_发布部署",
+        "description": "部署脚本、发布说明、回滚方案"
+      },
+      {
+        "path": "06_复盘优化",
+        "description": "版本复盘、指标分析与改进事项"
+      }
+    ]
+  },
+  {
+    "id": "software-engineer-project-hierarchical-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "软件工程师",
+      "开发者",
+      "技术负责人",
+      "敏捷"
+    ],
+    "purposeKeywords": [
+      "项目源代码",
+      "设计文档",
+      "技术笔记",
+      "部署脚本",
+      "项目管理",
+      "敏捷交付"
+    ],
+    "directories": [
+      {
+        "path": "规划/业务背景",
+        "description": "业务理解、干系人列表与需求摘要"
+      },
+      {
+        "path": "规划/需求清单",
+        "description": "用户故事、需求拆分与验收标准"
+      },
+      {
+        "path": "执行/架构设计",
+        "description": "架构设计文档、技术选型与ADR记录"
+      },
+      {
+        "path": "执行/实现/前端",
+        "description": "前端模块设计、组件说明与规范"
+      },
+      {
+        "path": "执行/实现/后端",
+        "description": "服务接口、API文档与数据模型"
+      },
+      {
+        "path": "执行/质量保障",
+        "description": "测试策略、自动化脚本与质量报告"
+      },
+      {
+        "path": "交付/发布记录",
+        "description": "发布说明、上线Checklist与回滚方案"
+      },
+      {
+        "path": "交付/运维手册",
+        "description": "监控告警、应急预案与值班说明"
+      }
+    ]
+  },
+  {
+    "id": "teacher-course-materials-flat-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "flat",
+    "professionKeywords": [
+      "教师",
+      "老师",
+      "教育工作者"
+    ],
+    "purposeKeywords": [
+      "课程资料",
+      "教学",
+      "课堂管理",
+      "教学准备",
+      "课程计划",
+      "讲义",
+      "学生作业",
+      "评分记录"
+    ],
+    "directories": [
+      {
+        "path": "课程规划",
+        "description": "学期教学计划、课程目标和重点安排"
+      },
+      {
+        "path": "教案课件",
+        "description": "课程教案、PPT课件以及课堂脚本"
+      },
+      {
+        "path": "作业与练习",
+        "description": "课堂练习、课后作业及答案解析"
+      },
+      {
+        "path": "学生反馈",
+        "description": "学生问卷、课堂反馈与改进记录"
+      },
+      {
+        "path": "评估与成绩",
+        "description": "考试试卷、评分标准和成绩单"
+      },
+      {
+        "path": "教学反思",
+        "description": "教学日志、课堂表现记录和改进计划"
+      }
+    ]
+  },
+  {
+    "id": "teacher-course-materials-hierarchical-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "教师",
+      "老师",
+      "教学主管"
+    ],
+    "purposeKeywords": [
+      "课程设计",
+      "教学研究",
+      "学科建设",
+      "教学管理",
+      "课程计划",
+      "讲义",
+      "学生作业",
+      "评分记录"
+    ],
+    "directories": [
+      {
+        "path": "教学管理/年度计划",
+        "description": "年度教学目标、主题以及关键日程"
+      },
+      {
+        "path": "教学管理/月度安排",
+        "description": "每月课程主题与活动安排"
+      },
+      {
+        "path": "课堂资源/教案",
+        "description": "详细教案、教学素材和案例"
+      },
+      {
+        "path": "课堂资源/课件",
+        "description": "课堂演示文稿和演示素材"
+      },
+      {
+        "path": "课堂资源/拓展资料",
+        "description": "延伸阅读、补充习题和多媒体资源"
+      },
+      {
+        "path": "学生发展/作业与测试",
+        "description": "作业要求、测试题目、评分标准"
+      },
+      {
+        "path": "学生发展/评语反馈",
+        "description": "学生表现评语、家校沟通记录"
+      },
+      {
+        "path": "教研提升/研讨记录",
+        "description": "教研活动纪要和教学反思"
+      }
+    ]
+  },
+  {
+    "id": "lawyer-case-management-flat-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "flat",
+    "professionKeywords": [
+      "律师",
+      "法律顾问",
+      "法务"
+    ],
+    "purposeKeywords": [
+      "案件文件",
+      "法律研究",
+      "合同",
+      "客户通信",
+      "合规",
+      "法律文档"
+    ],
+    "directories": [
+      {
+        "path": "01_客户接洽",
+        "description": "委托书、冲突审查与客户背景资料"
+      },
+      {
+        "path": "02_案件文件",
+        "description": "进行中的案件卷宗与往来文件"
+      },
+      {
+        "path": "03_法律研究",
+        "description": "检索笔记、案例汇编与法条整理"
+      },
+      {
+        "path": "04_诉讼文书",
+        "description": "起诉状、答辩状、庭审资料"
+      },
+      {
+        "path": "05_合同管理",
+        "description": "合同模板、谈判版本与签署文本"
+      },
+      {
+        "path": "06_合规审计",
+        "description": "合规政策、审计报告与整改记录"
+      }
+    ]
+  },
+  {
+    "id": "lawyer-case-management-hierarchical-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "律师",
+      "法务",
+      "法律顾问"
+    ],
+    "purposeKeywords": [
+      "案件管理",
+      "法律研究",
+      "合同",
+      "客户通信",
+      "合规",
+      "法律文档"
+    ],
+    "directories": [
+      {
+        "path": "客户/接洽资料",
+        "description": "客户信息、委托协议、尽调报告"
+      },
+      {
+        "path": "客户/案件/在办",
+        "description": "在办案件的诉讼材料与证据链"
+      },
+      {
+        "path": "客户/案件/已结",
+        "description": "结案总结、归档文件与经验复盘"
+      },
+      {
+        "path": "研究/案例库",
+        "description": "案例检索、裁判文书与法律观点"
+      },
+      {
+        "path": "研究/法规汇编",
+        "description": "法规条文、监管指引与政策解读"
+      },
+      {
+        "path": "运营/收费管理",
+        "description": "费用清单、工时记录与开票资料"
+      },
+      {
+        "path": "运营/制度模板",
+        "description": "律所制度、合同模板与流程指引"
+      }
+    ]
+  },
+  {
+    "id": "student-academic-success-flat-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "flat",
+    "professionKeywords": [
+      "学生",
+      "本科生",
+      "研究生",
+      "学习者"
+    ],
+    "purposeKeywords": [
+      "学习笔记",
+      "作业",
+      "研究论文",
+      "项目文件",
+      "学业规划",
+      "课程管理"
+    ],
+    "directories": [
+      {
+        "path": "01_日程规划",
+        "description": "学期时间表、任务截止与提醒"
+      },
+      {
+        "path": "02_课程笔记",
+        "description": "课堂笔记、课件整理与重点摘要"
+      },
+      {
+        "path": "03_作业提交",
+        "description": "作业题目、提交记录与反馈"
+      },
+      {
+        "path": "04_考试复习",
+        "description": "历年试题、复习资料与错题本"
+      },
+      {
+        "path": "05_项目研究",
+        "description": "小组项目、实验报告与研究资料"
+      },
+      {
+        "path": "06_资源库",
+        "description": "参考文献、电子书与学习工具"
+      }
+    ]
+  },
+  {
+    "id": "student-academic-success-hierarchical-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "学生",
+      "高校",
+      "考研",
+      "留学"
+    ],
+    "purposeKeywords": [
+      "学业规划",
+      "课程管理",
+      "学习笔记",
+      "作业",
+      "研究论文",
+      "项目文件"
+    ],
+    "directories": [
+      {
+        "path": "课程/本学期/讲义",
+        "description": "本学期课程的课堂讲义与资料"
+      },
+      {
+        "path": "课程/本学期/作业",
+        "description": "进行中的作业、评分标准与批注"
+      },
+      {
+        "path": "课程/往期",
+        "description": "历史课程资料、成绩单与总结"
+      },
+      {
+        "path": "研究/选题灵感",
+        "description": "研究方向、头脑风暴与文献记录"
+      },
+      {
+        "path": "研究/文献资料",
+        "description": "论文原文、阅读笔记与引用管理"
+      },
+      {
+        "path": "职业/申请材料",
+        "description": "简历、推荐信、实习申请与面试记录"
+      },
+      {
+        "path": "个人/财务管理",
+        "description": "奖学金、预算表与票据收据"
+      }
+    ]
+  },
+  {
+    "id": "project-manager-operations-flat-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "flat",
+    "professionKeywords": [
+      "项目经理",
+      "项目管理",
+      "交付经理",
+      "PM"
+    ],
+    "purposeKeywords": [
+      "项目计划",
+      "时间表",
+      "会议记录",
+      "需求",
+      "报告",
+      "项目协调"
+    ],
+    "directories": [
+      {
+        "path": "01_立项",
+        "description": "项目章程、干系人分析与启动资料"
+      },
+      {
+        "path": "02_计划",
+        "description": "进度计划、资源分配与WBS"
+      },
+      {
+        "path": "03_执行",
+        "description": "状态报告、行动跟踪与风险登记"
+      },
+      {
+        "path": "04_沟通",
+        "description": "会议纪要、沟通记录与公告"
+      },
+      {
+        "path": "05_成本与预算",
+        "description": "预算控制、费用报销与财务报表"
+      },
+      {
+        "path": "06_收尾",
+        "description": "验收文档、经验总结与知识沉淀"
+      }
+    ]
+  },
+  {
+    "id": "project-manager-operations-hierarchical-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "项目经理",
+      "项目群经理",
+      "Scrum Master",
+      "交付负责人"
+    ],
+    "purposeKeywords": [
+      "项目计划",
+      "时间表",
+      "会议记录",
+      "需求",
+      "报告",
+      "项目运营"
+    ],
+    "directories": [
+      {
+        "path": "组合管理/项目群/在执行",
+        "description": "项目群整体进度与治理文档"
+      },
+      {
+        "path": "组合管理/项目群/已完成",
+        "description": "已结项项目的复盘与归档"
+      },
+      {
+        "path": "项目/启动阶段",
+        "description": "商业案例、批准文件与启动会议资料"
+      },
+      {
+        "path": "项目/交付/迭代计划",
+        "description": "迭代目标、燃尽图与任务分配"
+      },
+      {
+        "path": "项目/交付/风险问题",
+        "description": "风险清单、问题跟踪与应对措施"
+      },
+      {
+        "path": "汇报/干系人",
+        "description": "管理层汇报、干系人沟通材料"
+      },
+      {
+        "path": "汇报/指标看板",
+        "description": "KPI、OKR与绩效分析"
+      }
+    ]
+  },
+  {
+    "id": "content-creator-production-flat-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "flat",
+    "professionKeywords": [
+      "内容创作者",
+      "自媒体",
+      "博主",
+      "创意人"
+    ],
+    "purposeKeywords": [
+      "草稿",
+      "媒体素材",
+      "脚本",
+      "发布日程",
+      "项目简介",
+      "内容日历"
+    ],
+    "directories": [
+      {
+        "path": "01_策略定位",
+        "description": "受众画像、品牌调性与目标规划"
+      },
+      {
+        "path": "02_选题策划",
+        "description": "创意头脑风暴、选题库与脚本大纲"
+      },
+      {
+        "path": "03_前期准备",
+        "description": "拍摄脚本、分镜、素材清单"
+      },
+      {
+        "path": "04_内容制作",
+        "description": "原始素材、拍摄文件与录音"
+      },
+      {
+        "path": "05_剪辑发布",
+        "description": "剪辑工程、成片版本与审核反馈"
+      },
+      {
+        "path": "06_上线排期",
+        "description": "发布日程、推广计划与渠道安排"
+      },
+      {
+        "path": "07_数据复盘",
+        "description": "数据分析、粉丝反馈与优化建议"
+      }
+    ]
+  },
+  {
+    "id": "content-creator-production-hierarchical-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "内容创作者",
+      "视频制作",
+      "播客",
+      "数字营销"
+    ],
+    "purposeKeywords": [
+      "草稿",
+      "媒体素材",
+      "脚本",
+      "发布日程",
+      "项目简介",
+      "内容工作流"
+    ],
+    "directories": [
+      {
+        "path": "规划/内容策略",
+        "description": "渠道策略、用户画像与核心信息"
+      },
+      {
+        "path": "规划/内容日历",
+        "description": "月度主题、发布日期与关键节点"
+      },
+      {
+        "path": "制作/前期筹备",
+        "description": "脚本、分镜、拍摄清单与资源准备"
+      },
+      {
+        "path": "制作/素材/原始",
+        "description": "原始视频、照片、音频与素材文件"
+      },
+      {
+        "path": "制作/素材/成片",
+        "description": "最终成片、导出版本与平台定制文件"
+      },
+      {
+        "path": "投放/渠道管理",
+        "description": "各平台发布素材、标题与描述"
+      },
+      {
+        "path": "投放/合作共创",
+        "description": "品牌合作方案、合同与沟通记录"
+      },
+      {
+        "path": "复盘/数据分析",
+        "description": "数据看板、复盘总结与优化计划"
+      }
+    ]
+  }
+]
