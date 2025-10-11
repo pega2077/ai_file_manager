@@ -60,6 +60,7 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 let win: BrowserWindow | null;
 let botWin: BrowserWindow | null;
 let tray: Tray | null;
+let isQuitting = false; // Track whether the app is in an explicit quit flow
 
 /**
  * Clear all app data (database file, vectors directory, temp directory) and relaunch the app.
@@ -429,6 +430,7 @@ function setupIpcHandlers() {
   // IPC handler to quit the application
   ipcMain.handle("quit-app", () => {
     logger.info('Quit requested via IPC');
+    isQuitting = true;
     app.quit();
     return true;
   });
@@ -459,8 +461,11 @@ function createWindow() {
 
   // Handle window close to hide instead of close
   win.on("close", (e) => {
-    e.preventDefault();
-    win?.hide();
+    // Allow normal close when the app is quitting (e.g., Dock Quit or Cmd+Q)
+    if (!isQuitting) {
+      e.preventDefault();
+      win?.hide();
+    }
   });
 
   // Test active push message to Renderer-process.
@@ -607,6 +612,7 @@ function createMenu() {
           label: i18n.t('menu.quit', 'Quit'),
           accelerator: process.platform === "darwin" ? "Cmd+Q" : "Ctrl+Q",
           click: () => {
+            isQuitting = true;
             app.quit();
           },
         },
@@ -771,6 +777,7 @@ function createTray() {
     {
       label: i18n.t('tray.closeApp', 'Close App'),
       click: () => {
+        isQuitting = true;
         win?.destroy();
         botWin?.destroy();
         app.quit();
@@ -796,7 +803,9 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   logger.info('Application before-quit event triggered');
+  isQuitting = true;
   void stopLocalExpressServer();
+  void closeDB();
 });
 
 app.on("activate", () => {
