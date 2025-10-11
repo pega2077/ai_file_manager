@@ -253,12 +253,13 @@
       "register": "注册"
     },
     "form": {
-      "email": "邮箱",
-      "phone": "手机号",
       "password": "密码",
       "confirmPassword": "确认密码",
       "identifier": "邮箱或手机号"
     },
+      "placeholders": {
+        "identifier": "请输入邮箱或手机号"
+      },
     "actions": {
       "login": "登录",
       "register": "创建账号",
@@ -282,14 +283,12 @@
       "noToken": "暂无 Token"
     },
     "validation": {
-      "emailRequired": "请输入邮箱",
-      "emailFormat": "请输入有效的邮箱地址",
-      "phoneRequired": "请输入手机号",
       "passwordRequired": "请输入密码",
       "passwordLength": "密码至少需要 6 个字符",
       "confirmPasswordRequired": "请确认密码",
       "passwordMismatch": "两次输入的密码不一致",
-      "identifierRequired": "请输入邮箱或手机号"
+      "identifierRequired": "请输入邮箱或手机号",
+      "identifierFormat": "请输入有效的邮箱地址或手机号"
     }
   },
   "bot": {

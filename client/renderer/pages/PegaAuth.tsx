@@ -12,14 +12,21 @@ const { Title, Paragraph, Text } = Typography;
 const TAB_LOGIN = 'login';
 const TAB_REGISTER = 'register';
 
+type IdentifierType = 'email' | 'phone';
+
+interface IdentifierDetectionResult {
+  type: IdentifierType;
+  normalized: string;
+  raw: string;
+}
+
 interface LoginFormValues {
   identifier: string;
   password: string;
 }
 
 interface RegisterFormValues {
-  email: string;
-  phone: string;
+  identifier: string;
   password: string;
   confirmPassword: string;
 }
@@ -33,6 +40,47 @@ const maskValue = (value: string, fallback: string): string => {
     return trimmed;
   }
   return `${trimmed.slice(0, 4)}...${trimmed.slice(-4)}`;
+};
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const phoneCandidatePattern = /^[+]?\d{6,20}$/;
+const phoneBasicPattern = /^[+]?\d+$/;
+
+const detectIdentifier = (input: string): IdentifierDetectionResult | null => {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const lowered = trimmed.toLowerCase();
+  if (emailPattern.test(lowered)) {
+    return {
+      type: 'email',
+      normalized: lowered,
+      raw: trimmed,
+    };
+  }
+
+  const sanitized = trimmed.replace(/[\s()-]/g, '');
+  if (!phoneBasicPattern.test(sanitized)) {
+    return null;
+  }
+
+  const digits = sanitized.startsWith('+') ? sanitized.slice(1) : sanitized;
+  if (!/^[0-9]{6,20}$/.test(digits)) {
+    return null;
+  }
+
+  const normalized = sanitized.startsWith('+') ? `+${digits}` : digits;
+  if (phoneCandidatePattern.test(normalized)) {
+    return {
+      type: 'phone',
+      normalized,
+      raw: trimmed,
+    };
+  }
+
+  return null;
 };
 
 const PegaAuth = () => {
@@ -81,13 +129,19 @@ const PegaAuth = () => {
   const handleRegister = async (values: RegisterFormValues) => {
     setRegisterLoading(true);
     try {
+      const detection = detectIdentifier(values.identifier);
+      if (!detection) {
+        message.error(t('pegaAuth.validation.identifierFormat'));
+        return;
+      }
+
       const response = await apiService.registerPegaAccount({
-        email: values.email,
-        phone: values.phone,
+        email: detection.type === 'email' ? detection.normalized : undefined,
+        phone: detection.type === 'phone' ? detection.normalized : undefined,
         password: values.password,
       });
       message.success(response.message || t('pegaAuth.messages.registerSuccess'));
-      loginForm.setFieldsValue({ identifier: values.email, password: values.password });
+      loginForm.setFieldsValue({ identifier: detection.raw, password: values.password });
       setActiveTab(TAB_LOGIN);
     } catch (error) {
       console.error('Registration failed:', error);
@@ -100,7 +154,16 @@ const PegaAuth = () => {
   const handleLogin = async (values: LoginFormValues) => {
     setLoginLoading(true);
     try {
-      const loginResponse = await apiService.loginPegaAccount(values);
+      const detection = detectIdentifier(values.identifier);
+      if (!detection) {
+        message.error(t('pegaAuth.validation.identifierFormat'));
+        return;
+      }
+
+      const loginResponse = await apiService.loginPegaAccount({
+        identifier: detection.normalized,
+        password: values.password,
+      });
       const token = loginResponse.token;
       if (!token) {
         message.error(loginResponse.message || t('pegaAuth.messages.loginFailed'));
@@ -135,21 +198,27 @@ const PegaAuth = () => {
     }
   };
 
+  const identifierFormRules = useMemo(
+    () => [
+      { required: true, message: t('pegaAuth.validation.identifierRequired') },
+      () => ({
+        validator(_: unknown, value: string) {
+          if (!value) {
+            return Promise.resolve();
+          }
+          return detectIdentifier(value)
+            ? Promise.resolve()
+            : Promise.reject(new Error(t('pegaAuth.validation.identifierFormat')));
+        },
+      }),
+    ],
+    [t],
+  );
+
   const registerTab = (
     <Form layout="vertical" form={registerForm} onFinish={handleRegister}>
-      <Form.Item
-        name="email"
-        label={t('pegaAuth.form.email')}
-        rules={[{ required: true, message: t('pegaAuth.validation.emailRequired') }, { type: 'email', message: t('pegaAuth.validation.emailFormat') }]}
-      >
-        <Input placeholder="user@example.com" autoComplete="email" allowClear />
-      </Form.Item>
-      <Form.Item
-        name="phone"
-        label={t('pegaAuth.form.phone')}
-        rules={[{ required: true, message: t('pegaAuth.validation.phoneRequired') }]}
-      >
-        <Input placeholder="1234567890" autoComplete="tel" allowClear />
+      <Form.Item name="identifier" label={t('pegaAuth.form.identifier')} rules={identifierFormRules}>
+        <Input placeholder={t('pegaAuth.placeholders.identifier')} autoComplete="username" allowClear />
       </Form.Item>
       <Form.Item
         name="password"
@@ -188,12 +257,8 @@ const PegaAuth = () => {
 
   const loginTab = (
     <Form layout="vertical" form={loginForm} onFinish={handleLogin}>
-      <Form.Item
-        name="identifier"
-        label={t('pegaAuth.form.identifier')}
-        rules={[{ required: true, message: t('pegaAuth.validation.identifierRequired') }]}
-      >
-        <Input placeholder="user@example.com" autoComplete="username" allowClear />
+      <Form.Item name="identifier" label={t('pegaAuth.form.identifier')} rules={identifierFormRules}>
+        <Input placeholder={t('pegaAuth.placeholders.identifier')} autoComplete="username" allowClear />
       </Form.Item>
       <Form.Item
         name="password"

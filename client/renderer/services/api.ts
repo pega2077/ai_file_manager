@@ -819,12 +819,14 @@ class ApiService {
     });
   }
 
-  async registerPegaAccount(payload: { email: string; phone?: string; password: string }) {
-    const body = JSON.stringify({
-      email: payload.email,
+  async registerPegaAccount(payload: { email?: string; phone?: string; password: string }) {
+    const bodyPayload: Record<string, string> = {
+      email: payload.email ?? '',
       phone: payload.phone ?? '',
       password: payload.password,
-    });
+    };
+
+    const body = JSON.stringify(bodyPayload);
     const response = await this.requestFromPega<Record<string, unknown>>('/auth/register', {
       method: 'POST',
       body,
