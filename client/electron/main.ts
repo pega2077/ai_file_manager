@@ -485,6 +485,7 @@ function createWindow() {
 }
 
 function createBotWindow() {
+  const isInitialized = Boolean(configManager.getConfig().isInitialized);
   const { width: screenWidth, height: screenHeight } =
     screen.getPrimaryDisplay().workAreaSize;
   const windowWidth = 400;
@@ -504,6 +505,9 @@ function createBotWindow() {
       preload: path.join(__dirname, "preload.mjs"),
     },
   });
+  if (!isInitialized) {
+    botWin.hide();
+  }
 
   botWin.on("closed", () => {
     botWin = null;

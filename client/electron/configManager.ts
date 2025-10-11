@@ -164,7 +164,7 @@ const DEFAULT_CONFIG: AppConfig = {
     bailianEmbedModel: "text-embedding-v4",
     bailianVisionModel: "qwen3-vl-plus",//
   },
-  fileConvertEndpoint: "",
+  fileConvertEndpoint: "https://converter.pegamob.com",
   // Default to repository-standard SQLite location; can be overridden in config.json
   sqliteDbPath: "database/files.db",
   // App defaults (override in config.json)
