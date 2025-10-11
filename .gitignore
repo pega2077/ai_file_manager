@@ -8,7 +8,6 @@ database
 __pycache__
 bin
 .env
-models
 client/dist-electron/
 client/release/
 temp
