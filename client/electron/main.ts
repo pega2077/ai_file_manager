@@ -731,8 +731,8 @@ function createMenu() {
 // Create system tray
 function createTray() {
   const iconPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'app-icon.ico')
-    : path.join(__dirname, '../app-icon.ico');
+    ? path.join(process.resourcesPath, 'app-iconTemplate.png')
+    : path.join(__dirname, '../app-iconTemplate.png');
   tray = new Tray(
     nativeImage.createFromPath(iconPath)
   );

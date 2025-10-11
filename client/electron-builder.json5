@@ -32,6 +32,14 @@
       "to": "app-icon.ico"
     },
     {
+      "from": "app-icon.png",
+      "to": "app-icon.png"
+    },
+    {
+      "from": "app-iconTemplate.png",
+      "to": "app-iconTemplate.png"
+    },
+    {
       // Ensure locales JSON are available at runtime for any non-bundled consumers
       "from": "locales",
       "to": "locales"
