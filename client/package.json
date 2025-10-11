@@ -8,7 +8,7 @@
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "test:faiss": "tsx scripts/test-faiss.ts"
+    "rebuild:native": "electron-rebuild -f -w faiss-node"
   },
   "dependencies": {
     "@ant-design/cssinjs": "^1.24.0",
@@ -26,6 +26,7 @@
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.6.0",
     "@types/express": "^5.0.3",
     "@types/node": "^20.14.10",
     "@types/react": "^18.2.64",

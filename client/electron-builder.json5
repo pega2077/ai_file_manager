@@ -3,13 +3,28 @@
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   "appId": "com.pega2077.aifilemanager",
   "asar": true,
+  // Unpack native modules and dynamic libraries so Node can dlopen them at runtime
+  "asarUnpack": [
+    "node_modules/faiss-node/**",
+    "**/*.node",
+    "**/*.dylib",
+    "**/*.so*"
+  ],
   "productName": "AiFileManager",
   "directories": {
     "output": "builds/${version}"
   },
   "files": [
     "builds/renderer",
-    "builds/electron"
+    "builds/electron",
+    // Ensure faiss-node runtime files are packaged (left external from Vite bundle)
+    {
+      "from": "node_modules/faiss-node",
+      "to": "node_modules/faiss-node",
+      "filter": [
+        "**/*"
+      ]
+    }
   ],
   "extraResources": [
     {
@@ -39,7 +54,7 @@
     "target": [
       "dmg"
     ],
-    "icon": "app-icon.ico",
+    "icon": "app-icon.png",
     "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
   },
   "win": {
