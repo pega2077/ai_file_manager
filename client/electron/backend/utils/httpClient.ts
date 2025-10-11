@@ -40,12 +40,14 @@ export async function httpPostJson<T>(url: string, body: unknown, headers?: Reco
     mergedHeaders = { ...mergedHeaders, Authorization: `Bearer ${token}` };
   }
   try {
+    console.log("HTTP POST request to:", url, "\nwith headers:\n", mergedHeaders, "\nwith body:\n", body);
     const resp = await fetch(url, {
       method: "POST",
       headers: mergedHeaders,
       body: JSON.stringify(body),
-      signal: controller.signal,
+      //signal: controller.signal,
     });
+    console.log("HTTP POST response status:", resp.status,resp.ok);
     const status = resp.status;
     const ok = resp.ok;
     const text = await resp.text();

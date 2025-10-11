@@ -220,7 +220,7 @@ export async function generateStructuredJsonWithOllama(
   if (responseFormat?.json_schema?.schema) {
     payload.format = "json";
   }
-  // logger.info("Ollama generate payload prepared", JSON.stringify(payload));
+  logger.info("Ollama generate payload prepared", JSON.stringify(payload));
   const apiKey = resolved.apiKey;
   const resp = await httpPostJson<OllamaGenerateResponseBody>(
     url,
@@ -231,10 +231,10 @@ export async function generateStructuredJsonWithOllama(
   );
   if (!resp.ok || !resp.data) {
     const msg =
-      resp.error?.message || `Failed generate via ${providerLabel}: HTTP ${resp.status}`;
+      resp.error?.message || `Failed generate via ${providerLabel}: HTTP ${resp.status} DATA ${resp.data}`;
     throw new Error(msg);
   }
-  //console.log("Ollama raw response:", resp.data);
+  console.log("Ollama raw response:", resp.data);
   const raw = resp.data.response ?? "";
   try {
     const res = JSON.parse(raw);
