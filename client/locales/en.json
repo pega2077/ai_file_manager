@@ -152,6 +152,9 @@
         "invalidTarget": "Target folder path is required",
         "emptyStructure": "Folder structure cannot be empty",
         "failure": "Failed to create folder structure"
+      },
+      "errors": {
+        "textConversionFailed": "Failed to convert file to text"
       }
     },
     "common": {
@@ -479,7 +482,9 @@
       "importedRagSuccess": "File successfully imported to RAG library",
       "saveSuccessRagFailed": "File saved successfully, but importing to RAG library failed",
       "describingImage": "Describing image content for analysis...",
-      "imageDescription": "Image description: {text}"
+      "imageDescription": "Image description: {text}",
+      "conversionError": "File conversion failed. Please verify the conversion service configuration.",
+      "conversionErrorWithReason": "File conversion failed: {reason}"
     ,
       "updateSuccess": "File updated",
       "updateFailed": "Failed to update file",

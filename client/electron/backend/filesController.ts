@@ -19,6 +19,11 @@ import { randomUUID } from "crypto";
 import ChunkModel from "./models/chunk";
 import { updateGlobalFaissIndex } from "./utils/vectorStore";
 import { configManager } from "../configManager";
+import { i18n } from "../languageHelper";
+
+function getTextConversionFailedMessage(): string {
+  return i18n.t("backend.files.errors.textConversionFailed", "Failed to convert file to text");
+}
 
 interface ListFilesRequestBody {
   page?: unknown;
@@ -808,6 +813,18 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
     } else {
       // ensure .txt for non-image
       txtPath = await ensureTxtFile(filePath);
+      if (!txtPath || !txtPath.trim()) {
+        logger.error("importToRagHandler: ensureTxtFile returned empty path", { file: filePath });
+        res.status(500).json({
+          success: false,
+          message: "conversion_failed",
+          data: null,
+          error: { code: "TEXT_CONVERSION_FAILED", message: getTextConversionFailedMessage(), details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
       content = await fsp.readFile(txtPath, "utf8");
     }
     // 2) chunk
@@ -1478,6 +1495,10 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
             let textContent = "";
             try {
               const txtPath = await ensureTxtFile(destPath);
+              if (!txtPath || !txtPath.trim()) {
+                logger.warn("Auto-tag document conversion returned empty path", { file: destPath });
+                throw new Error("ensureTxtFile returned empty path");
+              }
               textContent = await fsp.readFile(txtPath, "utf8");
             } catch (convErr) {
               // If conversion fails, try direct read for simple text-like files
@@ -1613,6 +1634,18 @@ export async function recommendDirectoryHandler(req: Request, res: Response): Pr
       txtPath = null;
     } else {
       txtPath = await ensureTxtFile(filePath);
+      if (!txtPath || !txtPath.trim()) {
+        logger.error("recommendDirectoryHandler: ensureTxtFile returned empty path", { file: filePath });
+        res.status(500).json({
+          success: false,
+          message: "conversion_failed",
+          data: null,
+          error: { code: "TEXT_CONVERSION_FAILED", message: getTextConversionFailedMessage(), details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
       content = await fsp.readFile(txtPath, "utf8");
     }
     const snippet = content.slice(0, 500);
@@ -1651,7 +1684,7 @@ export async function recommendDirectoryHandler(req: Request, res: Response): Pr
 
     let result: unknown;
     try {
-  result = await generateStructuredJson(messages, responseFormat, 0.7, 1000, "", undefined, provider);
+      result = await generateStructuredJson(messages, responseFormat, 0.7, 1000, "", undefined, provider);
     } catch (err) {
       logger.error("LLM recommend-directory call failed", err as unknown);
       res.status(500).json({
@@ -1690,7 +1723,7 @@ export async function recommendDirectoryHandler(req: Request, res: Response): Pr
       request_id: "",
     });
   } catch (err) {
-    logger.error("/api/files/recommend-directory failed", err as unknown);
+    logger.error("/api/files/recommend-directory failed", err);
     res.status(500).json({
       success: false,
       message: "internal_error",

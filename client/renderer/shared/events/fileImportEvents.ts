@@ -9,7 +9,7 @@ export type FileImportStep =
   | 'save-file'
   | 'import-rag';
 
-export type FileImportStepState = 'start' | 'success';
+export type FileImportStepState = 'start' | 'success' | 'error';
 
 export type FileImportNotification =
   | {

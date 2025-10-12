@@ -42,6 +42,13 @@ interface ApiResponse<T = unknown> {
   request_id: string;
 }
 
+export interface ApiError extends Error {
+  status: number;
+  code?: string;
+  details?: unknown;
+  payload?: unknown;
+}
+
 interface RecommendDirectoryResponse {
   recommended_directory: string;
   alternatives: string[];
@@ -249,6 +256,67 @@ class ApiService {
     };
   }
 
+  private async parseJsonOrThrow<T>(response: Response): Promise<T> {
+    const rawText = await response.text();
+    const trimmed = rawText.trim();
+    let parsed: unknown;
+    let parsedSuccessfully = false;
+
+    if (trimmed.length > 0) {
+      try {
+        parsed = JSON.parse(trimmed);
+        parsedSuccessfully = true;
+      } catch {
+        parsedSuccessfully = false;
+      }
+    }
+
+    if (!response.ok) {
+      const error = new Error(`HTTP error! status: ${response.status}`) as ApiError;
+      error.status = response.status;
+
+      if (parsedSuccessfully && parsed && typeof parsed === 'object') {
+        const payload = parsed as Partial<ApiResponse<unknown>>;
+        const errorPart = (payload.error ?? undefined) as
+          | { code?: string; message?: string; details?: unknown }
+          | null
+          | undefined;
+        const fromErrorPart = typeof errorPart?.message === 'string' ? errorPart.message : undefined;
+        const fromPayloadMessage = typeof payload.message === 'string' ? payload.message : undefined;
+
+        if (fromErrorPart && fromErrorPart.trim()) {
+          error.message = fromErrorPart;
+        } else if (fromPayloadMessage && fromPayloadMessage.trim()) {
+          error.message = fromPayloadMessage;
+        }
+
+        if (errorPart?.code) {
+          error.code = errorPart.code;
+        }
+
+        if (errorPart?.details !== undefined) {
+          error.details = errorPart.details;
+        }
+
+        error.payload = payload;
+      } else if (trimmed.length > 0) {
+        error.message = trimmed;
+        error.payload = trimmed;
+      }
+
+      throw error;
+    }
+
+    if (!parsedSuccessfully) {
+      if (trimmed.length === 0) {
+        return undefined as T;
+      }
+      throw new Error('Failed to parse JSON response');
+    }
+
+    return parsed as T;
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const url = `${API_BASE_URL}${endpoint}`;
     const mergedHeaders = this.mergeHeaders(options.headers);
@@ -257,11 +325,7 @@ class ApiService {
       headers: mergedHeaders,
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
+    return this.parseJsonOrThrow<ApiResponse<T>>(response);
   }
 
   private async requestFromRoot<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -272,11 +336,7 @@ class ApiService {
       headers: mergedHeaders,
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.json() as Promise<T>;
+    return this.parseJsonOrThrow<T>(response);
   }
 
   private async ensurePegaBaseUrl(): Promise<string> {
@@ -314,11 +374,7 @@ class ApiService {
       headers: mergedHeaders,
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.json() as Promise<T>;
+    return this.parseJsonOrThrow<T>(response);
   }
 
   private extractToken(payload: unknown): string | undefined {

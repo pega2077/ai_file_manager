@@ -175,29 +175,30 @@ export async function convertFileViaService(filePath: string, sourceFormat: stri
  * Returns absolute path of the .txt file stored under temp.
  */
 export async function ensureTxtFile(localFilePath: string): Promise<string> {
-  const ext = path.extname(localFilePath).toLowerCase().replace(/^\./, "");
-  const tempDir = await ensureTempDir();
-
-  // quick pass-through extensions
-  const pass = new Set(["txt", "md", "csv", "json", "html", "htm"]);
-  if (pass.has(ext)) {
-    const buf = await fsp.readFile(localFilePath);
-    const text = buf.toString("utf8");
-    const out = path.join(tempDir, `${Date.now()}_${path.basename(localFilePath, path.extname(localFilePath))}.txt`);
-    await fsp.writeFile(out, text, "utf8");
-    return out;
-  }
-
-  // Otherwise attempt conversion to markdown via service, then write .txt (keeping markdown text content)
   try {
+    const ext = path.extname(localFilePath).toLowerCase().replace(/^\./, "");
+    const tempDir = await ensureTempDir();
+
+    // quick pass-through extensions
+    const pass = new Set(["txt", "md", "csv", "json", "html", "htm"]);
+    if (pass.has(ext)) {
+      const buf = await fsp.readFile(localFilePath);
+      const text = buf.toString("utf8");
+      const out = path.join(tempDir, `${Date.now()}_${path.basename(localFilePath, path.extname(localFilePath))}.txt`);
+      await fsp.writeFile(out, text, "utf8");
+      return out;
+    }
+
+    // Otherwise attempt conversion to markdown via service, then write .txt (keeping markdown text content)
     const mdPath = await convertFileViaService(localFilePath, ext, "md");
     const mdText = await fsp.readFile(mdPath, "utf8");
     const out = path.join(tempDir, `${Date.now()}_${path.basename(localFilePath, path.extname(localFilePath))}.txt`);
     await fsp.writeFile(out, mdText, "utf8");
     return out;
-  } catch (err) {
-    logger.error("ensureTxtFile: conversion fallback failed", { file: localFilePath, err: String(err) });
-    throw err;
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logger.error("ensureTxtFile failed", { file: localFilePath, err: errMsg });
+    return "";
   }
 }
 

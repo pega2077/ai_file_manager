@@ -9,6 +9,7 @@ import React, {
 import { Button, Modal, Select, TreeSelect, message } from "antd";
 import { useTranslation } from "../shared/i18n/I18nProvider";
 import { apiService } from "../services/api";
+import type { ApiError } from "../services/api";
 import type {
   DirectoryStructureResponse,
   RecommendDirectoryResponse,
@@ -25,6 +26,25 @@ type FileImportProps = {
   onImported?: () => void;
 };
 
+const CONVERSION_ERROR_CODES = new Set([
+  "CONVERSION_FAILED",
+  "CONVERSION_ERROR",
+  "IMPORT_RAG_ERROR",
+  "PANDOC_NOT_FOUND",
+  "PANDOC_NOT_AVAILABLE",
+  "MARKITDOWN_ERROR",
+  "CONVERTER_UNAVAILABLE",
+]);
+
+const CONVERSION_KEYWORDS = [
+  "convert",
+  "conversion",
+  "pandoc",
+  "markitdown",
+  "转换",
+  "转化",
+];
+
 export type FileImportRef = {
   startImport: () => Promise<void> | void;
   importFile: (filePath: string) => Promise<void>;
@@ -33,6 +53,74 @@ export type FileImportRef = {
 const FileImport = forwardRef<FileImportRef, FileImportProps>(
   ({ onImported }, ref) => {
     const { t } = useTranslation();
+    const getConversionMessage = useCallback(
+      (error: unknown): string | null => {
+        if (!error) {
+          return null;
+        }
+
+        const maybeApiError = error as Partial<ApiError> | null | undefined;
+        const code = typeof maybeApiError?.code === "string" ? maybeApiError.code : undefined;
+
+        const messages: string[] = [];
+
+        if (typeof (error as { message?: unknown }).message === "string") {
+          messages.push((error as { message: string }).message);
+        }
+
+        const details = maybeApiError?.details;
+        if (typeof details === "string") {
+          messages.push(details);
+        } else if (details && typeof details === "object") {
+          const detailMessage = (details as { message?: unknown }).message;
+          if (typeof detailMessage === "string") {
+            messages.push(detailMessage);
+          }
+        }
+
+        const payload = maybeApiError?.payload;
+        if (payload && typeof payload === "object") {
+          const payloadMessage = (payload as { message?: unknown }).message;
+          if (typeof payloadMessage === "string") {
+            messages.push(payloadMessage);
+          }
+          const nestedErrorMessage = (payload as { error?: { message?: string } }).error?.message;
+          if (typeof nestedErrorMessage === "string") {
+            messages.push(nestedErrorMessage);
+          }
+        }
+
+        const normalizedMessages = messages
+          .map((msg) => msg.trim())
+          .filter((msg) => msg.length > 0);
+
+        const aggregated = normalizedMessages.join(" ").toLowerCase();
+        const hasConversionCode = code ? CONVERSION_ERROR_CODES.has(code) : false;
+        const hasKeywordHit = aggregated.length > 0
+          ? CONVERSION_KEYWORDS.some((keyword) => aggregated.includes(keyword))
+          : false;
+
+        if (!hasConversionCode && !hasKeywordHit) {
+          return null;
+        }
+
+        const primary = normalizedMessages.find((msg) => msg.length > 0) ?? "";
+        const normalizedPrimary = primary.toLowerCase();
+
+        const genericMessages = new Set([
+          "conversion failed",
+          "conversion error",
+          "file conversion failed",
+        ]);
+
+        if (!primary || genericMessages.has(normalizedPrimary)) {
+          return t("files.messages.conversionError");
+        }
+
+        return t("files.messages.conversionErrorWithReason", { reason: primary });
+      },
+      [t],
+    );
 
     // Local states
     const [workDirectory, setWorkDirectory] = useState<string>("workdir");
@@ -257,23 +345,44 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
                 notifyProgress("import-rag", "success", t("files.messages.importedRagSuccess"));
                 message.success(t("files.messages.importedRagSuccess"));
               } else {
-                notifyProgress("import-rag", "success", t("files.messages.saveSuccessRagFailed"));
-                message.warning(t("files.messages.saveSuccessRagFailed"));
+                const failureMessage = getConversionMessage({
+                  message: ragResponse.error?.message ?? ragResponse.message,
+                  code: ragResponse.error?.code,
+                  details: ragResponse.error?.details,
+                  payload: ragResponse,
+                });
+                const displayMessage = failureMessage ?? t("files.messages.saveSuccessRagFailed");
+                notifyProgress("import-rag", failureMessage ? "error" : "success", displayMessage);
+                if (failureMessage) {
+                  message.error(displayMessage);
+                } else {
+                  message.warning(displayMessage);
+                }
               }
             }
           } finally {
             if (hideLoading) hideLoading();
           }
         } catch (error) {
-          notifyProgress("import-rag", "success", t("files.messages.saveSuccessRagFailed"));
-          message.warning(t("files.messages.saveSuccessRagFailed"));
+          const conversionMessage = getConversionMessage(error);
+          const fallback = t("files.messages.saveSuccessRagFailed");
+          const messageToShow = conversionMessage ?? fallback;
+          notifyProgress("import-rag", "error", messageToShow);
+          if (conversionMessage) {
+            message.error(messageToShow);
+          } else {
+            message.warning(messageToShow);
+          }
           window.electronAPI?.logError?.(
             "importToRag (handleRagImport) failed",
-            { err: String(error) }
+            {
+              err: String(error),
+              conversionMessage: conversionMessage ?? undefined,
+            }
           );
         }
       },
-      [t, notifyProgress]
+      [t, notifyProgress, getConversionMessage]
     );
 
     const showImportConfirmationDialog = useCallback(
@@ -481,16 +590,27 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           );
         } catch (err) {
           loadingKey();
-          message.error(t("files.messages.getRecommendationFailed"));
+          const conversionMessage = getConversionMessage(err);
+          const fallback = t("files.messages.getRecommendationFailed");
+          const displayMessage = conversionMessage ?? fallback;
+          message.error(displayMessage);
           window.electronAPI?.logError?.("recommendDirectory HTTP error", {
             err: String(err),
+            conversionMessage: conversionMessage ?? undefined,
           });
-          notifyError(err, t("files.messages.getRecommendationFailed"));
+          notifyError(err, displayMessage);
           return;
         }
         loadingKey();
         if (!recommendResponse.success) {
+          const conversionMessage = getConversionMessage({
+            message: recommendResponse.error?.message ?? recommendResponse.message,
+            code: recommendResponse.error?.code,
+            details: recommendResponse.error?.details,
+            payload: recommendResponse,
+          });
           const errMsg =
+            conversionMessage ||
             recommendResponse.message ||
             t("files.messages.getRecommendationFailed");
           message.error(errMsg);
@@ -559,23 +679,37 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
                   );
                   message.success(t("files.messages.importedRagSuccess"));
                 } else {
-                  notifyProgress(
-                    "import-rag",
-                    "success",
-                    t("files.messages.saveSuccessRagFailed")
-                  );
-                  message.warning(t("files.messages.saveSuccessRagFailed"));
+                  const failureMessage = getConversionMessage({
+                    message: ragResponse.error?.message ?? ragResponse.message,
+                    code: ragResponse.error?.code,
+                    details: ragResponse.error?.details,
+                    payload: ragResponse,
+                  });
+                  const fallback = t("files.messages.saveSuccessRagFailed");
+                  const displayMessage = failureMessage ?? fallback;
+                  notifyProgress("import-rag", failureMessage ? "error" : "success", displayMessage);
+                  if (failureMessage) {
+                    message.error(displayMessage);
+                  } else {
+                    message.warning(displayMessage);
+                  }
                 }
               } catch (e) {
-                notifyProgress(
-                  "import-rag",
-                  "success",
-                  t("files.messages.saveSuccessRagFailed")
-                );
-                message.warning(t("files.messages.saveSuccessRagFailed"));
+                const fallback = t("files.messages.saveSuccessRagFailed");
+                const conversionMessage = getConversionMessage(e);
+                const displayMessage = conversionMessage ?? fallback;
+                notifyProgress("import-rag", "error", displayMessage);
+                if (conversionMessage) {
+                  message.error(displayMessage);
+                } else {
+                  message.warning(displayMessage);
+                }
                 window.electronAPI?.logError?.(
                   "importToRag (auto classify) failed",
-                  { err: String(e) }
+                  {
+                    err: String(e),
+                    conversionMessage: conversionMessage ?? undefined,
+                  }
                 );
               } finally {
                 hideLoadingRag?.();
@@ -612,6 +746,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         notifyProgress,
         notifySuccess,
         notifyError,
+        getConversionMessage,
       ]
     );
 
@@ -748,26 +883,38 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
                     );
                     message.success(t("files.messages.importedRagSuccess"));
                   } else {
-                    notifyProgress(
-                      "import-rag",
-                      "success",
-                      t("files.messages.saveSuccessRagFailed")
-                    );
-                    message.warning(t("files.messages.saveSuccessRagFailed"));
+                    const failureMessage = getConversionMessage({
+                      message: ragResponse.error?.message ?? ragResponse.message,
+                      code: ragResponse.error?.code,
+                      details: ragResponse.error?.details,
+                      payload: ragResponse,
+                    });
+                    const fallback = t("files.messages.saveSuccessRagFailed");
+                    const displayMessage = failureMessage ?? fallback;
+                    notifyProgress("import-rag", failureMessage ? "error" : "success", displayMessage);
+                    if (failureMessage) {
+                      message.error(displayMessage);
+                    } else {
+                      message.warning(displayMessage);
+                    }
                   }
                 }
               } finally {
                 if (hideLoading) hideLoading();
               }
             } catch (e) {
-              notifyProgress(
-                "import-rag",
-                "success",
-                t("files.messages.saveSuccessRagFailed")
-              );
-              message.warning(t("files.messages.saveSuccessRagFailed"));
+              const fallback = t("files.messages.saveSuccessRagFailed");
+              const conversionMessage = getConversionMessage(e);
+              const displayMessage = conversionMessage ?? fallback;
+              notifyProgress("import-rag", "error", displayMessage);
+              if (conversionMessage) {
+                message.error(displayMessage);
+              } else {
+                message.warning(displayMessage);
+              }
               window.electronAPI?.logError?.("importToRag (confirm) failed", {
                 err: String(e),
+                conversionMessage: conversionMessage ?? undefined,
               });
             }
           }

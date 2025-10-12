@@ -151,6 +151,9 @@
         "invalidTarget": "目标文件夹路径是必需的",
         "emptyStructure": "文件夹结构不能为空",
         "failure": "创建文件夹结构失败"
+      },
+      "errors": {
+        "textConversionFailed": "文件转换为文本失败"
       }
     },
     "common": {
@@ -481,7 +484,9 @@
       "importedRagSuccess": "文件已成功导入RAG库",
       "saveSuccessRagFailed": "文件保存成功，但导入RAG库失败",
       "describingImage": "正在描述图片内容以便分析...",
-      "imageDescription": "图片描述：{text}"
+      "imageDescription": "图片描述：{text}",
+      "conversionError": "文件转换失败，请检查转换服务配置。",
+      "conversionErrorWithReason": "文件转换失败：{reason}"
     ,
       "updateSuccess": "文件已更新",
       "updateFailed": "更新文件失败",
