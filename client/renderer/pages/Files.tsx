@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Layout, Button, message, Select, Table, Input, Tag, Space, Pagination, Modal, Form } from 'antd';
+import { Layout, Button, message, Select, Table, Input, Tag, Space, Pagination, Modal, Form, Checkbox } from 'antd';
 import type { TableProps } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { ReloadOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined, QuestionCircleOutlined, FileAddOutlined, FolderAddOutlined, EditOutlined } from '@ant-design/icons';
+import { ReloadOutlined, EyeOutlined, FolderOpenOutlined, FileTextOutlined, SearchOutlined, CheckCircleOutlined, CloseCircleOutlined, DatabaseOutlined, QuestionCircleOutlined, FileAddOutlined, FolderAddOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import FilePreview from "../components/FilePreview";
@@ -61,6 +61,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
   const [editVisible, setEditVisible] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editingFile, setEditingFile] = useState<ImportedFileItem | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editForm] = Form.useForm<{ name: string; category: string; tags: string[]; path?: string; type?: string }>();
 
   // 获取文件列表
@@ -153,6 +154,50 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
       message.error(t('files.messages.importToRagFailed', { name: file.name }));
       console.error('导入知识库失败:', error);
     }
+  };
+
+  const handleDelete = (file: ImportedFileItem) => {
+    let deleteFromDisk = false;
+    Modal.confirm({
+      title: t('files.delete.confirmTitle', { name: file.name }),
+      content: (
+        <div>
+          <p>{t('files.delete.confirmMessage', { name: file.name })}</p>
+          <Checkbox onChange={(e) => { deleteFromDisk = e.target.checked; }}>
+            {t('files.delete.deleteFromDiskLabel')}
+          </Checkbox>
+        </div>
+      ),
+      okText: t('files.delete.okText') || t('common.confirm'),
+      cancelText: t('common.cancel'),
+      okButtonProps: { danger: true },
+      icon: <ExclamationCircleOutlined style={{ color: '#faad14' }} />,
+      async onOk() {
+        let handled = false;
+        setDeletingId(file.file_id);
+        try {
+          const resp = await apiService.deleteFile({ file_id: file.file_id, deleteFromDisk });
+          if (!resp.success) {
+            handled = true;
+            const errMsg = resp.message || t('files.messages.deleteFailed', { name: file.name });
+            message.error(errMsg);
+            throw new Error(errMsg);
+          }
+          message.success(t('files.messages.deleteSuccess', { name: file.name }));
+          const nextPage = files.length === 1 && pagination.current_page > 1
+            ? pagination.current_page - 1
+            : pagination.current_page;
+          await fetchFiles(nextPage);
+        } catch (error) {
+          if (!handled) {
+            message.error(t('files.messages.deleteFailed', { name: file.name }));
+          }
+          throw error;
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
   };
 
   // Open edit modal
@@ -386,6 +431,15 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
             icon={<EditOutlined />}
             onClick={() => openEdit(record)}
             title={t('files.actions.editFile') || 'Edit'}
+          />
+          <Button
+            type="text"
+            icon={<DeleteOutlined />}
+            danger
+            onClick={() => handleDelete(record)}
+            title={t('files.actions.delete') || 'Delete'}
+            loading={deletingId === record.file_id}
+            disabled={deletingId === record.file_id}
           />
         </Space>
       ),

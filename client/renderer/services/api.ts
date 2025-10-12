@@ -772,6 +772,17 @@ class ApiService {
     });
   }
 
+  // 删除文件记录，可选删除磁盘文件
+  async deleteFile(payload: { file_id: string; deleteFromDisk?: boolean }) {
+    return this.request('/files/delete', {
+      method: 'POST',
+      body: JSON.stringify({
+        file_id: payload.file_id,
+        confirm_delete: Boolean(payload.deleteFromDisk),
+      }),
+    });
+  }
+
   // 创建单个目录
   async createDirectory(directoryPath: string) {
     return this.request('/files/create-directory', {

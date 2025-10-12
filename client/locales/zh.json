@@ -410,13 +410,20 @@
       "openFile": "打开文件",
       "importToRag": "导入知识库",
       "askQuestion": "提问",
-      "editFile": "编辑"
+      "editFile": "编辑",
+      "delete": "删除"
     },
     "edit": {
       "modalTitle": "编辑文件",
       "nameLabel": "名称",
       "categoryLabel": "分类",
       "tagsLabel": "标签"
+    },
+    "delete": {
+      "confirmTitle": "删除“{name}”？",
+      "confirmMessage": "将从知识库中移除该文件记录，此操作不可撤销。",
+      "deleteFromDiskLabel": "同时删除磁盘上的文件",
+      "okText": "删除"
     },
     "placeholders": {
       "searchFileName": "搜索文件名",
@@ -490,7 +497,9 @@
     ,
       "updateSuccess": "文件已更新",
       "updateFailed": "更新文件失败",
-      "editInvalidName": "请输入合法的文件名"
+      "editInvalidName": "请输入有效的文件名",
+      "deleteSuccess": "已删除文件“{name}”",
+      "deleteFailed": "删除文件“{name}”失败"
     },
     "createFolder": {
       "modalTitle": "创建文件夹",

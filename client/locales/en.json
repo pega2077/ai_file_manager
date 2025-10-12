@@ -411,13 +411,20 @@
       "openFile": "Open File",
       "importToRag": "Import to Knowledge Base",
       "askQuestion": "Ask Question",
-      "editFile": "Edit"
+      "editFile": "Edit",
+      "delete": "Delete"
     },
     "edit": {
       "modalTitle": "Edit File",
       "nameLabel": "Name",
       "categoryLabel": "Category",
       "tagsLabel": "Tags"
+    },
+    "delete": {
+      "confirmTitle": "Delete \"{name}\"?",
+      "confirmMessage": "The file record will be removed from the knowledge base. This action cannot be undone.",
+      "deleteFromDiskLabel": "Also delete the file from disk",
+      "okText": "Delete"
     },
     "placeholders": {
       "searchFileName": "Search file name",
@@ -488,7 +495,9 @@
     ,
       "updateSuccess": "File updated",
       "updateFailed": "Failed to update file",
-      "editInvalidName": "Please enter a valid file name"
+      "editInvalidName": "Please enter a valid file name",
+      "deleteSuccess": "File \"{name}\" deleted",
+      "deleteFailed": "Failed to delete file \"{name}\""
     },
     "createFolder": {
       "modalTitle": "Create Folder",
