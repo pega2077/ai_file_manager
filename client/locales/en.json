@@ -265,6 +265,7 @@
     "actions": {
       "login": "Sign in",
       "register": "Create account",
+      "logout": "Sign out",
       "back": "Back",
       "backToSettings": "Return to Settings"
     },
@@ -282,7 +283,11 @@
       "apiKeySuccess": "API key retrieved and saved",
       "apiKeyFailed": "Failed to fetch API key",
       "noApiKey": "No API key",
-      "noToken": "No token"
+      "noToken": "No token",
+      "logoutConfirmTitle": "Sign out?",
+      "logoutConfirmMessage": "Signing out removes the saved API key and token for the Pega provider.",
+      "logoutSuccess": "Signed out successfully.",
+      "logoutFailed": "Sign out failed. Please try again."
     },
     "validation": {
       "passwordRequired": "Please enter a password",

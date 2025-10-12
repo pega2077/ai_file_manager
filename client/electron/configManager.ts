@@ -23,6 +23,7 @@ export interface AppConfig {
     pegaVisionModel?: string;
     pegaApiKey?: string;
     pegaAuthToken?: string;
+    pegaPreviousProvider?: AppConfig['llmProvider'];
   };
   bailian?: {
     /** Bailian (DashScope) OpenAI-compatible endpoint */
@@ -140,6 +141,7 @@ const DEFAULT_CONFIG: AppConfig = {
     pegaVisionModel: "qwen2.5vl:7b",
     pegaApiKey: undefined,
     pegaAuthToken: undefined,
+    pegaPreviousProvider: undefined,
   },
   openai: {
     openaiEndpoint: "https://api.openai.com/v1",

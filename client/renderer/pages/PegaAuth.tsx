@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Layout, Card, Tabs, Form, Input, Button, Typography, message } from 'antd';
+import { Layout, Card, Tabs, Form, Input, Button, Typography, message, Modal } from 'antd';
 import type { TabsProps } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
@@ -93,6 +93,8 @@ const PegaAuth = () => {
   const [registerLoading, setRegisterLoading] = useState(false);
   const [storedApiKey, setStoredApiKey] = useState('');
   const [storedToken, setStoredToken] = useState('');
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [previousProvider, setPreviousProvider] = useState<AppConfig['llmProvider'] | undefined>(undefined);
 
   useEffect(() => {
     let mounted = true;
@@ -106,6 +108,10 @@ const PegaAuth = () => {
         const savedToken = typeof cfg.pega?.pegaAuthToken === 'string' ? cfg.pega?.pegaAuthToken : '';
         setStoredApiKey(savedApiKey ?? '');
         setStoredToken(savedToken ?? '');
+        const fallbackProvider = ((cfg.llmProvider && cfg.llmProvider !== 'pega'
+          ? cfg.llmProvider
+          : cfg.pega?.pegaPreviousProvider) ?? 'ollama') as AppConfig['llmProvider'];
+        setPreviousProvider(fallbackProvider);
       } catch (error) {
         console.error('Failed to load pega config:', error);
       }
@@ -179,17 +185,23 @@ const PegaAuth = () => {
       }
 
       const currentConfig = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const previousProviderValue = ((currentConfig?.llmProvider && currentConfig.llmProvider !== 'pega'
+        ? currentConfig.llmProvider
+        : currentConfig?.pega?.pegaPreviousProvider) ?? 'ollama') as AppConfig['llmProvider'];
       const nextPegaConfig = {
         ...(currentConfig?.pega ?? {}),
         pegaApiKey: apiKey,
         pegaAuthToken: token,
+        pegaPreviousProvider: previousProviderValue,
       };
       await window.electronAPI.updateAppConfig({ llmProvider: 'pega', pega: nextPegaConfig });
       apiService.setProvider('pega');
 
       setStoredApiKey(apiKey);
       setStoredToken(token);
+      setPreviousProvider(previousProviderValue);
       message.success(apiKeyResponse.message || t('pegaAuth.messages.apiKeySuccess'));
+      loginForm.resetFields();
     } catch (error) {
       console.error('Login failed:', error);
       message.error(t('pegaAuth.messages.loginFailed'));
@@ -288,6 +300,61 @@ const PegaAuth = () => {
     },
   ];
 
+  const canLogout = Boolean(storedApiKey.trim() || storedToken.trim());
+
+  const performLogout = async () => {
+    setLogoutLoading(true);
+    try {
+      const currentConfig = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const fallbackProvider = ((currentConfig?.pega?.pegaPreviousProvider && currentConfig.pega.pegaPreviousProvider !== 'pega'
+        ? currentConfig.pega.pegaPreviousProvider
+        : previousProvider && previousProvider !== 'pega'
+          ? previousProvider
+          : undefined) ?? 'ollama') as AppConfig['llmProvider'];
+      const nextPegaConfig = {
+        ...(currentConfig?.pega ?? {}),
+        pegaApiKey: undefined,
+        pegaAuthToken: undefined,
+        pegaPreviousProvider: fallbackProvider,
+      };
+      const updates: Partial<AppConfig> = {
+        pega: nextPegaConfig,
+      };
+      if (currentConfig?.llmProvider === 'pega') {
+        updates.llmProvider = fallbackProvider;
+      }
+      await window.electronAPI.updateAppConfig(updates);
+      if (updates.llmProvider) {
+        apiService.setProvider(updates.llmProvider);
+      } else {
+        apiService.clearProviderCache();
+      }
+      setStoredApiKey('');
+      setStoredToken('');
+      setPreviousProvider(fallbackProvider);
+      message.success(t('pegaAuth.messages.logoutSuccess'));
+    } catch (error) {
+      console.error('Logout failed:', error);
+      message.error(t('pegaAuth.messages.logoutFailed'));
+    } finally {
+      setLogoutLoading(false);
+    }
+  };
+
+  const confirmLogout = () => {
+    if (!canLogout || logoutLoading) {
+      return;
+    }
+    Modal.confirm({
+      title: t('pegaAuth.messages.logoutConfirmTitle'),
+      content: t('pegaAuth.messages.logoutConfirmMessage'),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      okType: 'danger',
+      onOk: () => performLogout(),
+    });
+  };
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Content style={{ padding: '24px', background: '#fff' }}>
@@ -316,6 +383,16 @@ const PegaAuth = () => {
                   </div>
                 </div>
               </div>
+              <Button
+                danger
+                block
+                style={{ marginTop: 12 }}
+                onClick={confirmLogout}
+                disabled={!canLogout}
+                loading={logoutLoading}
+              >
+                {t('pegaAuth.actions.logout')}
+              </Button>
             </div>
 
             <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />

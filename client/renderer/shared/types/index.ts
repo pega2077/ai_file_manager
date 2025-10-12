@@ -120,6 +120,7 @@ export interface AppConfig {
     pegaVisionModel?: string;
     pegaApiKey?: string;
     pegaAuthToken?: string;
+    pegaPreviousProvider?: AppConfig['llmProvider'];
   };
   fileConvertEndpoint?: string;
   sqliteDbPath: string;

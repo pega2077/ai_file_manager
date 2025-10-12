@@ -1,13 +1,12 @@
 import { configManager } from "../../configManager";
 import type { SupportedLang } from "./promptHelper";
 import {
-  generateStructuredJsonWithOllama,
-  describeImageWithOllama,
-  embedWithOllama,
+  ollamaClient,
   type StructuredResponseFormat,
   type OllamaMessage,
-  type OllamaLikeProvider,
+  type DescribeImageOptions,
 } from "./ollama";
+import { pegaOllamaClient } from "./pegaOllama";
 import {
   embedWithOpenAI,
   generateStructuredJsonWithOpenAI,
@@ -85,8 +84,10 @@ export async function embedText(inputs: string[], overrideModel?: string): Promi
   if (provider === "bailian") {
     return embedWithBailian(inputs, overrideModel);
   }
-  const ollamaProvider: OllamaLikeProvider = provider === "pega" ? "pega" : "ollama";
-  return embedWithOllama(inputs, overrideModel, ollamaProvider);
+  if (provider === "pega") {
+    return pegaOllamaClient.embed(inputs, overrideModel);
+  }
+  return ollamaClient.embed(inputs, overrideModel);
 }
 
 export async function generateStructuredJson(
@@ -116,24 +117,22 @@ export async function generateStructuredJson(
     return generateStructuredJsonWithBailian(oaMessages, schema, temperature, maxTokens, overrideModel || undefined);
   }
   if (provider === "pega") {
-    return generateStructuredJsonWithOllama(
+    return pegaOllamaClient.generateStructuredJson(
       messages,
       responseFormat,
       temperature,
       maxTokens,
       overrideModel,
-      lang,
-      "pega"
+      lang
     );
   }
-  return generateStructuredJsonWithOllama(
+  return ollamaClient.generateStructuredJson(
     messages,
     responseFormat,
     temperature,
     maxTokens,
     overrideModel,
-    lang,
-    "ollama"
+    lang
   );
 }
 
@@ -161,12 +160,16 @@ export async function describeImage(
     return describeImageWithBailian(img, options?.prompt, options?.overrideModel, options?.timeoutMs, options?.maxTokens);
   }
   const imgs = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
-  const providerOverride: OllamaLikeProvider = provider === "pega" ? "pega" : "ollama";
-  return describeImageWithOllama(imgs, {
-    prompt: options?.prompt,
-    overrideModel: options?.overrideModel,
-    timeoutMs: options?.timeoutMs,
-    maxTokens: options?.maxTokens,
-    provider: providerOverride,
-  });
+  const describeOptions: DescribeImageOptions | undefined = options
+    ? {
+        prompt: options.prompt,
+        overrideModel: options.overrideModel,
+        timeoutMs: options.timeoutMs,
+        maxTokens: options.maxTokens,
+      }
+    : undefined;
+  if (provider === "pega") {
+    return pegaOllamaClient.describeImage(imgs, describeOptions);
+  }
+  return ollamaClient.describeImage(imgs, describeOptions);
 }
