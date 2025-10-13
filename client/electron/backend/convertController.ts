@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from "express";
-import { app } from "electron";
+import { app, BrowserWindow } from "electron";
 import path from "path";
 import fs from "fs";
 import { execFile } from "child_process";
@@ -21,6 +21,8 @@ const ARTICLE_FETCH_TIMEOUT_MS = 20000;
 const MAX_FILENAME_LENGTH = 120;
 
 const RESERVED_FILENAME_CHARS = new Set(["<", ">", ":", "\"", "/", "\\", "|", "?", "*"]);
+
+type HttpStatusError = Error & { statusCode?: number; statusMessage?: string; finalUrl?: string };
 
 function sanitizeFileBaseName(raw: string, fallback: string): string {
   const base = raw || fallback;
@@ -64,28 +66,149 @@ function extractTitle(html: string): string {
 
 async function fetchWebpage(targetUrl: string): Promise<{ html: string; finalUrl: string; contentType: string; title: string }>
 {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ARTICLE_FETCH_TIMEOUT_MS);
-  const headers: Record<string, string> = {};
-  const ua = process.env.WEB_FETCH_USER_AGENT?.trim();
-  if (ua) {
-    headers["User-Agent"] = ua;
-  } else {
-    headers["User-Agent"] = "AiFileManagerBot/1.0 (+https://pegamob.com)";
+  if (!app.isReady()) {
+    await app.whenReady().catch(() => void 0);
   }
-  try {
-    const resp = await fetch(targetUrl, { signal: controller.signal, headers });
-    if (!resp.ok) {
-      throw new Error(`HTTP ${resp.status}`);
-    }
-    const contentType = resp.headers.get("content-type") || "";
-    const html = await resp.text();
-    const finalUrl = resp.url || targetUrl;
-    const title = extractTitle(html);
-    return { html, finalUrl, contentType, title };
-  } finally {
-    clearTimeout(timer);
-  }
+
+  //const userAgent = process.env.WEB_FETCH_USER_AGENT?.trim() || "AiFileManagerBot/1.0 (+https://pegamob.com)";
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const win = new BrowserWindow({
+      show: false,
+      width: 1920,
+      height: 1080,
+      webPreferences: {
+        offscreen: true,
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
+        javascript: true,
+        webSecurity: true,
+        backgroundThrottling: false,
+      },
+    });
+
+    const session = win.webContents.session;
+    const statusInfo: {
+      statusCode?: number;
+      statusMessage?: string;
+      finalUrl?: string;
+      contentType?: string;
+    } = {};
+    const filter = { urls: ["*://*/*"] };
+
+    const onCompleted = (details: Electron.OnCompletedListenerDetails) => {
+      if (details.webContentsId !== win.webContents.id || details.resourceType !== "mainFrame") {
+        return;
+      }
+      statusInfo.statusCode = details.statusCode;
+      statusInfo.statusMessage = details.statusLine || "";
+      statusInfo.finalUrl = details.url;
+      const headerKey = Object.keys(details.responseHeaders || {}).find((key) => key.toLowerCase() === "content-type");
+      if (headerKey && details.responseHeaders) {
+        const value = details.responseHeaders[headerKey];
+        statusInfo.contentType = Array.isArray(value) ? value[0] : value;
+      }
+      if (details.statusCode >= 400 && !settled) {
+        settled = true;
+        cleanup();
+        const error: HttpStatusError = new Error(`http_error_${details.statusCode}`);
+        error.statusCode = details.statusCode;
+        error.statusMessage = details.statusLine || "";
+        error.finalUrl = details.url;
+        reject(error);
+      }
+    };
+
+    const onErrorOccurred = (details: Electron.OnErrorOccurredListenerDetails) => {
+      if (details.webContentsId !== win.webContents.id || details.resourceType !== "mainFrame" || settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      const error: HttpStatusError = new Error(`network_error: ${details.error || "unknown"}`);
+      error.statusMessage = details.error || "network error";
+      error.finalUrl = details.url;
+      reject(error);
+    };
+
+    session.webRequest.onCompleted(filter, onCompleted);
+    session.webRequest.onErrorOccurred(filter, onErrorOccurred);
+
+    const cleanup = () => {
+      if (!win.isDestroyed()) {
+        win.destroy();
+      }
+      clearTimeout(timeoutHandle);
+      session.webRequest.onCompleted(filter, null);
+      session.webRequest.onErrorOccurred(filter, null);
+    };
+
+    const timeoutHandle = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error("webpage_fetch_timeout"));
+    }, ARTICLE_FETCH_TIMEOUT_MS);
+
+    //win.webContents.setUserAgent(userAgent);
+
+    win.webContents.once("did-fail-load", (_event, errorCode, errorDesc) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(`failed_to_load_page: ${errorCode} ${errorDesc}`));
+    });
+
+    win.webContents.once("did-finish-load", async () => {
+      if (settled) return;
+      try {
+        if (typeof statusInfo.statusCode === "number" && statusInfo.statusCode >= 400) {
+          settled = true;
+          cleanup();
+          const error: HttpStatusError = new Error(`http_error_${statusInfo.statusCode}`);
+          error.statusCode = statusInfo.statusCode;
+          error.statusMessage = statusInfo.statusMessage || "";
+          error.finalUrl = statusInfo.finalUrl || win.webContents.getURL() || targetUrl;
+          reject(error);
+          return;
+        }
+
+        const data = await win.webContents.executeJavaScript(
+          `(() => ({
+            html: document.documentElement ? document.documentElement.outerHTML : document.body?.outerHTML || "",
+            title: document.title || "",
+            contentType: document.contentType || ""
+          }))();`
+        );
+        const finalUrl = statusInfo.finalUrl || win.webContents.getURL() || targetUrl;
+        const html = typeof data?.html === "string" ? data.html : "";
+        const title = typeof data?.title === "string" ? data.title : extractTitle(html);
+        const contentType =
+          typeof statusInfo.contentType === "string" && statusInfo.contentType
+            ? statusInfo.contentType
+            : typeof data?.contentType === "string"
+              ? data.contentType
+              : "";
+        settled = true;
+        cleanup();
+        resolve({ html, title, contentType, finalUrl });
+      } catch (err) {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(err);
+      }
+    });
+
+    win.loadURL(targetUrl).catch((err) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(err);
+    });
+  });
 }
 
 function getProjectRoot(): string {
@@ -276,12 +399,40 @@ export function registerConversionRoutes(appExp: Express): void {
       try {
         fetchResult = await fetchWebpage(normalizedUrl.toString());
       } catch (err) {
-        logger.error("/api/files/convert/webpage fetch failed", { url: normalizedUrl.toString(), error: String(err) });
+        const fetchError = err as HttpStatusError;
+        const statusCode = typeof fetchError.statusCode === "number" ? fetchError.statusCode : undefined;
+        const statusMessage = typeof fetchError.statusMessage === "string" ? fetchError.statusMessage : undefined;
+        const finalUrlOnError = typeof fetchError.finalUrl === "string" && fetchError.finalUrl ? fetchError.finalUrl : normalizedUrl.toString();
+        logger.error("/api/files/convert/webpage fetch failed", {
+          url: normalizedUrl.toString(),
+          finalUrl: finalUrlOnError,
+          statusCode,
+          statusMessage,
+          error: String(fetchError?.message || err),
+        });
+        const errorDetails = statusCode
+          ? {
+              code: "HTTP_STATUS_ERROR",
+              message: `Target URL responded with status ${statusCode}`,
+              details: {
+                status_code: statusCode,
+                status_message: statusMessage ?? "",
+                final_url: finalUrlOnError,
+              },
+            }
+          : {
+              code: "FETCH_FAILED",
+              message: "Failed to fetch target URL",
+              details: {
+                status_message: statusMessage ?? "",
+                final_url: finalUrlOnError,
+              },
+            };
         res.status(502).json({
           success: false,
           message: "fetch_failed",
           data: null,
-          error: { code: "FETCH_FAILED", message: "Failed to fetch target URL", details: null },
+          error: errorDetails,
           timestamp: new Date().toISOString(),
           request_id: "",
         });
