@@ -124,6 +124,34 @@ export interface ChatSearchResponse {
   metadata: ChatSearchMetadata;
 }
 
+export interface SemanticSearchContext {
+  prev_chunk?: string | null;
+  next_chunk?: string | null;
+}
+
+export interface SemanticSearchResult {
+  chunk_id: string;
+  file_id: string;
+  file_name: string;
+  file_path: string;
+  chunk_content: string;
+  chunk_index: number;
+  similarity_score: number;
+  context?: SemanticSearchContext | null;
+}
+
+export interface SemanticSearchMetadata {
+  query: string;
+  total_results: number;
+  search_time_ms: number;
+  embedding_time_ms?: number | null;
+}
+
+export interface SemanticSearchResponse {
+  results: SemanticSearchResult[];
+  search_metadata?: SemanticSearchMetadata | null;
+}
+
 export interface QuestionSource {
   file_id: string;
   file_name: string;
@@ -162,6 +190,33 @@ export interface SearchKnowledgeOptions {
   file_ids?: string[];
   categories?: string[];
   tags?: string[];
+}
+
+export interface SemanticSearchOptions {
+  limit?: number;
+  similarity_threshold?: number;
+  file_filters?: {
+    file_ids?: string[];
+    categories?: string[];
+    tags?: string[];
+    file_types?: string[];
+  };
+}
+
+export interface AskQuestionOptions {
+  context_limit?: number;
+  similarity_threshold?: number;
+  temperature?: number;
+  max_tokens?: number;
+  stream?: boolean;
+  language?: string;
+  override_model?: string;
+  providerOverride?: ProviderName;
+  file_filters?: {
+    file_ids?: string[];
+    categories?: string[];
+    tags?: string[];
+  };
 }
 
 export interface AnalyzeQuestionOptions {
@@ -639,6 +694,42 @@ class ApiService {
     });
   }
 
+  async semanticSearch(query: string, options?: SemanticSearchOptions): Promise<ApiResponse<SemanticSearchResponse>> {
+    const limit = Math.max(1, Math.min(50, Math.floor(options?.limit ?? 10)));
+    const similarityThreshold = Math.min(1, Math.max(0, options?.similarity_threshold ?? 0.7));
+    const payload: Record<string, unknown> = {
+      query,
+      limit,
+      similarity_threshold: similarityThreshold,
+    };
+
+    const filtersPayload: Record<string, unknown> = {};
+    const filters = options?.file_filters;
+    if (filters) {
+      if (filters.file_ids && filters.file_ids.length > 0) {
+        filtersPayload.file_ids = filters.file_ids;
+      }
+      if (filters.categories && filters.categories.length > 0) {
+        filtersPayload.categories = filters.categories;
+      }
+      if (filters.tags && filters.tags.length > 0) {
+        filtersPayload.tags = filters.tags;
+      }
+      if (filters.file_types && filters.file_types.length > 0) {
+        filtersPayload.file_types = filters.file_types;
+      }
+    }
+
+    if (Object.keys(filtersPayload).length > 0) {
+      payload.file_filters = filtersPayload;
+    }
+
+    return this.request<SemanticSearchResponse>('/search/semantic', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   async analyzeQuestion(
     question: string,
     selectedChunks: AnalyzeChunkSelection[],
@@ -794,95 +885,49 @@ class ApiService {
   }
 
   // 智能问答
-  async askQuestion(question: string, options?: {
-    context_limit?: number;
-    similarity_threshold?: number;
-    temperature?: number;
-    max_tokens?: number;
-    stream?: boolean;
-    file_ids?: string[];
-  }): Promise<ApiResponse<QuestionResponse>> {
-    const provider = await this.ensureProvider();
+  async askQuestion(question: string, options?: AskQuestionOptions): Promise<ApiResponse<QuestionResponse>> {
+    const provider = options?.providerOverride ?? (await this.ensureProvider());
     const contextLimit = Math.max(1, Math.floor(options?.context_limit ?? 5));
-    const similarityThreshold =
-      typeof options?.similarity_threshold === 'number'
-        ? options.similarity_threshold
-        : 0.5;
-
-    const searchResponse = await this.searchKnowledge(question, {
+    const similarityThreshold = Math.min(1, Math.max(0, options?.similarity_threshold ?? 0.7));
+    const temperature = typeof options?.temperature === 'number' ? options.temperature : 0.7;
+    const maxTokens = typeof options?.max_tokens === 'number' ? Math.max(100, Math.floor(options.max_tokens)) : 1000;
+    const payload: Record<string, unknown> = {
+      question,
       context_limit: contextLimit,
       similarity_threshold: similarityThreshold,
-      max_results: contextLimit * 4,
-      file_ids: options?.file_ids,
-    });
+      temperature,
+      max_tokens: maxTokens,
+      stream: Boolean(options?.stream),
+      provider,
+    };
 
-    if (!searchResponse.success) {
-      return searchResponse as unknown as ApiResponse<QuestionResponse>;
+    if (options?.override_model) {
+      payload.override_model = options.override_model;
     }
 
-    const searchData = searchResponse.data as ChatSearchResponse | undefined;
-    if (!searchData) {
-      const nowIso = new Date().toISOString();
-      return {
-        success: true,
-        message: 'no_context',
-        data: {
-          answer: 'No relevant context found. Please refine your search or import more documents.',
-          confidence: 0,
-          sources: [],
-          metadata: {
-            model_used: provider,
-            tokens_used: 0,
-            response_time_ms: 0,
-            retrieval_time_ms: 0,
-            generation_time_ms: 0,
-            retrieval_mode: 'none',
-          },
-        },
-        error: null,
-        timestamp: nowIso,
-        request_id: '',
-      };
+    if (options?.language) {
+      payload.language = options.language;
     }
 
-    const selections = searchData.results
-      .slice(0, contextLimit)
-      .map((item) => ({
-        chunk_record_id: item.chunk_record_id,
-        relevance_score: item.relevance_score,
-        match_reason: item.match_reason,
-      }));
-
-    if (selections.length === 0) {
-      const nowIso = new Date().toISOString();
-      return {
-        success: true,
-        message: 'no_context',
-        data: {
-          answer: 'No relevant context found. Please refine your search or import more documents.',
-          confidence: 0,
-          sources: [],
-          metadata: {
-            model_used: provider,
-            tokens_used: 0,
-            response_time_ms: searchData.metadata.response_time_ms,
-            retrieval_time_ms: searchData.metadata.retrieval_time_ms,
-            generation_time_ms: 0,
-            retrieval_mode: searchData.retrieval_mode,
-          },
-        },
-        error: null,
-        timestamp: nowIso,
-        request_id: '',
-      };
+    if (options?.file_filters) {
+      const fileFilters: Record<string, unknown> = {};
+      if (options.file_filters.file_ids && options.file_filters.file_ids.length > 0) {
+        fileFilters.file_ids = options.file_filters.file_ids;
+      }
+      if (options.file_filters.categories && options.file_filters.categories.length > 0) {
+        fileFilters.categories = options.file_filters.categories;
+      }
+      if (options.file_filters.tags && options.file_filters.tags.length > 0) {
+        fileFilters.tags = options.file_filters.tags;
+      }
+      if (Object.keys(fileFilters).length > 0) {
+        payload.file_filters = fileFilters;
+      }
     }
 
-    return this.analyzeQuestion(question, selections, {
-      context_limit: contextLimit,
-      temperature: options?.temperature,
-      max_tokens: options?.max_tokens,
-      similarity_threshold: similarityThreshold,
-      providerOverride: provider,
+    return this.request<QuestionResponse>('/chat/ask', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     });
   }
 

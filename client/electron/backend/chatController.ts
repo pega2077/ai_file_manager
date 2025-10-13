@@ -36,6 +36,8 @@ export function registerChatRoutes(app: Express) {
   app.post("/api/chat/search", chatSearchHandler);
   // POST /api/chat/analyze (LLM analysis step)
   app.post("/api/chat/analyze", chatAnalyzeHandler);
+  // POST /api/search/semantic (vector search API)
+  app.post("/api/search/semantic", semanticSearchHandler);
 }
 
 type ChatRecommendBody = {
@@ -407,6 +409,7 @@ type ParsedFileFilters = {
   file_ids?: string[];
   categories?: string[];
   tags?: string[];
+  file_types?: string[];
 };
 
 type MatchReason =
@@ -431,6 +434,7 @@ interface HydratedChunkRow {
   content: string;
   file_name: string;
   file_path: string;
+  file_type: string;
   file_category: string;
   file_tags: string | null;
   tags_array: string[];
@@ -468,6 +472,7 @@ function parseFileFilters(input: unknown): ParsedFileFilters {
     file_ids: parseList(obj.file_ids),
     categories: parseList(obj.categories),
     tags: parseList(obj.tags),
+    file_types: parseList(obj.file_types),
   };
 }
 
@@ -590,6 +595,18 @@ function filterRowsByFileFilters(
         return false;
       }
     }
+    if (filters.file_types && filters.file_types.length > 0) {
+      const normalizedRowType = row.file_type?.toLowerCase() ?? "";
+      if (!normalizedRowType) {
+        return false;
+      }
+      const normalizedFilters = filters.file_types.map((value) =>
+        value.toLowerCase()
+      );
+      if (!normalizedFilters.includes(normalizedRowType)) {
+        return false;
+      }
+    }
     return true;
   });
 }
@@ -670,6 +687,7 @@ async function hydrateChunkCandidates(
       content: chunk.content,
       file_name: file?.name ?? "",
       file_path: file?.path ?? "",
+      file_type: file?.type ?? "",
       file_category: file?.category ?? "",
       file_tags: file?.tags ?? null,
       tags_array: tagsArray,
@@ -1106,6 +1124,177 @@ type ChatAnalyzeBody = {
   override_model?: unknown;
   language?: unknown;
 };
+
+type SemanticSearchBody = {
+  query?: unknown;
+  limit?: unknown;
+  similarity_threshold?: unknown;
+  file_filters?: unknown;
+  include_context?: unknown;
+};
+
+export async function semanticSearchHandler(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const body = req.body as SemanticSearchBody | undefined;
+    const queryRaw =
+      typeof body?.query === "string"
+        ? body.query
+        : typeof body?.query === "number"
+        ? String(body.query)
+        : "";
+    const query = queryRaw.trim();
+    if (!query) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "query is required",
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const resolveNumber = (value: unknown, fallback: number): number => {
+      if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === "string") {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+      return fallback;
+    };
+
+    const rawLimit = resolveNumber(body?.limit, 10);
+    const rawSimilarity = resolveNumber(body?.similarity_threshold, 0.7);
+    const includeContext = body?.include_context === false ? false : true;
+
+    const limit = Math.max(1, Math.min(50, Math.floor(rawLimit)));
+    const similarityThreshold = Math.max(
+      0,
+      Math.min(1, rawSimilarity)
+    );
+
+    const filters = parseFileFilters(body?.file_filters);
+
+    const searchResult = await performVectorSearch(
+      query,
+      limit,
+      similarityThreshold,
+      filters
+    );
+
+    const rows = searchResult.rows.slice(0, limit);
+
+    let contextMap = new Map<string, ChunkAttributes>();
+    if (includeContext && rows.length > 0) {
+      const neighborConditions = new Map<
+        string,
+        { file_id: string; chunk_index: number }
+      >();
+      for (const row of rows) {
+        if (row.chunk_index > 0) {
+          const prevKey = `${row.file_id}:${row.chunk_index - 1}`;
+          if (!neighborConditions.has(prevKey)) {
+            neighborConditions.set(prevKey, {
+              file_id: row.file_id,
+              chunk_index: row.chunk_index - 1,
+            });
+          }
+        }
+        const nextKey = `${row.file_id}:${row.chunk_index + 1}`;
+        if (!neighborConditions.has(nextKey)) {
+          neighborConditions.set(nextKey, {
+            file_id: row.file_id,
+            chunk_index: row.chunk_index + 1,
+          });
+        }
+      }
+
+      const neighbors = neighborConditions.size
+        ? ((await ChunkModel.findAll({
+            where: { [Op.or]: Array.from(neighborConditions.values()) },
+            raw: true,
+          }).catch(() => [])) as ChunkAttributes[])
+        : [];
+
+      contextMap = new Map(
+        neighbors.map((chunk) => [
+          `${chunk.file_id}:${chunk.chunk_index}`,
+          chunk,
+        ])
+      );
+    }
+
+    const results = rows.map((row) => {
+      const prev = includeContext
+        ? contextMap.get(`${row.file_id}:${row.chunk_index - 1}`)?.content ??
+          null
+        : null;
+      const next = includeContext
+        ? contextMap.get(`${row.file_id}:${row.chunk_index + 1}`)?.content ??
+          null
+        : null;
+
+      return {
+        chunk_id: row.chunk_id,
+        file_id: row.file_id,
+        file_name: row.file_name,
+        file_path: row.file_path,
+        chunk_content: row.content,
+        chunk_index: row.chunk_index,
+        similarity_score: row.relevance_score,
+        context: includeContext
+          ? {
+              prev_chunk: prev,
+              next_chunk: next,
+            }
+          : undefined,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        results,
+        search_metadata: {
+          query,
+          total_results: searchResult.rows.length,
+          search_time_ms: searchResult.retrievalTimeMs,
+          embedding_time_ms: searchResult.embeddingTimeMs ?? null,
+        },
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/search/semantic failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Semantic search failed",
+        details: null,
+      },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
 
 export async function chatSearchHandler(
   req: Request,
