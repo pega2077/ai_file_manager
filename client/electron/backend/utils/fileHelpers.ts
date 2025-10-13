@@ -102,7 +102,7 @@ export function getExtension(filePath: string): string {
 
 // Category extensions mapping used by /api/files/list
 export const CATEGORY_EXTENSIONS: Record<string, string[]> = {
-  document: ["txt", "doc", "docx", "pdf", "ppt", "pptx", "rtf", "odt", "ods", "odp"],
+  document: ["txt", "doc", "docx", "pdf", "ppt", "pptx", "rtf", "odt", "ods", "odp","md", "html", "htm", "epub"],
   sheet: ["xlsx", "xls", "csv", "ods"],
   image: ["jpg", "png", "gif", "jpeg", "bmp", "tiff", "tif", "webp", "svg"],
   video: ["mp4", "avi", "mkv", "mov", "wmv", "flv", "webm", "m4v"],
