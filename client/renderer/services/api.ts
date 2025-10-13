@@ -2,7 +2,7 @@
 let ROOT_BASE_URL = 'http://localhost:8000';
 let API_BASE_URL = `${ROOT_BASE_URL}/api`;
 
-import { FileConversionResult, StageFileResponse } from '../shared/types';
+import { FileConversionResult, StageFileResponse, WebpageConversionResult } from '../shared/types';
 import type { AppConfig } from '../shared/types';
 
 // Function to update API base URL
@@ -791,6 +791,18 @@ class ApiService {
         file_path: payload.filePath,
         target_format: payload.targetFormat,
         output_directory: payload.outputDirectory,
+        overwrite: payload.overwrite ?? false,
+      }),
+    });
+  }
+
+  async convertWebpage(payload: { url: string; outputDirectory?: string; fileName?: string; overwrite?: boolean }) {
+    return this.request<WebpageConversionResult>('/files/convert/webpage', {
+      method: 'POST',
+      body: JSON.stringify({
+        url: payload.url,
+        output_directory: payload.outputDirectory,
+        file_name: payload.fileName,
         overwrite: payload.overwrite ?? false,
       }),
     });

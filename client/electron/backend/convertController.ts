@@ -5,6 +5,7 @@ import fs from "fs";
 import { execFile } from "child_process";
 import { logger } from "../logger";
 import { promises as fsp } from "fs";
+import { ensureTempDir } from "./utils/pathHelper";
 import { convertFileViaService } from "./utils/fileConversion";
 
 type FormatsData = {
@@ -16,6 +17,76 @@ type FormatsData = {
 
 let cachedFormats: { data: FormatsData; ts: number } | null = null;
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const ARTICLE_FETCH_TIMEOUT_MS = 20000;
+const MAX_FILENAME_LENGTH = 120;
+
+const RESERVED_FILENAME_CHARS = new Set(["<", ">", ":", "\"", "/", "\\", "|", "?", "*"]);
+
+function sanitizeFileBaseName(raw: string, fallback: string): string {
+  const base = raw || fallback;
+  let normalized = base;
+  try {
+    normalized = base.normalize("NFKD");
+  } catch {
+    normalized = base;
+  }
+  const filtered = Array.from(normalized)
+    .map((ch) => {
+      const code = ch.charCodeAt(0);
+      if (code < 32 || RESERVED_FILENAME_CHARS.has(ch)) {
+        return " ";
+      }
+      return ch;
+    })
+    .join("");
+  const compact = filtered.replace(/\s+/g, " ").trim();
+  if (!compact) {
+    return "article";
+  }
+  const truncated = compact.slice(0, MAX_FILENAME_LENGTH).replace(/[. ]+$/u, "");
+  const withoutExt = truncated.replace(/\.(md|markdown)$/iu, "");
+  return withoutExt || "article";
+}
+
+function extractTitle(html: string): string {
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (!match) return "";
+  const raw = match[1].replace(/\s+/g, " ").trim();
+  const entities: Record<string, string> = {
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&#39;": "'",
+  };
+  return raw.replace(/&[#a-zA-Z0-9]+;/g, (ent) => entities[ent] ?? ent);
+}
+
+async function fetchWebpage(targetUrl: string): Promise<{ html: string; finalUrl: string; contentType: string; title: string }>
+{
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ARTICLE_FETCH_TIMEOUT_MS);
+  const headers: Record<string, string> = {};
+  const ua = process.env.WEB_FETCH_USER_AGENT?.trim();
+  if (ua) {
+    headers["User-Agent"] = ua;
+  } else {
+    headers["User-Agent"] = "AiFileManagerBot/1.0 (+https://pegamob.com)";
+  }
+  try {
+    const resp = await fetch(targetUrl, { signal: controller.signal, headers });
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}`);
+    }
+    const contentType = resp.headers.get("content-type") || "";
+    const html = await resp.text();
+    const finalUrl = resp.url || targetUrl;
+    const title = extractTitle(html);
+    return { html, finalUrl, contentType, title };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function getProjectRoot(): string {
   try {
@@ -148,6 +219,158 @@ export function registerConversionRoutes(appExp: Express): void {
         message: "internal_error",
         data: null,
         error: { code: "INTERNAL_ERROR", message: "Failed to list Pandoc formats", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+    }
+  });
+
+  appExp.post("/api/files/convert/webpage", async (req: Request, res: Response) => {
+    try {
+      const body = req.body as {
+        url?: unknown;
+        output_directory?: unknown;
+        file_name?: unknown;
+        overwrite?: unknown;
+      } | undefined;
+
+      const urlRaw = typeof body?.url === "string" ? body.url.trim() : "";
+      const outputDirInput = typeof body?.output_directory === "string" ? body.output_directory.trim() : "";
+      const fileNameInput = typeof body?.file_name === "string" ? body.file_name.trim() : "";
+      const overwrite = typeof body?.overwrite === "boolean" ? body.overwrite : false;
+
+      if (!urlRaw) {
+        res.status(400).json({
+          success: false,
+          message: "invalid_request",
+          data: null,
+          error: { code: "INVALID_REQUEST", message: "url is required", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+
+      let normalizedUrl: URL;
+      try {
+        normalizedUrl = new URL(urlRaw);
+        if (!normalizedUrl.protocol.startsWith("http")) {
+          throw new Error("unsupported protocol");
+        }
+      } catch {
+        res.status(400).json({
+          success: false,
+          message: "invalid_request",
+          data: null,
+          error: { code: "INVALID_REQUEST", message: "url must be a valid http(s) URL", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+
+      const destinationDir = outputDirInput ? path.resolve(outputDirInput) : await ensureTempDir();
+      await fsp.mkdir(destinationDir, { recursive: true });
+
+      let fetchResult;
+      try {
+        fetchResult = await fetchWebpage(normalizedUrl.toString());
+      } catch (err) {
+        logger.error("/api/files/convert/webpage fetch failed", { url: normalizedUrl.toString(), error: String(err) });
+        res.status(502).json({
+          success: false,
+          message: "fetch_failed",
+          data: null,
+          error: { code: "FETCH_FAILED", message: "Failed to fetch target URL", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+
+      const { html, finalUrl, contentType, title } = fetchResult;
+      if (!html.trim()) {
+        res.status(422).json({
+          success: false,
+          message: "no_content",
+          data: null,
+          error: { code: "NO_CONTENT", message: "Readable content not found", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+
+      const tempDir = await ensureTempDir();
+      const htmlBase = sanitizeFileBaseName(fileNameInput || title, normalizedUrl.hostname || "article");
+      const tempHtmlPath = path.join(tempDir, `${Date.now()}_${htmlBase}.html`);
+      await fsp.writeFile(tempHtmlPath, html, "utf8");
+
+      let convertedPath = "";
+      try {
+        convertedPath = await convertFileViaService(tempHtmlPath, "html", "md");
+      } catch (error) {
+        logger.error("/api/files/convert/webpage conversion failed", {
+          url: finalUrl,
+          htmlPath: tempHtmlPath,
+          err: String(error),
+        });
+        res.status(502).json({
+          success: false,
+          message: "conversion_failed",
+          data: null,
+          error: { code: "CONVERSION_FAILED", message: "Failed to convert webpage content", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+
+      const baseName = sanitizeFileBaseName(fileNameInput || title, normalizedUrl.hostname || "article");
+      const buildOutPath = (suffix?: string) => path.join(destinationDir, `${baseName}${suffix ? ` ${suffix}` : ""}.md`);
+      let outPath = buildOutPath();
+      if (!overwrite) {
+        for (let idx = 1; idx <= 1000; idx += 1) {
+          const exists = await fsp
+            .access(outPath)
+            .then(() => true)
+            .catch(() => false);
+          if (!exists) break;
+          outPath = buildOutPath(`(${idx})`);
+        }
+      }
+
+      await fsp.copyFile(convertedPath, outPath);
+      const outStat = await fsp.stat(outPath).catch(() => null);
+      const size = outStat?.size ?? 0;
+      logger.info("Webpage converted via service", { sourceUrl: finalUrl, htmlPath: tempHtmlPath, output: outPath, size });
+
+      res.status(200).json({
+        success: true,
+        message: "ok",
+        data: {
+          source_url: finalUrl,
+          title,
+          byline: "",
+          excerpt: "",
+          content_type: contentType,
+          html_temp_file_path: tempHtmlPath,
+          output_file_path: outPath,
+          output_format: "md",
+          size,
+          message: "converted",
+        },
+        error: null,
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+    } catch (err) {
+      logger.error("/api/files/convert/webpage failed", err as unknown);
+      res.status(500).json({
+        success: false,
+        message: "internal_error",
+        data: null,
+        error: { code: "INTERNAL_ERROR", message: "Unhandled exception", details: null },
         timestamp: new Date().toISOString(),
         request_id: "",
       });

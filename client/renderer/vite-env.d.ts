@@ -8,6 +8,7 @@ declare global {
       openFolder: (filePath: string) => Promise<boolean>
       selectFile: () => Promise<string | null>
       copyToClipboard: (text: string) => Promise<boolean>
+  readClipboardText: () => Promise<string>
       importFile: () => Promise<{ success: boolean; message: string }>
       getApiBaseUrl: () => Promise<string>
       setApiBaseUrl: (url: string) => Promise<boolean>

@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFolder: (filePath: string) => ipcRenderer.invoke('open-folder', filePath),
   selectFile: () => ipcRenderer.invoke('select-file'),
   copyToClipboard: (text: string) => ipcRenderer.invoke('copy-to-clipboard', text),
+  readClipboardText: () => ipcRenderer.invoke('read-clipboard-text'),
   importFile: () => ipcRenderer.invoke('import-file'),
   getApiBaseUrl: () => ipcRenderer.invoke('get-api-base-url'),
   setApiBaseUrl: (url: string) => ipcRenderer.invoke('set-api-base-url', url),

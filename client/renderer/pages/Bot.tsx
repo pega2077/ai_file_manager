@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import botLoadingImage from '../assets/mona-loading-default.gif';
 import botStaticImage from '../assets/mona-loading-default-static.png';
 import { message, Menu, Button, Tooltip } from 'antd';
@@ -9,6 +9,16 @@ import {
   FileImportNotification,
   subscribeFileImportNotifications,
 } from '../shared/events/fileImportEvents';
+import { apiService } from '../services/api';
+
+const isValidHttpUrl = (value: string): boolean => {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
 
 const Bot: React.FC = () => {
   const { t } = useTranslation();
@@ -20,6 +30,7 @@ const Bot: React.FC = () => {
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [webImporting, setWebImporting] = useState(false);
 
   // Work directory handling moved into FileImport component.
 
@@ -36,6 +47,85 @@ const Bot: React.FC = () => {
     setMenuPosition({ x: e.clientX, y: e.clientY });
     setMenuVisible(true);
   };
+
+  const readClipboardText = useCallback(async (): Promise<string> => {
+    if (navigator?.clipboard?.readText) {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          return text;
+        }
+      } catch (error) {
+        window.electronAPI?.logError?.('bot-read-clipboard-browser-failed', {
+          err: String(error),
+        });
+      }
+    }
+
+    if (window.electronAPI?.readClipboardText) {
+      try {
+        return await window.electronAPI.readClipboardText();
+      } catch (error) {
+        window.electronAPI?.logError?.('bot-read-clipboard-electron-failed', {
+          err: String(error),
+        });
+      }
+    }
+
+    return '';
+  }, []);
+
+  const handleFileImport = useCallback(async (filePath: string) => {
+    try {
+      await importRef.current?.importFile(filePath);
+    } catch (error) {
+      window.electronAPI?.logError?.('bot-handle-file-import-failed', {
+        err: String(error),
+      });
+      message.error(t('files.messages.fileImportFailed'));
+    }
+  }, [t]);
+
+  const handleWebImport = useCallback(async (rawUrl: string) => {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) {
+      message.warning(t('bot.messages.invalidUrl'));
+      return;
+    }
+    if (!isValidHttpUrl(trimmed)) {
+      message.error(t('bot.messages.invalidUrl'));
+      return;
+    }
+    if (webImporting) {
+      message.info(t('bot.messages.webImportInProgress'));
+      return;
+    }
+
+    setMenuVisible(false);
+    setWebImporting(true);
+    setStatusMessage(t('bot.messages.fetchingWebpage'));
+
+    let hideLoading: (() => void) | undefined;
+    try {
+      hideLoading = message.loading(t('bot.messages.fetchingWebpage'), 0);
+      const response = await apiService.convertWebpage({ url: trimmed });
+      const data = response.data;
+      if (!data || !data.output_file_path) {
+        throw new Error('missing_output_path');
+      }
+      await handleFileImport(data.output_file_path);
+      message.success(t('bot.messages.webImportSuccess'));
+    } catch (error) {
+      window.electronAPI?.logError?.('bot-web-import-failed', {
+        url: trimmed,
+        err: String(error),
+      });
+      message.error(t('bot.messages.webImportFailed'));
+    } finally {
+      if (hideLoading) hideLoading();
+      setWebImporting(false);
+    }
+  }, [handleFileImport, t, webImporting]);
 
   const handleMenuClick = async (key: string) => {
     setMenuVisible(false);
@@ -57,6 +147,20 @@ const Bot: React.FC = () => {
         await window.electronAPI.hideBotWindow();
       } catch (error) {
         console.error('Failed to hide bot window:', error);
+      }
+    } else if (key === 'pasteUrl') {
+      try {
+        const urlFromClipboard = await readClipboardText();
+        if (!urlFromClipboard) {
+          message.warning(t('bot.messages.clipboardEmpty'));
+          return;
+        }
+        await handleWebImport(urlFromClipboard);
+      } catch (error) {
+        window.electronAPI?.logError?.('bot-paste-url-failed', {
+          err: String(error),
+        });
+        message.error(t('bot.messages.webImportFailed'));
       }
     } else if (key === 'openWorkdir') {
       try {
@@ -123,18 +227,6 @@ const Bot: React.FC = () => {
 
   const handleMouseUp = () => {
     isDragging.current = false;
-  };
-
-  // Use FileImport to process files
-  const handleFileImport = async (filePath: string) => {
-    try {
-      await importRef.current?.importFile(filePath);
-    } catch (error) {
-      window.electronAPI?.logError?.('bot-handle-file-import-failed', {
-        err: String(error),
-      });
-      message.error(t('files.messages.fileImportFailed'));
-    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -214,6 +306,25 @@ const Bot: React.FC = () => {
       unsubscribe();
     };
   }, [t]);
+
+  useEffect(() => {
+    const handlePasteEvent = (event: ClipboardEvent) => {
+      const pastedText = event.clipboardData?.getData('text')?.trim();
+      if (!pastedText) {
+        return;
+      }
+      if (!isValidHttpUrl(pastedText)) {
+        return;
+      }
+      event.preventDefault();
+      void handleWebImport(pastedText);
+    };
+
+    window.addEventListener('paste', handlePasteEvent);
+    return () => {
+      window.removeEventListener('paste', handlePasteEvent);
+    };
+  }, [handleWebImport]);
 
   useEffect(() => {
     if (!statusMessage) {
@@ -354,6 +465,7 @@ const Bot: React.FC = () => {
         >
           <Menu onClick={({ key }) => handleMenuClick(key as string)}>
             <Menu.Item key="importFile">{t('bot.menu.importFile')}</Menu.Item>
+            <Menu.Item key="pasteUrl" disabled={webImporting}>{t('bot.menu.pasteUrl')}</Menu.Item>
             <Menu.Item key="openWorkdir">{t('bot.menu.openWorkdir')}</Menu.Item>
             <Menu.Item key="showMain">{t('bot.menu.showMain')}</Menu.Item>
             <Menu.Item key="hideBot">{t('bot.menu.hideBot')}</Menu.Item>

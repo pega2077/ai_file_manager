@@ -34,6 +34,7 @@ export default defineConfig({
                 'sharp',
                 '@img/sharp-win32-x64',
                 '@img/sharp-wasm32',
+                'jsdom'
               ],
             },
           },

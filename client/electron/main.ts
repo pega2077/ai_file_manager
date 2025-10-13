@@ -313,6 +313,15 @@ function setupIpcHandlers() {
     }
   });
 
+  ipcMain.handle("read-clipboard-text", () => {
+    try {
+      return clipboard.readText();
+    } catch (error) {
+      logger.error("Failed to read clipboard text", error);
+      return "";
+    }
+  });
+
   // IPC handler for importing file
   ipcMain.handle("import-file", async () => {
     return { success: false, message: "Import service not initialized" };

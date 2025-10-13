@@ -319,7 +319,13 @@
       "openWorkdirFailed": "Failed to open work directory",
       "openFolderNotSupported": "Opening folders is not supported in this environment",
       "droppedFilePath": "FilePath: {path}",
-      "filesDroppedCount": "{count} files dropped"
+      "filesDroppedCount": "{count} files dropped",
+      "fetchingWebpage": "Fetching webpage content...",
+      "webImportSuccess": "Webpage content imported",
+      "webImportFailed": "Failed to import webpage content",
+      "invalidUrl": "Please provide a valid URL",
+      "clipboardEmpty": "Clipboard does not contain a URL",
+      "webImportInProgress": "Webpage import already in progress"
     }
     ,
     "menu": {
@@ -329,7 +335,8 @@
       "hideBot": "Hide Bot Window",
       "exitApp": "Exit Application",
       "botImageAlt": "Assistant Bot",
-      "search": "Search"
+      "search": "Search",
+      "pasteUrl": "Paste URL"
     }
   },
   "convert": {

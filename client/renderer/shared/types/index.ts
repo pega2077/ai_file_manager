@@ -102,6 +102,18 @@ export interface FileConversionResult {
   message: string;
 }
 
+export interface WebpageConversionResult {
+  source_url: string;
+  title: string;
+  byline: string;
+  excerpt: string;
+  content_type: string;
+  output_file_path: string;
+  output_format: string;
+  size: number;
+  message: string;
+}
+
 // Mirror of main process AppConfig for renderer typing convenience
 export interface AppConfig {
   useLocalService: boolean;
