@@ -199,7 +199,7 @@
       "autoClassify": "保存文件到推荐目录时跳过确认步骤。",
       "useLocalService": "启用后使用本地 Python 服务（通常为 http://localhost:8000），关闭后可配置远程 API 地址。",
       "workDirectory": "工作空间在初始化流程中设置，可通过重新运行向导进行修改。",
-      "apiBaseUrl": "Python 后端的基础地址（包含协议，例如 http://localhost:8000）。",
+      "apiBaseUrl": "本程序web服务的基础地址",
       "llmProvider": "影响目录推荐、嵌入与智能分析所使用的大模型来源。",
       "pegaApiKey": "保存在配置文件中，如已失效请重新登录获取。"
     },
@@ -435,7 +435,7 @@
       "okText": "删除"
     },
     "placeholders": {
-      "searchFileName": "搜索文件名",
+      "searchFileName": "按文件名、标签或分类搜索",
       "selectCategory": "选择分类",
       "selectType": "选择类型",
       "tagsCommaSeparated": "标签1, 标签2"

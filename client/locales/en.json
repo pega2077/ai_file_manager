@@ -200,7 +200,7 @@
       "autoClassify": "Skip confirmation dialogs when saving files to recommended directories.",
       "useLocalService": "When enabled, use the local Python service (typically http://localhost:8000). When disabled, you can configure a remote API URL.",
       "workDirectory": "The workspace folder is defined during setup. Re-run the setup wizard to change it.",
-      "apiBaseUrl": "Base URL of the Python backend, including protocol (e.g. http://localhost:8000).",
+      "apiBaseUrl": "Base URL of this program's web service.",
       "llmProvider": "Applies to intelligent directory suggestions, embeddings, and chat analysis.",
       "pegaApiKey": "Stored securely in config.json. Update it by signing in below when it expires."
     },
@@ -436,7 +436,7 @@
       "okText": "Delete"
     },
     "placeholders": {
-      "searchFileName": "Search file name",
+      "searchFileName": "Search by name, tags, or category",
       "selectCategory": "Select category",
       "selectType": "Select type",
       "tagsCommaSeparated": "tag1, tag2"
