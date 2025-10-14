@@ -210,27 +210,38 @@
 
 接口: `GET /api/files/convert/formats`
 
-说明：调用本地 Pandoc 获取支持的输入/输出格式列表。优先使用项目内置 `bin/pandoc(.exe)`，也可通过环境变量 `PANDOC_PATH` 指定；若均不存在则返回 503 并给出错误信息。
+**说明**:
+- 通过配置的 `fileConvertEndpoint` 远程转换服务查询支持的输入/输出格式。
+- 当未配置服务或请求失败时，接口将分别返回 503（`SERVICE_NOT_CONFIGURED`）或 502（`REMOTE_FETCH_FAILED`）。
 
-响应数据:
-
+**响应数据**:
 ```json
 {
   "inputs": ["string"],
   "outputs": ["string"],
   "combined": ["string"],
-  "pandocPath": "string|null"
+  "input_formats": ["string"],
+  "output_formats": ["string"],
+  "service_endpoint": "string|null",
+  "default_output_directory": "string",
+  "pandoc_available": true,
+  "markitdown_available": true
 }
 ```
 
-字段说明：
-- `inputs`: Pandoc 支持的所有输入格式（--list-input-formats）
-- `outputs`: Pandoc 支持的所有输出格式（--list-output-formats）
-- `combined`: `inputs ∪ outputs` 的去重并排序集合
-- `pandocPath`: 实际使用到的 Pandoc 可执行文件路径，若通过 PATH 调用则为命令名；未找到则为 null
+**字段说明**:
+- `inputs`：远程服务声明支持的源格式（小写扩展名，已去重）。
+- `outputs`：远程服务声明支持的目标格式。
+- `combined`：`inputs ∪ outputs` 的去重并排序集合。
+- `input_formats` / `output_formats`：与 `inputs` / `outputs` 相同，保留用于向后兼容。
+- `service_endpoint`：当前使用的转换服务基础 URL，未配置时为 `null`。
+- `default_output_directory`：本地默认输出目录（通常位于应用的临时目录）。
+- `pandoc_available`：向后兼容字段，表示远程服务可用并返回了有效的输出格式列表。
+- `markitdown_available`：是否有能力输出 Markdown（`md` 或 `markdown`）。
 
-错误：
-- 当未找到 Pandoc 时，HTTP 503，`error.code = "PANDOC_NOT_FOUND"`
+**错误码**:
+- `SERVICE_NOT_CONFIGURED`
+- `REMOTE_FETCH_FAILED`
 
   "deleted_file_id": "string",
   "deleted_chunks_count": "number"
@@ -699,9 +710,9 @@
 - `provider`: 可选，指定使用的LLM提供方，允许值：`ollama` | `openai` | `azure-openai` | `openrouter`
 
 **处理逻辑**:
-1. 检查文件是否存在
-2. 如果是文档类型，使用pandoc转换为文本格式
-3. 提取文件名和文件前500字符内容
+1. 检查文件是否存在。
+2. 如果是文档类型，通过配置的 `fileConvertEndpoint` 服务（或内置降级流程）转换为 Markdown 文本后提取正文。
+3. 提取文件名和文件前500字符内容。
 4. 调用大语言模型分析内容并推荐最合适的保存目录
 5. 返回推荐结果及置信度
 
@@ -770,20 +781,22 @@
   "output_formats": ["string"],
   "default_output_directory": "string",
   "pandoc_available": true,
-  "markitdown_available": true
+  "markitdown_available": true,
+  "service_endpoint": "string|null"
 }
 ```
 
 **字段说明**:
-- `input_formats`: 支持识别的输入文件扩展名列表（含点，如 `.pdf`、`.docx`）
-- `output_formats`: 支持输出的目标格式列表（不含点，如 `md`、`pdf` 等）
-- `default_output_directory`: 默认的转换结果输出目录（绝对路径）
-- `pandoc_available`: 是否检测到 Pandoc，可用于非 Markdown 转换
-- `markitdown_available`: 是否可以使用 MarkItDown，将文件转换为 Markdown
+- `input_formats`：远程转换服务声明支持的输入扩展名（不带点，已去重）。
+- `output_formats`：远程转换服务声明支持的输出格式。
+- `default_output_directory`：本地默认的转换结果输出目录。
+- `pandoc_available`：向后兼容字段，指示远程服务是否可用并返回了至少一个目标格式。
+- `markitdown_available`：远程服务是否支持输出 Markdown 文本。
+- `service_endpoint`：当前生效的转换服务基础 URL，便于排查配置问题。
 
 **说明**:
-- 当 `pandoc_available=false` 时，仅支持导出为 Markdown
-- 输入、输出格式列表会随着后端能力动态调整
+- 接口数据直接来源于 `fileConvertEndpoint` 服务的 `/formats` 结果，若服务更新，此处会同步变化。
+- 若接口返回 `SERVICE_NOT_CONFIGURED` 或 `REMOTE_FETCH_FAILED`，请检查配置或服务可用性。
 
 ### 1.12 文件格式转换
 
@@ -806,11 +819,11 @@
 - `overwrite`: 是否允许覆盖已存在的同名文件，默认为 `false`
 
 **处理逻辑**:
-1. 校验源文件是否存在且可读
-2. 校验目标格式是否合法
-3. 当目标格式为 `md`/`markdown` 时，使用 MarkItDown 进行转换
-4. 其他格式依赖 Pandoc，若未检测到 Pandoc 将返回错误
-5. 写入输出文件并返回转换结果概要
+1. 校验源文件是否存在且可读。
+2. 校验目标格式字符串是否有效（会自动归一化扩展名）。
+3. 调用配置的 `fileConvertEndpoint` 远程转换服务（上传 → 创建任务 → 轮询状态 → 下载结果）。
+4. 将下载的结果文件复制到目标目录，并根据是否允许覆盖生成唯一文件名。
+5. 返回转换结果摘要（输出路径、格式、大小等）。
 
 **响应数据**:
 ```json
@@ -831,16 +844,15 @@
 - `message`: 转换成功时的提示信息
 
 **注意事项**:
-- 转换过程中会在后台创建必要的输出目录
-- 若 `overwrite=false` 且输出文件已存在，将返回错误
-- 建议在调用前通过 `/api/files/convert/formats` 获取最新支持的格式
+- 转换过程中会在后台创建必要的输出目录，并自动避免文件名冲突。
+- 建议在调用前通过 `/api/files/convert/formats` 获取最新支持的格式与服务状态。
+- 远程服务任务默认有超时限制（约 8 分钟），超时会返回 `CONVERSION_FAILED`。
 
 **可能的错误码**:
-- `RESOURCE_NOT_FOUND`: 源文件不存在
-- `UNSUPPORTED_FORMAT`: 目标格式不受支持
-- `PANDOC_NOT_AVAILABLE`: 目标格式需要 Pandoc，但未检测到 Pandoc
-- `FILE_EXISTS`: 输出文件已存在且未允许覆盖
-- `CONVERSION_FAILED`: 转换执行失败
+- `INVALID_REQUEST`: 请求参数缺失或格式错误。
+- `SERVICE_NOT_CONFIGURED`: 未配置 `fileConvertEndpoint`。
+- `CONVERSION_FAILED`: 远程服务转换失败或超时。
+- `INTERNAL_ERROR`: 未捕获的服务器异常。
 
 
 
@@ -860,7 +872,7 @@
 
 **处理逻辑**:
 1. 检查文件是否存在和文件大小
-2. 如果是文档类型，使用pandoc转换为markdown格式
+2. 如果是文档类型，通过 `fileConvertEndpoint` 转换服务（或内置降级流程）生成 Markdown 文本
 3. 如果是文本文件，直接读取内容
 4. 对内容进行文本分片处理
 5. 生成embeddings并存储到向量数据库

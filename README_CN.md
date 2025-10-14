@@ -14,20 +14,23 @@
 ## 技术架构
 
 - **前端界面**: Electron + React + TypeScript
-- **后端服务**: Python FastAPI
-- **文档处理**: Pandoc 转换为 Markdown
-- **数据库**: SQLite (文档元信息) + Faiss/Chroma (向量数据库)
-- **AI 模型**: 本地 Embedding 模型 + LLM 支持
+- **本地服务层**: 嵌入在 Electron 主进程中的 Node.js（Express）本地服务
+- **文档处理**: 基于可配置的 `fileConvertEndpoint` 远程转换服务，由 Node 统一调度
+- **数据存储**: SQLite（通过 Sequelize 维护元信息）+ Faiss 向量索引（faiss-node）
+- **AI 模型**: 可插拔的 LLM / Embedding 提供方（OpenAI、Azure、OpenRouter、百炼、Ollama 等）
 
 ## 项目结构
 
 ```
 ai_file_manager/
-├── electron/           # Electron 主进程
-├── renderer/           # React 前端界面
-├── python/            # Python 后端服务
-├── workdir/           # 用户文档工作区
-├── database/          # SQLite 数据库文件
+├── client/
+│   ├── electron/       # Electron 主进程与嵌入式 Express API
+│   ├── renderer/       # React/Vite 前端界面
+│   ├── public/         # 前端静态资源
+│   └── package.json    # 客户端脚本与依赖
+├── database/           # SQLite 与 FAISS 向量索引文件（运行时生成）
+├── locales/            # 旧版翻译回退资源
+├── temp/               # 文件导入/转换的临时目录
 └── README.md
 ```
 
@@ -60,3 +63,7 @@ ai_file_manager/
 ## 许可证
 
 MIT License
+
+## 国际化
+
+共享翻译文件位于 `client/locales/`。React 渲染进程通过 `@locales` 引入 JSON 文本，Electron 主进程 (`client/electron/languageHelper.ts`) 也会加载同一路径，并在缺少资源时回退到根目录 `locales/`。若需新增语言，请在 `client/locales/` 下创建 `<lang>.json` 并保持与现有结构一致，重启应用即可生效。

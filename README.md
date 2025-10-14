@@ -14,20 +14,23 @@ A desktop document organization and intelligent search program based on RAG (Ret
 ## Technical Architecture
 
 - **Frontend Interface**: Electron + React + TypeScript
-- **Backend Service**: Python FastAPI
-- **Document Processing**: Pandoc for Markdown conversion
-- **Database**: SQLite (document metadata) + Faiss/Chroma (vector database)
-- **AI Models**: Local Embedding models + LLM support
+- **Local Service Layer**: Embedded Node.js (Express) server inside the Electron main process
+- **Document Processing**: Remote file conversion via the configurable `fileConvertEndpoint` service (with Node orchestration)
+- **Data Storage**: SQLite (document metadata via Sequelize) + Faiss vector index (faiss-node)
+- **AI Models**: Pluggable LLM / embedding providers (OpenAI, Azure, OpenRouter, Bailian, Ollama, etc.)
 
 ## Project Structure
 
 ```
 ai_file_manager/
-├── electron/           # Electron main process
-├── renderer/           # React frontend interface
-├── python/            # Python backend service
-├── workdir/           # User document workspace
-├── database/          # SQLite database files
+├── client/
+│   ├── electron/       # Electron main process + embedded Express APIs
+│   ├── renderer/       # React frontend (Vite)
+│   ├── public/         # Static assets packaged with the renderer
+│   └── package.json    # Client dependencies & scripts
+├── database/           # SQLite database and FAISS index files (runtime generated)
+├── locales/            # Legacy translation fallback (renderer uses client/locales)
+├── temp/               # Temporary converted/imported documents
 └── README.md
 ```
 
@@ -65,5 +68,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Tagged with #ForTheLoveOfCode
 ## Internationalization
 
-Shared translations now live in `client/locales/`. The React renderer imports JSON via the `@locales` alias, and the Python FastAPI backend (`python/i18n.py`) will look in `client/locales/` first and fall back to the legacy root `locales/` if needed. To add a language, create `<lang>.json` in `client/locales/` mirroring the existing structure, and restart the desktop application.
+Shared translations now live in `client/locales/`. The React renderer imports JSON via the `@locales` alias, and the Electron main process (`client/electron/languageHelper.ts`) loads the same files with a fallback to the legacy root `locales/` directory. To add a language, create `<lang>.json` in `client/locales/` mirroring the existing structure, then restart the desktop application.
 
