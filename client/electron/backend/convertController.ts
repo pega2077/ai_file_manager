@@ -1,18 +1,36 @@
 import type { Express, Request, Response } from "express";
 import { app, BrowserWindow } from "electron";
 import path from "path";
-import fs from "fs";
-import { execFile } from "child_process";
 import { logger } from "../logger";
 import { promises as fsp } from "fs";
 import { ensureTempDir } from "./utils/pathHelper";
 import { convertFileViaService } from "./utils/fileConversion";
+import { configManager } from "../configManager";
+import { httpGetJson } from "./utils/httpClient";
 
 type FormatsData = {
   inputs: string[];
   outputs: string[];
+  input_formats: string[];
+  output_formats: string[];
   combined: string[];
-  pandocPath: string | null;
+  service_endpoint: string | null;
+  default_output_directory: string;
+  pandoc_available: boolean;
+  markitdown_available: boolean;
+};
+
+type ServiceFormatsResponse = {
+  formats?: {
+    source?: unknown;
+    target?: unknown;
+  };
+};
+
+type ServiceError = Error & {
+  code?: string;
+  status?: number;
+  details?: unknown;
 };
 
 let cachedFormats: { data: FormatsData; ts: number } | null = null;
@@ -211,102 +229,65 @@ async function fetchWebpage(targetUrl: string): Promise<{ html: string; finalUrl
   });
 }
 
-function getProjectRoot(): string {
-  try {
-    const appRoot = app.getAppPath();
-    // In development appRoot points to client/dist-electron; in production it's the app dir.
-    return app.isPackaged ? path.join(appRoot, "..") : path.join(appRoot, "..", "..");
-  } catch {
-    return process.cwd();
+function normalizeFormats(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const item of list) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    const lower = trimmed.toLowerCase();
+    if (seen.has(lower)) continue;
+    seen.add(lower);
+    normalized.push(lower);
   }
+  normalized.sort();
+  return normalized;
 }
 
-function resolvePandocCandidates(): string[] {
-  const candidates: string[] = [];
-  const envPath = (process.env.PANDOC_PATH || "").trim();
-  if (envPath) candidates.push(envPath);
-
-  const projectRoot = getProjectRoot();
-  if (process.platform === "win32") {
-    candidates.push(path.join(projectRoot, "bin", "pandoc.exe"));
-    candidates.push(path.join(projectRoot, "client", "bin", "pandoc.exe"));
-    candidates.push("pandoc.exe"); // from PATH
-  } else {
-    candidates.push(path.join(projectRoot, "bin", "pandoc"));
-    candidates.push(path.join(projectRoot, "client", "bin", "pandoc"));
-    candidates.push("pandoc"); // from PATH
-  }
-  return candidates;
-}
-
-function findExistingPandoc(): string | null {
-  const cands = resolvePandocCandidates();
-  for (const p of cands) {
-    try {
-      if (p.includes(path.sep)) {
-        if (fs.existsSync(p)) return p;
-      } else {
-        // command in PATH; we can't check existence easily, just return to try execution
-        return p;
-      }
-    } catch {
-      // continue
-    }
-  }
-  return null;
-}
-
-function execList(pandocPath: string, args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(pandocPath, args, { timeout: 10000, windowsHide: true }, (err, stdout, stderr) => {
-      if (err) {
-        reject(new Error(`${String(err.message || err)} | ${stderr || ""}`));
-        return;
-      }
-      resolve(stdout);
-    });
-  });
-}
-
-async function loadPandocFormats(): Promise<FormatsData> {
-  // serve from cache when fresh
+async function loadServiceFormats(): Promise<FormatsData> {
   if (cachedFormats && Date.now() - cachedFormats.ts < CACHE_TTL_MS) {
     return cachedFormats.data;
   }
 
-  const pandocPath = findExistingPandoc();
-  if (!pandocPath) {
-    const data: FormatsData = { inputs: [], outputs: [], combined: [], pandocPath: null };
-    cachedFormats = { data, ts: Date.now() };
-    return data;
+  const cfg = configManager.getConfig();
+  const baseRaw = (cfg.fileConvertEndpoint || "").trim();
+  if (!baseRaw) {
+    const err: ServiceError = new Error("converter_service_not_configured");
+    err.code = "SERVICE_NOT_CONFIGURED";
+    throw err;
+  }
+  const base = baseRaw.replace(/\/+$/, "");
+  if (!base) {
+    const err: ServiceError = new Error("converter_service_not_configured");
+    err.code = "SERVICE_NOT_CONFIGURED";
+    throw err;
   }
 
-  let inRaw = "";
-  let outRaw = "";
-  try {
-    [inRaw, outRaw] = await Promise.all([
-      execList(pandocPath, ["--list-input-formats"]),
-      execList(pandocPath, ["--list-output-formats"]),
-    ]);
-  } catch (e) {
-    logger.error("Pandoc list formats failed", e as unknown);
-    const data: FormatsData = { inputs: [], outputs: [], combined: [], pandocPath };
-    cachedFormats = { data, ts: Date.now() };
-    return data;
+  const resp = await httpGetJson<ServiceFormatsResponse>(`${base}/formats`, undefined, 20000);
+  if (!resp.ok || !resp.data) {
+    const err: ServiceError = new Error(resp.error?.message || `fetch_failed_${resp.status}`);
+    err.code = "REMOTE_FETCH_FAILED";
+    err.status = resp.status;
+    throw err;
   }
 
-  const toList = (s: string) =>
-    s
-      .split(/\r?\n/g)
-      .map((l) => l.trim())
-      .filter((l) => !!l && !l.startsWith("#"))
-      .sort();
-
-  const inputs = toList(inRaw);
-  const outputs = toList(outRaw);
+  const inputs = normalizeFormats(resp.data.formats?.source);
+  const outputs = normalizeFormats(resp.data.formats?.target);
   const combined = Array.from(new Set([...inputs, ...outputs])).sort();
-
-  const data: FormatsData = { inputs, outputs, combined, pandocPath };
+  const defaultDir = await ensureTempDir();
+  const data: FormatsData = {
+    inputs,
+    outputs,
+    input_formats: inputs,
+    output_formats: outputs,
+    combined,
+    service_endpoint: base,
+    default_output_directory: defaultDir,
+  pandoc_available: outputs.length > 0,
+    markitdown_available: outputs.some((fmt) => fmt === "md" || fmt === "markdown"),
+  };
   cachedFormats = { data, ts: Date.now() };
   return data;
 }
@@ -315,18 +296,7 @@ export function registerConversionRoutes(appExp: Express): void {
   // GET /api/files/convert/formats
   appExp.get("/api/files/convert/formats", async (_req: Request, res: Response) => {
     try {
-      const data = await loadPandocFormats();
-      if (!data.pandocPath) {
-        res.status(503).json({
-          success: false,
-          message: "pandoc_not_available",
-          data,
-          error: { code: "PANDOC_NOT_FOUND", message: "Pandoc executable not found. Set PANDOC_PATH or place pandoc in bin/.", details: null },
-          timestamp: new Date().toISOString(),
-          request_id: "",
-        });
-        return;
-      }
+      const data = await loadServiceFormats();
       res.status(200).json({
         success: true,
         message: "ok",
@@ -336,12 +306,26 @@ export function registerConversionRoutes(appExp: Express): void {
         request_id: "",
       });
     } catch (err) {
-      logger.error("/api/files/convert/formats failed", err as unknown);
-      res.status(500).json({
+      const serviceErr = err as ServiceError;
+      const code = serviceErr.code || "REMOTE_FETCH_FAILED";
+      const status = code === "SERVICE_NOT_CONFIGURED" ? 503 : 502;
+      logger.error("/api/files/convert/formats failed", {
+        code,
+        status,
+        error: String(serviceErr?.message || err),
+      });
+      res.status(status).json({
         success: false,
-        message: "internal_error",
+        message: code === "SERVICE_NOT_CONFIGURED" ? "service_not_configured" : "fetch_failed",
         data: null,
-        error: { code: "INTERNAL_ERROR", message: "Failed to list Pandoc formats", details: null },
+        error: {
+          code,
+          message:
+            code === "SERVICE_NOT_CONFIGURED"
+              ? "File converter service endpoint not configured."
+              : "Failed to retrieve formats from converter service.",
+          details: serviceErr?.status ?? null,
+        },
         timestamp: new Date().toISOString(),
         request_id: "",
       });
@@ -619,58 +603,35 @@ export function registerConversionRoutes(appExp: Express): void {
         }
       }
 
-      const pandocFmt = (fmt: string) => (fmt === "md" ? "markdown" : fmt);
-      const doPandoc = async (src: string, out: string, fmt: string) => {
-        const pandocPath = findExistingPandoc();
-        if (!pandocPath) return false;
-        const args = [src, "-t", pandocFmt(fmt), "-o", out];
-        await new Promise<void>((resolve, reject) => {
-          execFile(pandocPath, args, { windowsHide: true }, (err) => {
-            if (err) return reject(err);
-            resolve();
-          });
-        });
-        return true;
-      };
-
       let finalOut = "";
       try {
-        if (targetFormat === "md" || targetFormat === "markdown") {
-          // Prefer pandoc when available; otherwise fallback to remote service
-          const usedPandoc = await doPandoc(filePath, outPath, "markdown").catch(() => false);
-          if (usedPandoc) {
-            finalOut = outPath;
-          } else {
-            // remote conversion service to markdown
-            const srcExt = path.extname(filePath).replace(/^\./, "");
-            const tmp = await convertFileViaService(filePath, srcExt, "md");
-            // Move or copy to desired outPath
-            await fsp.copyFile(tmp, outPath);
-            finalOut = outPath;
-          }
-        } else {
-          // Non-markdown requires pandoc
-          const ok = await doPandoc(filePath, outPath, targetFormat).catch(() => false);
-          if (!ok) {
-            res.status(503).json({
-              success: false,
-              message: "pandoc_not_available",
-              data: null,
-              error: { code: "PANDOC_NOT_FOUND", message: "Pandoc is required for this target format", details: null },
-              timestamp: new Date().toISOString(),
-              request_id: "",
-            });
-            return;
-          }
-          finalOut = outPath;
-        }
+        const srcExt = path.extname(filePath).replace(/^\./, "").toLowerCase() || "txt";
+        const tempResultPath = await convertFileViaService(filePath, srcExt, targetFormat);
+        await fsp.copyFile(tempResultPath, outPath);
+        finalOut = outPath;
       } catch (e) {
-        logger.error("/api/files/convert failed in processing", e as unknown);
-        res.status(500).json({
+        const messageText = e instanceof Error ? e.message : String(e);
+        logger.error("/api/files/convert conversion service failed", {
+          source: filePath,
+          targetFormat,
+          error: messageText,
+        });
+        if (messageText.toLowerCase().includes("not configured")) {
+          res.status(503).json({
+            success: false,
+            message: "service_not_configured",
+            data: null,
+            error: { code: "SERVICE_NOT_CONFIGURED", message: "File converter service endpoint not configured.", details: null },
+            timestamp: new Date().toISOString(),
+            request_id: "",
+          });
+          return;
+        }
+        res.status(502).json({
           success: false,
-          message: "internal_error",
+          message: "conversion_failed",
           data: null,
-          error: { code: "INTERNAL_ERROR", message: "Conversion failed", details: null },
+          error: { code: "CONVERSION_FAILED", message: "Failed to convert file via remote service", details: messageText },
           timestamp: new Date().toISOString(),
           request_id: "",
         });
