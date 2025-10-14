@@ -6,7 +6,7 @@ declare global {
       selectFolder: () => Promise<string | null>
       openFile: (filePath: string) => Promise<boolean>
       openFolder: (filePath: string) => Promise<boolean>
-      selectFile: () => Promise<string | null>
+  selectFile: () => Promise<string[] | null>
       copyToClipboard: (text: string) => Promise<boolean>
   readClipboardText: () => Promise<string>
       importFile: () => Promise<{ success: boolean; message: string }>

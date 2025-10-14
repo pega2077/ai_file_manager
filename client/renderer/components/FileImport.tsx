@@ -26,6 +26,16 @@ type FileImportProps = {
   onImported?: () => void;
 };
 
+type ProcessFileResult = "complete" | "pending-user-action";
+
+type QueuedImportTask = {
+  path: string;
+  deferred: {
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  };
+};
+
 const CONVERSION_ERROR_CODES = new Set([
   "CONVERSION_FAILED",
   "CONVERSION_ERROR",
@@ -133,6 +143,9 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
     const [directoryOptions, setDirectoryOptions] = useState<TreeNode[]>([]);
     const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
     const taskIdRef = useRef<string | null>(null);
+  const importQueueRef = useRef<QueuedImportTask[]>([]);
+  const currentImportRef = useRef<QueuedImportTask | null>(null);
+  const isProcessingRef = useRef(false);
 
     const createTaskId = useCallback(
       () =>
@@ -470,7 +483,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
     };
 
     const processFile = useCallback(
-      async (filePath: string) => {
+      async (filePath: string): Promise<ProcessFileResult> => {
         notifyStart(filePath);
 
         let cfg: import("../shared/types").AppConfig | undefined;
@@ -487,7 +500,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             err: String(error),
           });
           notifyError(error, t("files.messages.fileImportFailed"));
-          return;
+          return "complete";
         }
         const lang = (cfg?.language || "en") as "zh" | "en";
 
@@ -501,7 +514,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             const errMsg = stageResponse.message || t("files.messages.stageFailed");
             message.error(errMsg);
             notifyError(new Error(errMsg), errMsg);
-            return;
+            return "complete";
           }
           stagedFileInfo = stageResponse.data as StageFileResponse;
           notifyProgress("stage-file", "success", t("common.success"));
@@ -511,14 +524,14 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             err: String(err),
           });
           notifyError(err, t("files.messages.stageFailed"));
-          return;
+          return "complete";
         } finally {
           hideStaging?.();
         }
 
         if (!stagedFileInfo) {
           notifyError("stageFileToTemp returned empty", t("files.messages.stageFailed"));
-          return;
+          return "complete";
         }
 
         const stagedPath = stagedFileInfo.staged_path;
@@ -536,7 +549,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             err: String(err),
           });
           notifyError(err, t("files.messages.getDirectoryStructureFailed"));
-          return;
+          return "complete";
         }
         if (!directoryStructureResponse.success) {
           const errMsg =
@@ -544,7 +557,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             t("files.messages.getDirectoryStructureFailed");
           message.error(errMsg);
           notifyError(new Error(errMsg), errMsg);
-          return;
+          return "complete";
         }
         notifyProgress("list-directory", "success");
 
@@ -599,7 +612,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             conversionMessage: conversionMessage ?? undefined,
           });
           notifyError(err, displayMessage);
-          return;
+          return "complete";
         }
         loadingKey();
         if (!recommendResponse.success) {
@@ -615,7 +628,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             t("files.messages.getRecommendationFailed");
           message.error(errMsg);
           notifyError(new Error(errMsg), errMsg);
-          return;
+          return "complete";
         }
         notifyProgress("recommend-directory", "success");
 
@@ -646,7 +659,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             const errMsg = saveResponse.message || t("files.messages.fileSaveFailed");
             message.error(errMsg);
             notifyError(new Error(errMsg), errMsg);
-            return;
+            return "complete";
           }
           notifyProgress("save-file", "success");
           message.success(
@@ -724,7 +737,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
               path: recommendedDirectory,
             })
           );
-          return;
+          return "complete";
         }
 
         await showImportConfirmationDialog(
@@ -734,6 +747,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           directoryStructureResponse.data as DirectoryStructureResponse
         );
         notifyProgress("await-confirmation", "start", t("files.import.selectTargetPrompt"));
+        return "pending-user-action";
       },
       [
         workDirectory,
@@ -748,6 +762,64 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         notifyError,
         getConversionMessage,
       ]
+  );
+
+    const runNextImport = useCallback(async () => {
+      if (isProcessingRef.current) {
+        return;
+      }
+      const nextTask = importQueueRef.current.shift();
+      if (!nextTask) {
+        return;
+      }
+      currentImportRef.current = nextTask;
+      isProcessingRef.current = true;
+      try {
+        const status = await processFile(nextTask.path);
+        if (status === "complete") {
+          nextTask.deferred.resolve();
+          currentImportRef.current = null;
+          isProcessingRef.current = false;
+          void runNextImport();
+        }
+      } catch (error) {
+        nextTask.deferred.reject(error);
+        currentImportRef.current = null;
+        isProcessingRef.current = false;
+        window.electronAPI?.logError?.("processFile queue failed", {
+          err: String(error),
+          path: nextTask.path,
+        });
+        void runNextImport();
+      }
+    }, [processFile]);
+
+    const resolveCurrentImport = useCallback(() => {
+      const currentTask = currentImportRef.current;
+      if (!currentTask) {
+        return;
+      }
+      currentTask.deferred.resolve();
+      currentImportRef.current = null;
+      isProcessingRef.current = false;
+      void runNextImport();
+    }, [runNextImport]);
+
+    const enqueueFile = useCallback(
+      (filePath: string) =>
+        new Promise<void>((resolve, reject) => {
+          const normalizedPath = filePath.trim();
+          if (!normalizedPath) {
+            resolve();
+            return;
+          }
+          importQueueRef.current.push({
+            path: normalizedPath,
+            deferred: { resolve, reject },
+          });
+          void runNextImport();
+        }),
+      [runNextImport],
     );
 
     const handleStartImport = useCallback(async () => {
@@ -758,25 +830,40 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         if (cfg?.workDirectory && cfg.workDirectory !== workDirectory) {
           setWorkDirectory(cfg.workDirectory);
         }
-        const filePath = await window.electronAPI.selectFile();
-        if (!filePath) return;
-        setStagedFileId(null);
-        setImportFilePath("");
-        setSelectedDirectory("");
-        await processFile(filePath);
+        const selected = await window.electronAPI.selectFile();
+        if (!selected) return;
+
+        const selectedPaths = Array.isArray(selected) ? selected : [selected];
+        const normalizedPaths = selectedPaths
+          .map((path) => (typeof path === "string" ? path.trim() : ""))
+          .filter((path) => path.length > 0);
+
+        if (normalizedPaths.length === 0) {
+          return;
+        }
+
+        if (!isProcessingRef.current && !currentImportRef.current) {
+          setStagedFileId(null);
+          setImportFilePath("");
+          setSelectedDirectory("");
+        }
+
+        normalizedPaths.forEach((path) => {
+          void enqueueFile(path);
+        });
       } catch (error) {
         message.error(t("files.messages.fileImportFailed"));
         window.electronAPI?.logError?.("handleStartImport failed", {
           err: String(error),
         });
       }
-    }, [processFile, t, workDirectory]);
+    }, [enqueueFile, t, workDirectory]);
 
     // Expose imperative API
     useImperativeHandle(
       ref,
-      () => ({ startImport: handleStartImport, importFile: processFile }),
-      [handleStartImport, processFile]
+      () => ({ startImport: handleStartImport, importFile: enqueueFile }),
+      [handleStartImport, enqueueFile]
     );
 
     const handleImportConfirm = async () => {
@@ -919,6 +1006,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             }
           }
           notifySuccess(t("files.import.fileSavedTo", { path: selectedDirectory }));
+          resolveCurrentImport();
         } else {
           const errMsg =
             saveResponse.message || t("files.messages.fileSaveFailed");
@@ -940,6 +1028,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       setImportFilePath("");
       setStagedFileId(null);
       notifyCancelled(t("common.cancel"));
+      resolveCurrentImport();
     };
 
     const handleManualSelectDirectory = () => {
@@ -990,6 +1079,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             await handleRagImport(fileId, true);
           }
           notifySuccess(t("files.import.fileSavedTo", { path: selectedDirectory }));
+          resolveCurrentImport();
         } else {
           const errMsg =
             saveResponse.message || t("files.messages.fileSaveFailed");
@@ -1012,6 +1102,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       setImportFilePath("");
       setSelectedDirectory("");
       notifyCancelled(t("common.cancel"));
+      resolveCurrentImport();
     };
 
     return (

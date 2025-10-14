@@ -116,8 +116,9 @@ const FileConversion: React.FC = () => {
     }
     try {
       const selected = await window.electronAPI.selectFile();
-      if (selected) {
-        setSourceFile(selected);
+      const selectedPath = Array.isArray(selected) ? selected[0] : selected;
+      if (selectedPath) {
+        setSourceFile(selectedPath);
         setConversionResult(null);
       }
     } catch (error) {

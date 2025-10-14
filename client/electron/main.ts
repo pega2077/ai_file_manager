@@ -284,7 +284,7 @@ function setupIpcHandlers() {
   // IPC handler for selecting file to import
   ipcMain.handle("select-file", async () => {
     const result = await dialog.showOpenDialog(win!, {
-      properties: ["openFile"],
+      properties: ["openFile", "multiSelections"],
       filters: [
         { 
           name: "All Files", 
@@ -304,7 +304,11 @@ function setupIpcHandlers() {
       ],
     });
 
-    return result.canceled ? null : result.filePaths[0];
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    return result.filePaths;
   });
 
   // IPC handler for copying text to clipboard
