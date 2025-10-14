@@ -34,7 +34,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setApiBaseUrl: (url: string) => ipcRenderer.invoke('set-api-base-url', url),
   getAppConfig: () => ipcRenderer.invoke('get-app-config'),
   updateAppConfig: (updates: unknown) => ipcRenderer.invoke('update-app-config', updates),
-  showMainWindow: () => ipcRenderer.invoke('show-main-window'),
+  showMainWindow: (options?: { route?: string; refreshFiles?: boolean }) =>
+    ipcRenderer.invoke('show-main-window', options),
   hideBotWindow: () => ipcRenderer.invoke('hide-bot-window'),
   moveBotWindow: (deltaX: number, deltaY: number) => ipcRenderer.send('move-bot-window', deltaX, deltaY),
   getPreferredLocale: () => ipcRenderer.invoke('locale:get-preferred'),

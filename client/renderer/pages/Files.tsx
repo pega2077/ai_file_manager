@@ -43,6 +43,7 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
     total_count: 0,
     limit: 20
   });
+  const currentPageRef = useRef(1);
 
   // 筛选条件
   const [filters, setFilters] = useState({
@@ -494,6 +495,22 @@ const FileList: React.FC<FileListProps> = ({ onFileSelect, refreshTrigger }) => 
   // 初始化加载
   useEffect(() => {
     fetchFiles();
+  }, [fetchFiles]);
+
+  useEffect(() => {
+    currentPageRef.current = pagination.current_page || 1;
+  }, [pagination.current_page]);
+
+  useEffect(() => {
+    const handleExternalRefresh = () => {
+      void fetchFiles(currentPageRef.current || 1);
+    };
+
+    window.addEventListener('files:refresh', handleExternalRefresh as EventListener);
+
+    return () => {
+      window.removeEventListener('files:refresh', handleExternalRefresh as EventListener);
+    };
   }, [fetchFiles]);
 
   // 监听刷新触发器

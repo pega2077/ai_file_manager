@@ -34,12 +34,26 @@ const Bot: React.FC = () => {
 
   // Work directory handling moved into FileImport component.
 
-  const handleDoubleClick = async () => {
+  const showMainWindow = useCallback(async (options?: { route?: string; refreshFiles?: boolean }) => {
     try {
-      await window.electronAPI.showMainWindow();
+      await window.electronAPI.showMainWindow(options);
+      return true;
     } catch (error) {
       console.error('Failed to show main window:', error);
+      return false;
     }
+  }, []);
+
+  const openFilesView = useCallback(() => {
+    return showMainWindow({ route: '/files', refreshFiles: true });
+  }, [showMainWindow]);
+
+  const openSearchView = useCallback(() => {
+    return showMainWindow({ route: '/search' });
+  }, [showMainWindow]);
+
+  const handleDoubleClick = async () => {
+    await openFilesView();
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -137,11 +151,7 @@ const Bot: React.FC = () => {
         message.error(t('files.messages.fileImportFailed'));
       }
     } else if (key === 'showMain') {
-      try {
-        await window.electronAPI.showMainWindow();
-      } catch (error) {
-        console.error('Failed to show main window:', error);
-      }
+      await openFilesView();
     } else if (key === 'hideBot') {
       try {
         await window.electronAPI.hideBotWindow();
@@ -203,11 +213,10 @@ const Bot: React.FC = () => {
 
   const handleSearchClick = async () => {
     setMenuVisible(false);
-    try {
-      // Open the main window where the user can search. If you have a dedicated search API, replace this.
-      await window.electronAPI.showMainWindow();
-    } catch (error) {
-      console.error('Failed to open main window for search:', error);
+    // Open the main window where the user can search. If you have a dedicated search API, replace this.
+  const opened = await openSearchView();
+    if (!opened) {
+      console.error('Failed to open main window for search');
     }
   };
 

@@ -13,8 +13,8 @@ declare global {
       getApiBaseUrl: () => Promise<string>
       setApiBaseUrl: (url: string) => Promise<boolean>
       getAppConfig: () => Promise<unknown>
-      updateAppConfig: (updates: unknown) => Promise<unknown>
-      showMainWindow: () => Promise<boolean>
+  updateAppConfig: (updates: unknown) => Promise<unknown>
+  showMainWindow: (options?: { route?: string; refreshFiles?: boolean }) => Promise<boolean>
       hideBotWindow: () => Promise<boolean>
       moveBotWindow: (deltaX: number, deltaY: number) => void
       getPreferredLocale: () => Promise<string>

@@ -1,4 +1,6 @@
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import type { IpcRenderer, IpcRendererEvent } from 'electron';
+import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import Landing from './pages/Landing';
 import Directories from './pages/Directories';
 import Files from './pages/Files';
@@ -9,9 +11,44 @@ import Bot from './pages/Bot';
 import Convert from './pages/Convert';
 import PegaAuth from './pages/PegaAuth';
 
+type NavigationPayload = {
+  route?: string;
+  refreshFiles?: boolean;
+};
+
+const NavigationBridge = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const ipcRenderer = (window as Window & typeof globalThis & { ipcRenderer?: IpcRenderer }).ipcRenderer;
+
+    if (!ipcRenderer?.on || !ipcRenderer?.off) {
+      return undefined;
+    }
+
+    const handler = (_event: IpcRendererEvent, payload?: NavigationPayload) => {
+      if (payload?.route) {
+        navigate(payload.route);
+      }
+      if (payload?.refreshFiles) {
+        window.dispatchEvent(new CustomEvent('files:refresh'));
+      }
+    };
+
+    ipcRenderer.on('renderer:navigate', handler);
+
+    return () => {
+      ipcRenderer.off('renderer:navigate', handler);
+    };
+  }, [navigate]);
+
+  return null;
+};
+
 function App() {
   return (
     <HashRouter>
+      <NavigationBridge />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/home" element={<Directories />} />

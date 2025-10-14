@@ -37,7 +37,7 @@ interface Window {
     setApiBaseUrl: (url: string) => Promise<boolean>
     getAppConfig: () => Promise<unknown>
     updateAppConfig: (updates: unknown) => Promise<unknown>
-    showMainWindow: () => Promise<boolean>
+  showMainWindow: (options?: { route?: string; refreshFiles?: boolean }) => Promise<boolean>
     hideBotWindow: () => Promise<boolean>
     moveBotWindow: (deltaX: number, deltaY: number) => void
     getPreferredLocale: () => Promise<string>

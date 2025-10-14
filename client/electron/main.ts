@@ -62,6 +62,11 @@ let botWin: BrowserWindow | null;
 let tray: Tray | null;
 let isQuitting = false; // Track whether the app is in an explicit quit flow
 
+interface ShowMainWindowOptions {
+  route?: string;
+  refreshFiles?: boolean;
+}
+
 /**
  * Clear all app data (database file, vectors directory, temp directory) and relaunch the app.
  * - Does NOT remove config.json or logs by design.
@@ -414,12 +419,42 @@ function setupIpcHandlers() {
   });
 
   // IPC handler for showing main window
-  ipcMain.handle("show-main-window", () => {
+  ipcMain.handle("show-main-window", (_event, rawOptions?: ShowMainWindowOptions) => {
+    const options: ShowMainWindowOptions | undefined = rawOptions && typeof rawOptions === "object"
+      ? rawOptions
+      : undefined;
+
     if (!win || win.isDestroyed()) {
       createWindow();
     }
 
+    const dispatchNavigation = () => {
+      if (!win || win.isDestroyed()) {
+        return;
+      }
+
+      const payload: ShowMainWindowOptions = {};
+      if (options?.route) {
+        payload.route = options.route;
+      }
+      if (options?.refreshFiles) {
+        payload.refreshFiles = true;
+      }
+
+      if (payload.route || payload.refreshFiles) {
+        win.webContents.send("renderer:navigate", payload);
+      }
+    };
+
     if (win && !win.isDestroyed()) {
+      if (options?.route || options?.refreshFiles) {
+        if (win.webContents.isLoading()) {
+          win.webContents.once("did-finish-load", dispatchNavigation);
+        } else {
+          dispatchNavigation();
+        }
+      }
+
       win.show();
       win.focus();
     }
