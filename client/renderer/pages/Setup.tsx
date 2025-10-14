@@ -30,11 +30,12 @@ interface ProfessionOption {
 
 const professionOptionKeys = [
   'softwareEngineer',
-  'lawyer',
+  'designer',
+  'contentCreator',
   'teacher',
   'student',
   'projectManager',
-  'contentCreator',
+  'lawyer',
 ] as const;
 
 type LlmProvider = NonNullable<AppConfig['llmProvider']>;

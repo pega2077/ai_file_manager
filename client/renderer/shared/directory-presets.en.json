@@ -601,5 +601,118 @@
         "description": "Performance dashboards, learnings, and iteration plans"
       }
     ]
+  },
+  {
+    "id": "designer-creative-operations-flat-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "flat",
+    "professionKeywords": [
+      "designer",
+      "product designer",
+      "ux designer",
+      "graphic designer"
+    ],
+    "purposeKeywords": [
+      "design projects",
+      "brand identity",
+      "client deliverables",
+      "visual assets",
+      "ui/ux",
+      "creative briefs",
+      "concept development",
+      "research",
+      "design concepts",
+      "working files",
+      "client feedback",
+      "final deliverables"
+    ],
+    "directories": [
+      {
+        "path": "01_Discovery",
+        "description": "Research summaries, personas, and project briefs"
+      },
+      {
+        "path": "02_Concepts",
+        "description": "Mood boards, sketches, and iterative concepts"
+      },
+      {
+        "path": "03_Design_Files",
+        "description": "Working design files and linked libraries"
+      },
+      {
+        "path": "04_Prototypes",
+        "description": "Interactive prototypes, presentations, and demos"
+      },
+      {
+        "path": "05_Client_Reviews",
+        "description": "Feedback logs, review notes, and revision requests"
+      },
+      {
+        "path": "06_Final_Deliverables",
+        "description": "Exported assets, style guides, and handoff packages"
+      },
+      {
+        "path": "07_Archive",
+        "description": "Closed project artifacts and learnings"
+      }
+    ]
+  },
+  {
+    "id": "designer-creative-operations-hierarchical-en",
+    "languages": ["en", "en-us", "en-gb"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "designer",
+      "ux researcher",
+      "visual designer",
+      "creative director"
+    ],
+    "purposeKeywords": [
+      "design workflow",
+      "brand identity",
+      "product design",
+      "client deliverables",
+      "design system",
+      "creative briefs",
+      "research",
+      "design concepts",
+      "working files",
+      "client feedback",
+      "final deliverables"
+    ],
+    "directories": [
+      {
+        "path": "Discovery/Research",
+        "description": "User interviews, market studies, and competitive audits"
+      },
+      {
+        "path": "Discovery/Strategy",
+        "description": "Personas, journey maps, and experience principles"
+      },
+      {
+        "path": "Design/Concepts",
+        "description": "Sketches, explorations, and mood boards"
+      },
+      {
+        "path": "Design/Production/Working",
+        "description": "Editable design files, components, and shared libraries"
+      },
+      {
+        "path": "Design/Production/Prototypes",
+        "description": "Interactive prototypes and presentation decks"
+      },
+      {
+        "path": "Collaboration/Reviews",
+        "description": "Client feedback, internal critiques, and revision logs"
+      },
+      {
+        "path": "Handoff/Deliverables",
+        "description": "Export packages, specifications, and style guides"
+      },
+      {
+        "path": "Operations/Admin",
+        "description": "Contracts, invoices, and project schedules"
+      }
+    ]
   }
 ]

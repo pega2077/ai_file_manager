@@ -578,5 +578,117 @@
         "description": "数据看板、复盘总结与优化计划"
       }
     ]
+  },
+  {
+    "id": "designer-creative-operations-flat-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "flat",
+    "professionKeywords": [
+      "设计师",
+      "视觉设计",
+      "产品设计",
+      "UX设计"
+    ],
+    "purposeKeywords": [
+      "品牌设计",
+      "界面设计",
+      "客户交付",
+      "视觉素材",
+      "设计项目",
+      "创意简报",
+      "设计概念",
+      "调研洞察",
+      "工作文件",
+      "客户反馈",
+      "最终交付物"
+    ],
+    "directories": [
+      {
+        "path": "01_前期调研",
+        "description": "用户访谈、竞品分析与项目简报"
+      },
+      {
+        "path": "02_概念创意",
+        "description": "情绪板、草图与创意方案"
+      },
+      {
+        "path": "03_设计文件",
+        "description": "工作稿件、组件库和源文件"
+      },
+      {
+        "path": "04_原型演示",
+        "description": "交互原型、展示文稿与演示视频"
+      },
+      {
+        "path": "05_客户反馈",
+        "description": "评审记录、反馈意见与改版说明"
+      },
+      {
+        "path": "06_交付成果",
+        "description": "导出资源、风格指南与移交资料"
+      },
+      {
+        "path": "07_归档总结",
+        "description": "项目复盘、经验总结与历史文件"
+      }
+    ]
+  },
+  {
+    "id": "designer-creative-operations-hierarchical-zh",
+    "languages": ["zh", "zh-cn", "zh-hans"],
+    "style": "hierarchical",
+    "professionKeywords": [
+      "设计师",
+      "产品设计",
+      "UX设计",
+      "视觉设计"
+    ],
+    "purposeKeywords": [
+      "设计流程",
+      "品牌设计",
+      "界面设计",
+      "客户交付",
+      "设计交付物",
+      "创意简报",
+      "调研洞察",
+      "设计概念",
+      "工作文件",
+      "客户反馈",
+      "最终交付物"
+    ],
+    "directories": [
+      {
+        "path": "洞察/调研资料",
+        "description": "用户访谈、市场调研和竞品分析"
+      },
+      {
+        "path": "洞察/策略定义",
+        "description": "目标用户、体验旅程与设计原则"
+      },
+      {
+        "path": "设计/概念探索",
+        "description": "草图、概念稿和情绪板"
+      },
+      {
+        "path": "设计/制作/工作文件",
+        "description": "可编辑源文件、组件库和版本记录"
+      },
+      {
+        "path": "设计/制作/原型展示",
+        "description": "交互原型、演示文档与演示素材"
+      },
+      {
+        "path": "协作/评审反馈",
+        "description": "客户评审、团队评审与修改记录"
+      },
+      {
+        "path": "交付/最终资产",
+        "description": "导出包、规范文档与交付清单"
+      },
+      {
+        "path": "运营/项目管理",
+        "description": "合同、报价、进度计划和结算资料"
+      }
+    ]
   }
 ]

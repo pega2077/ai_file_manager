@@ -120,7 +120,8 @@
         "teacher": "教师",
         "student": "学生",
         "projectManager": "项目经理",
-        "contentCreator": "内容创作者"
+        "contentCreator": "内容创作者",
+        "designer": "设计师"
       },
       "professionPurposes": {
         "softwareEngineer": "组织项目源代码、设计文档、技术笔记和部署脚本。",
@@ -128,7 +129,8 @@
         "teacher": "管理课程计划、讲义、学生作业和评分记录。",
         "student": "整理学习笔记、作业、研究论文和项目文件。",
         "projectManager": "保存项目计划、时间表、会议记录、需求和报告。",
-        "contentCreator": "存储草稿、媒体素材、脚本、发布日程和项目简介。"
+        "contentCreator": "存储草稿、媒体素材、脚本、发布日程和项目简介。",
+        "designer": "管理调研洞察、设计概念、工作文件、客户反馈和最终交付物。"
       },
       "style": {
         "flat": "扁平风格",
