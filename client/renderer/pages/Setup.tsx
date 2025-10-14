@@ -253,8 +253,25 @@ const Setup = () => {
 
       const response = await apiService.createFolders(selectedFolder, structure);
 
-        if (response.success) {
+      if (response.success) {
         await window.electronAPI.updateAppConfig({ isInitialized: true, workDirectory: selectedFolder });
+        try {
+          if (typeof window.electronAPI.showBotWindow === 'function') {
+            await window.electronAPI.showBotWindow();
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          if (typeof window.electronAPI.logError === 'function') {
+            try {
+              await window.electronAPI.logError(
+                'Failed to show assistant window after setup',
+                { error: errorMessage },
+              );
+            } catch {
+              // Intentionally ignore logging failures
+            }
+          }
+        }
         message.success(t('setup.messages.createSuccess'));
         navigate('/files');
       } else {

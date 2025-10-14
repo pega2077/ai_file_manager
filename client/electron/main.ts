@@ -462,6 +462,24 @@ function setupIpcHandlers() {
     return true;
   });
 
+  ipcMain.handle("show-bot-window", () => {
+    try {
+      if (!botWin || botWin.isDestroyed()) {
+        createBotWindow();
+      }
+
+      if (botWin && !botWin.isDestroyed()) {
+        botWin.show();
+        botWin.focus();
+      }
+
+      return true;
+    } catch (error) {
+      logger.error("Failed to show bot window", error);
+      return false;
+    }
+  });
+
   // IPC handler for hiding bot window
   ipcMain.handle("hide-bot-window", () => {
     if (botWin && !botWin.isDestroyed()) {

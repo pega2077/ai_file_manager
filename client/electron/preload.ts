@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateAppConfig: (updates: unknown) => ipcRenderer.invoke('update-app-config', updates),
   showMainWindow: (options?: { route?: string; refreshFiles?: boolean }) =>
     ipcRenderer.invoke('show-main-window', options),
+  showBotWindow: () => ipcRenderer.invoke('show-bot-window'),
   hideBotWindow: () => ipcRenderer.invoke('hide-bot-window'),
   moveBotWindow: (deltaX: number, deltaY: number) => ipcRenderer.send('move-bot-window', deltaX, deltaY),
   getPreferredLocale: () => ipcRenderer.invoke('locale:get-preferred'),
