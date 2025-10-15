@@ -12,17 +12,99 @@ import { embedText, generateStructuredJson, describeImage, getActiveModelName } 
 import type { LlmMessage } from "./utils/llm";
 import type { StructuredResponseFormat } from "./utils/ollama";
 import { buildVisionDescribePrompt, normalizeLanguage } from "./utils/promptHelper";
+import type { SupportedLang } from "./utils/promptHelper";
 import { buildExtractTagsMessages } from "./utils/promptHelper";
 import type { ProviderName } from "./utils/llm";
-import { app } from "electron";
+import { app, nativeImage } from "electron";
 import { randomUUID } from "crypto";
 import ChunkModel from "./models/chunk";
 import { updateGlobalFaissIndex } from "./utils/vectorStore";
 import { configManager } from "../configManager";
+import type { AppConfig } from "../configManager";
 import { i18n } from "../languageHelper";
+import { extractVideoScreenshots } from "./utils/videoCapture";
 
 function getTextConversionFailedMessage(): string {
   return i18n.t("backend.files.errors.textConversionFailed", "Failed to convert file to text");
+}
+
+async function summarizeVideoContent(
+  videoPath: string,
+  language: SupportedLang,
+  capture: AppConfig["videoCapture"] | undefined
+): Promise<{ summary: string }> {
+  const captureOptions = {
+    intervalSeconds: typeof capture?.intervalSeconds === "number" && capture.intervalSeconds > 0 ? Math.floor(capture.intervalSeconds) : 10,
+    maxShots: typeof capture?.maxShots === "number" && capture.maxShots > 0 ? Math.floor(capture.maxShots) : 5,
+    targetWidth: typeof capture?.targetWidth === "number" && capture.targetWidth > 0 ? Math.floor(capture.targetWidth) : undefined,
+    targetHeight: typeof capture?.targetHeight === "number" && capture.targetHeight > 0 ? Math.floor(capture.targetHeight) : undefined,
+    timeoutMs: typeof capture?.timeoutMs === "number" && capture.timeoutMs > 0 ? Math.floor(capture.timeoutMs) : 60000,
+  };
+
+  try {
+    const shots = await extractVideoScreenshots(videoPath, captureOptions);
+    const visionPrompt = buildVisionDescribePrompt(language);
+    const descriptions: string[] = [];
+    const configSizeLimit = Math.max(captureOptions.targetWidth ?? 0, captureOptions.targetHeight ?? 0);
+    const maxDescribeDimension = configSizeLimit > 0 ? Math.min(configSizeLimit, 512) : 512;
+
+    for (const shot of shots) {
+      try {
+        let base64: string | null = null;
+        try {
+          const nativeImg = nativeImage.createFromPath(shot.filePath);
+          if (!nativeImg.isEmpty()) {
+            const { width, height } = nativeImg.getSize();
+            if (width > 0 && height > 0) {
+              const maxDimensionLimit = Math.max(1, maxDescribeDimension);
+              const maxOriginalDimension = Math.max(width, height);
+              const shouldResize = maxOriginalDimension > maxDimensionLimit;
+              let processedImage = nativeImg;
+              if (shouldResize) {
+                const scale = maxDimensionLimit / maxOriginalDimension;
+                const targetWidth = Math.max(1, Math.round(width * scale));
+                const targetHeight = Math.max(1, Math.round(height * scale));
+                processedImage = nativeImg.resize({
+                  width: targetWidth,
+                  height: targetHeight,
+                  quality: "best",
+                });
+              }
+              if (!processedImage.isEmpty()) {
+                const pngBuffer = processedImage.toPNG();
+                base64 = pngBuffer.length > 0 ? pngBuffer.toString("base64") : null;
+              }
+            }
+          }
+        } catch (nativeError) {
+          logger.warn("summarizeVideoContent: nativeImage processing failed, falling back to buffer", {
+            frame: shot.filePath,
+            err: String(nativeError),
+          });
+        }
+
+        if (!base64) {
+          const imgBuf = await fsp.readFile(shot.filePath);
+          base64 = imgBuf.toString("base64");
+        }
+        const desc = await describeImage(base64, { prompt: visionPrompt });
+        if (desc && desc.trim()) {
+          descriptions.push(`[t=${shot.timeSec.toFixed(1)}s] ${desc.trim()}`);
+        }
+        logger.info("summarizeVideoContent: described screenshot", { file: shot.filePath, timeSec: shot.timeSec, desc });
+      } catch (e) {
+        logger.warn("summarizeVideoContent: describe screenshot failed", { frame: shot.filePath, err: String(e) });
+      }
+    }
+
+    if (descriptions.length > 0) {
+      return { summary: descriptions.join("\n") };
+    }
+  } catch (e) {
+    logger.warn("summarizeVideoContent failed, falling back to default summary", { videoPath, err: String(e) });
+  }
+
+  return { summary: `Video file ${path.basename(videoPath)}.` };
 }
 
 interface ListFilesRequestBody {
@@ -783,15 +865,16 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
     }
 
     // Detect file type
-    const ext = path.extname(filePath).replace(/^\./, "").toLowerCase();
-    const isImage = isImageExt(ext);
+  const ext = path.extname(filePath).replace(/^\./, "").toLowerCase();
+  const isImage = isImageExt(ext);
+  const isVideo = (CATEGORY_EXTENSIONS.video || []).includes(ext);
 
     let txtPath: string | null = null;
     let content: string;
     if (overrideContent && overrideContent.trim()) {
       // Use provided content directly
       content = overrideContent;
-    } else if (isImage) {
+  } else if (isImage) {
       // Read image and send to vision model
       const buf = await fsp.readFile(filePath);
       const base64 = buf.toString("base64");
@@ -809,6 +892,14 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
       const tempDir = await ensureTempDir();
       txtPath = path.join(tempDir, `${Date.now()}_${path.basename(filePath, path.extname(filePath))}_vision.txt`);
       content = description || `Image file ${path.basename(filePath)}.`;
+      await fsp.writeFile(txtPath, content, "utf8");
+    } else if (isVideo) {
+      const cfg = configManager.getConfig();
+      const language = normalizeLanguage(cfg.language ?? "zh", "zh");
+      const { summary } = await summarizeVideoContent(filePath, language, cfg.videoCapture);
+      const tempDir = await ensureTempDir();
+      txtPath = path.join(tempDir, `${Date.now()}_${path.basename(filePath, path.extname(filePath))}_video.txt`);
+      content = summary;
       await fsp.writeFile(txtPath, content, "utf8");
     } else {
       // ensure .txt for non-image
@@ -868,7 +959,7 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
       processed: true,
       updated_at: nowIso,
     };
-    if (isImage && content) {
+    if ((isImage || isVideo) && content) {
       fileUpdate.summary = content;
     }
     try {
@@ -1489,6 +1580,17 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
           } catch (e) {
             logger.warn("Auto-tag image processing failed", e as unknown);
           }
+        } else if (category === "video") {
+          // Video: summarize via screenshots, then extract tags
+          try {
+            const { summary } = await summarizeVideoContent(destPath, language, cfg.videoCapture);
+            autoSummary = summary ? summary.slice(0, maxLen) : null;
+            if (autoSummary && autoSummary.length > 0) {
+              autoTags = await extractTagsFromText(autoSummary);
+            }
+          } catch (e) {
+            logger.warn("Auto-tag video processing failed", e as unknown);
+          }
         } else if (category === "document") {
           // Document: convert to text, take snippet, then extract tags
           try {
@@ -1625,13 +1727,26 @@ export async function recommendDirectoryHandler(req: Request, res: Response): Pr
     }
 
     const filename = path.basename(filePath);
+    const ext = path.extname(filePath).replace(/^\./, "").toLowerCase();
+    const isVideo = (CATEGORY_EXTENSIONS.video || []).includes(ext);
 
     // Convert to text for analysis unless content is provided
     let txtPath: string | null = null;
     let content: string;
+  let usedContentSource: "request.content" | "converted_file" = "converted_file";
     if (overrideContent && overrideContent.trim()) {
       content = overrideContent;
       txtPath = null;
+      usedContentSource = "request.content";
+    } else if (isVideo) {
+      const cfg = configManager.getConfig();
+      const language = normalizeLanguage(cfg.language ?? "zh", "zh");
+      const { summary } = await summarizeVideoContent(filePath, language, cfg.videoCapture);
+      content = summary;
+  usedContentSource = "converted_file";
+      const tempDir = await ensureTempDir();
+      txtPath = path.join(tempDir, `${Date.now()}_${path.basename(filePath, path.extname(filePath))}_video_summary.txt`);
+      await fsp.writeFile(txtPath, content, "utf8");
     } else {
       txtPath = await ensureTxtFile(filePath);
       if (!txtPath || !txtPath.trim()) {
@@ -1715,7 +1830,7 @@ export async function recommendDirectoryHandler(req: Request, res: Response): Pr
         confidence: Math.max(0, Math.min(1, confidence)),
         reasoning,
         alternatives,
-        used_content_source: overrideContent && overrideContent.trim() ? "request.content" : "converted_file",
+        used_content_source: usedContentSource,
         txt_path: txtPath,
       },
       error: null,

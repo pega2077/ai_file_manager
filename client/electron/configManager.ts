@@ -118,6 +118,14 @@ export interface AppConfig {
   isInitialized?: boolean;
   /** When not using local service, custom API base URL */
   apiBaseUrl?: string;
+  /** Optional video capture settings for extracting screenshots from videos */
+  videoCapture?: {
+    intervalSeconds?: number;
+    maxShots?: number;
+    targetWidth?: number;
+    targetHeight?: number;
+    timeoutMs?: number;
+  };
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -181,7 +189,13 @@ const DEFAULT_CONFIG: AppConfig = {
   autoClassifyWithoutConfirmation: true,
   workDirectory: '',
   isInitialized: false,
-  apiBaseUrl: 'http://localhost:8000'
+  apiBaseUrl: 'http://localhost:8000',
+  videoCapture: {
+    intervalSeconds: 10,
+    maxShots: 5,
+    // targetWidth/targetHeight omitted => use video native resolution
+    timeoutMs: 60000,
+  }
 };
 
 export class ConfigManager {
