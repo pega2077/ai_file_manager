@@ -850,7 +850,8 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
       return;
     }
 
-    const filePath = (record as { path: string }).path;
+    const recordWithSummary = record as { path: string; summary?: string | null };
+    const filePath = recordWithSummary.path;
     const st = await fsp.stat(filePath).catch(() => null);
     if (!st || !st.isFile()) {
       res.status(404).json({
@@ -864,43 +865,67 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
       return;
     }
 
-    // Detect file type
-  const ext = path.extname(filePath).replace(/^\./, "").toLowerCase();
-  const isImage = isImageExt(ext);
-  const isVideo = (CATEGORY_EXTENSIONS.video || []).includes(ext);
+    const ext = path.extname(filePath).replace(/^\./, "").toLowerCase();
+    const isImage = isImageExt(ext);
+    const isVideo = (CATEGORY_EXTENSIONS.video || []).includes(ext);
+    const existingSummary = typeof recordWithSummary.summary === "string" ? recordWithSummary.summary.trim() : "";
 
     let txtPath: string | null = null;
+    let usedContentSource = "converted_file";
     let content: string;
     if (overrideContent && overrideContent.trim()) {
       // Use provided content directly
-      content = overrideContent;
-  } else if (isImage) {
-      // Read image and send to vision model
-      const buf = await fsp.readFile(filePath);
-      const base64 = buf.toString("base64");
-      let description = "";
-      const cfg = configManager.getConfig();
-      const language = normalizeLanguage(cfg.language ?? "zh", "zh");
-      const visionPrompt = buildVisionDescribePrompt(language);
-      try {
-        description = await describeImage(base64, { prompt: visionPrompt });
-      } catch (e) {
-        logger.warn("Image description via vision provider failed, continuing with empty description", e as unknown);
-        description = "";
+      content = overrideContent.trim();
+      usedContentSource = "request.content";
+    } else if (isImage) {
+      if (existingSummary) {
+        content = existingSummary;
+        const tempDir = await ensureTempDir();
+        const safeBase = path.basename(filePath, path.extname(filePath)) || "image";
+        txtPath = path.join(tempDir, `${Date.now()}_${safeBase}_summary.txt`);
+        await fsp.writeFile(txtPath, content, "utf8");
+        usedContentSource = "existing_summary";
+        logger.info("importToRagHandler: using existing summary for image", { fileId, path: filePath });
+      } else {
+        // Read image and send to vision model
+        const buf = await fsp.readFile(filePath);
+        const base64 = buf.toString("base64");
+        let description = "";
+        const cfg = configManager.getConfig();
+        const language = normalizeLanguage(cfg.language ?? "zh", "zh");
+        const visionPrompt = buildVisionDescribePrompt(language);
+        try {
+          description = await describeImage(base64, { prompt: visionPrompt });
+        } catch (e) {
+          logger.warn("Image description via vision provider failed, continuing with empty description", e as unknown);
+          description = "";
+        }
+        // Save a temp txt containing the description for chunking/embedding
+        const tempDir = await ensureTempDir();
+        txtPath = path.join(tempDir, `${Date.now()}_${path.basename(filePath, path.extname(filePath))}_vision.txt`);
+        content = description || `Image file ${path.basename(filePath)}.`;
+        await fsp.writeFile(txtPath, content, "utf8");
+        usedContentSource = "vision";
       }
-      // Save a temp txt containing the description for chunking/embedding
-      const tempDir = await ensureTempDir();
-      txtPath = path.join(tempDir, `${Date.now()}_${path.basename(filePath, path.extname(filePath))}_vision.txt`);
-      content = description || `Image file ${path.basename(filePath)}.`;
-      await fsp.writeFile(txtPath, content, "utf8");
     } else if (isVideo) {
-      const cfg = configManager.getConfig();
-      const language = normalizeLanguage(cfg.language ?? "zh", "zh");
-      const { summary } = await summarizeVideoContent(filePath, language, cfg.videoCapture);
-      const tempDir = await ensureTempDir();
-      txtPath = path.join(tempDir, `${Date.now()}_${path.basename(filePath, path.extname(filePath))}_video.txt`);
-      content = summary;
-      await fsp.writeFile(txtPath, content, "utf8");
+      if (existingSummary) {
+        content = existingSummary;
+        const tempDir = await ensureTempDir();
+        const safeBase = path.basename(filePath, path.extname(filePath)) || "video";
+        txtPath = path.join(tempDir, `${Date.now()}_${safeBase}_summary.txt`);
+        await fsp.writeFile(txtPath, content, "utf8");
+        usedContentSource = "existing_summary";
+        logger.info("importToRagHandler: using existing summary for video", { fileId, path: filePath });
+      } else {
+        const cfg = configManager.getConfig();
+        const language = normalizeLanguage(cfg.language ?? "zh", "zh");
+        const { summary } = await summarizeVideoContent(filePath, language, cfg.videoCapture);
+        const tempDir = await ensureTempDir();
+        txtPath = path.join(tempDir, `${Date.now()}_${path.basename(filePath, path.extname(filePath))}_video.txt`);
+        content = summary;
+        await fsp.writeFile(txtPath, content, "utf8");
+        usedContentSource = "video_summary";
+      }
     } else {
       // ensure .txt for non-image
       txtPath = await ensureTxtFile(filePath);
@@ -959,7 +984,7 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
       processed: true,
       updated_at: nowIso,
     };
-    if ((isImage || isVideo) && content) {
+    if ((isImage || isVideo) && content && content.trim()) {
       fileUpdate.summary = content;
     }
     try {
@@ -986,7 +1011,7 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
         chunk_count: chunks.length,
         embedding_count: embeddings.length,
         dims: embeddings[0]?.length ?? 0,
-        used_content_source: overrideContent && overrideContent.trim() ? "request.content" : (isImage ? "vision" : "converted_file"),
+        used_content_source: usedContentSource,
       },
       error: null,
       timestamp: new Date().toISOString(),

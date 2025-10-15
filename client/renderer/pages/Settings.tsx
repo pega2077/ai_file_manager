@@ -12,7 +12,7 @@
 } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiService, updateApiBaseUrl } from "../services/api";
+import { apiService } from "../services/api";
 import { useTranslation } from "../shared/i18n/I18nProvider";
 import {
   defaultLocale,
