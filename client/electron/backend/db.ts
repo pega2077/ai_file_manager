@@ -1,4 +1,4 @@
-import { Sequelize } from "sequelize";
+import { QueryTypes, Sequelize } from "sequelize";
 import path from "path";
 import fs from "fs";
 import { configManager } from "../configManager";
@@ -62,6 +62,7 @@ export async function initializeDB(): Promise<void> {
         size INTEGER NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT,
+        imported BOOLEAN DEFAULT FALSE,
         processed BOOLEAN DEFAULT FALSE
       );`
     );
@@ -101,6 +102,20 @@ export async function initializeDB(): Promise<void> {
     await sequelize.query(
       `CREATE INDEX IF NOT EXISTS idx_chunks_embedding_id ON chunks(embedding_id);`
     );
+
+    try {
+      const filesTableInfo = await sequelize.query<{ name: string }>("PRAGMA table_info(files);", {
+        type: QueryTypes.SELECT,
+      });
+      const hasImportedColumn = filesTableInfo.some((column) => column.name === "imported");
+      if (!hasImportedColumn) {
+        await sequelize.query("ALTER TABLE files ADD COLUMN imported BOOLEAN DEFAULT FALSE;");
+        await sequelize.query("UPDATE files SET imported = 0 WHERE imported IS NULL;");
+        logger.info("SQLite schema: added missing 'imported' column to files table");
+      }
+    } catch (migrationError) {
+      logger.warn("Failed to ensure 'imported' column exists on files table", migrationError as unknown);
+    }
 
     logger.info("SQLite schema verified/initialized successfully");
     logger.info(`SQLite database file ${existedBefore ? "already existed" : "was created/initialized"}: ${dbPath}`);

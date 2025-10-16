@@ -402,8 +402,14 @@
         "size": "大小",
         "tags": "标签",
         "addedAt": "添加时间",
+        "status": "状态",
+        "importStatus": "导入状态",
         "ragStatus": "知识库",
         "actions": "操作"
+      },
+      "importStatus": {
+        "imported": "已完成",
+        "pending": "待处理"
       },
       "ragStatus": {
         "imported": "已导入",

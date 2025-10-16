@@ -65,6 +65,7 @@ export interface StageFileResponse {
   category: string;
   size: number;
   created_at: string;
+  imported: boolean;
 }
 
 export interface ImportFileResponse {
@@ -78,6 +79,7 @@ export interface ImportFileResponse {
   tags: string[];
   created_at: string;
   processed: boolean;
+  imported: boolean;
 }
 
 export interface ImportedFileItem {
@@ -92,6 +94,7 @@ export interface ImportedFileItem {
   created_at: string;
   updated_at: string;
   processed: boolean;
+  imported: boolean;
 }
 
 export interface FileConversionResult {

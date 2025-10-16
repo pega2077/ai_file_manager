@@ -448,31 +448,31 @@ const FileList: React.FC<FileListProps> = ({
       render: (date: string) => new Date(date).toLocaleString(),
     },
     {
-      title: t("files.table.columns.ragStatus"),
-      dataIndex: "processed",
-      key: "processed",
-      width: 120,
-      render: (processed: boolean) => (
-        <div style={{ display: "flex", alignItems: "center" }}>
-          {processed ? (
-            <>
-              <CheckCircleOutlined
-                style={{ color: "#52c41a", marginRight: 8 }}
-              />
-              <span style={{ color: "#52c41a" }}>
-                {t("files.table.ragStatus.imported")}
-              </span>
-            </>
-          ) : (
-            <>
-              <CloseCircleOutlined
-                style={{ color: "#ff4d4f", marginRight: 8 }}
-              />
-              <span style={{ color: "#ff4d4f" }}>
-                {t("files.table.ragStatus.notImported")}
-              </span>
-            </>
-          )}
+      title: t("files.table.columns.status"),
+      key: "status",
+      width: 200,
+      render: (_: unknown, record: ImportedFileItem) => (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            {record.imported ? (
+              <CheckCircleOutlined style={{ color: "#52c41a", marginRight: 8 }} />
+            ) : (
+              <CloseCircleOutlined style={{ color: "#faad14", marginRight: 8 }} />
+            )}
+            <span style={{ color: record.imported ? "#52c41a" : "#faad14" }}>
+              {t("files.table.columns.importStatus")}: {record.imported ? t("files.table.importStatus.imported") : t("files.table.importStatus.pending")}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            {record.processed ? (
+              <CheckCircleOutlined style={{ color: "#52c41a", marginRight: 8 }} />
+            ) : (
+              <CloseCircleOutlined style={{ color: "#ff4d4f", marginRight: 8 }} />
+            )}
+            <span style={{ color: record.processed ? "#52c41a" : "#ff4d4f" }}>
+              {t("files.table.columns.ragStatus")}: {record.processed ? t("files.table.ragStatus.imported") : t("files.table.ragStatus.notImported")}
+            </span>
+          </div>
         </div>
       ),
     },
@@ -506,7 +506,7 @@ const FileList: React.FC<FileListProps> = ({
             icon={<DatabaseOutlined />}
             onClick={() => handleImportToRag(record)}
             title={t("files.actions.importToRag")}
-            disabled={record.processed}
+            disabled={!record.imported || record.processed}
           />
           <Button
             type="text"

@@ -191,6 +191,7 @@ export async function listFilesHandler(req: Request, res: Response): Promise<voi
       tags: string | null;
       size: number;
       processed: boolean | number | null;
+      imported: boolean | number | null;
       created_at: string;
       updated_at: string | null;
     };
@@ -212,6 +213,7 @@ export async function listFilesHandler(req: Request, res: Response): Promise<voi
         tags: tagsArr,
         size: row.size,
         processed: Boolean(row.processed ?? false),
+        imported: Boolean(row.imported ?? false),
         created_at: row.created_at,
         updated_at: row.updated_at,
       };
@@ -1244,6 +1246,7 @@ export async function stageFileHandler(req: Request, res: Response): Promise<voi
         created_at: nowIso,
         updated_at: null,
         processed: false,
+        imported: false,
       });
     } catch (e) {
       logger.error("DB insert failed for staged file", e as unknown);
@@ -1274,6 +1277,7 @@ export async function stageFileHandler(req: Request, res: Response): Promise<voi
         category,
         size: destStat.size,
         created_at: nowIso,
+        imported: false,
       },
       error: null,
       timestamp: new Date().toISOString(),
@@ -1518,6 +1522,7 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
           created_at: nowIso,
           updated_at: null,
           processed: false,
+          imported: false,
         });
       } catch (e) {
         logger.error("DB insert failed after saving file", e as unknown);
@@ -1644,22 +1649,27 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
           }
         }
 
-        // Persist when we have any result
-        if ((autoSummary && autoSummary.length > 0) || (autoTags && autoTags.length > 0)) {
-          const update: { summary?: string | null; tags?: string | null; updated_at: string } = {
-            updated_at: new Date().toISOString(),
-          };
-          if (autoSummary && autoSummary.length > 0) update.summary = autoSummary;
-          if (autoTags && autoTags.length > 0) update.tags = JSON.stringify(autoTags);
-          try {
-            await FileModel.update(update, { where: { file_id: effectiveFileId } });
-          } catch (e) {
-            logger.warn("Failed to update file with auto tags/summary", e as unknown);
-          }
-        }
       }
     } catch (e) {
       logger.warn("Auto-tag pipeline failed", e as unknown);
+    }
+
+    const hasSummaryUpdate = typeof autoSummary === "string" && autoSummary.length > 0;
+    const hasTagUpdate = Array.isArray(autoTags) && autoTags.length > 0;
+    const importStatusUpdate: { imported: boolean; updated_at: string; summary?: string | null; tags?: string | null } = {
+      imported: true,
+      updated_at: new Date().toISOString(),
+    };
+    if (hasSummaryUpdate) {
+      importStatusUpdate.summary = autoSummary;
+    }
+    if (hasTagUpdate) {
+      importStatusUpdate.tags = JSON.stringify(autoTags);
+    }
+    try {
+      await FileModel.update(importStatusUpdate, { where: { file_id: effectiveFileId } });
+    } catch (e) {
+      logger.warn("Failed to update file with import status or metadata", e as unknown);
     }
 
     res.status(200).json({
@@ -1671,6 +1681,7 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
         filename: destFileName,
         overwritten,
         file_id: effectiveFileId,
+        imported: true,
         // optional enrichment for caller convenience
         tags: autoTags,
         summary: autoSummary ?? undefined,

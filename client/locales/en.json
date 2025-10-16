@@ -403,8 +403,14 @@
         "size": "Size",
         "tags": "Tags",
         "addedAt": "Added Time",
+        "status": "Status",
+        "importStatus": "Import Status",
         "ragStatus": "RAG Status",
         "actions": "Actions"
+      },
+      "importStatus": {
+        "imported": "Completed",
+        "pending": "Pending"
       },
       "ragStatus": {
         "imported": "Imported",

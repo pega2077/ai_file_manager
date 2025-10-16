@@ -14,9 +14,10 @@ export interface FileAttributes {
   created_at: string; // ISO string stored as TEXT
   updated_at: string | null;
   processed: number | boolean | null;
+  imported: number | boolean | null;
 }
 
-type FileCreationAttributes = Optional<FileAttributes, "id" | "summary" | "tags" | "updated_at" | "processed">;
+type FileCreationAttributes = Optional<FileAttributes, "id" | "summary" | "tags" | "updated_at" | "processed" | "imported">;
 
 export class FileModel extends Model<FileAttributes, FileCreationAttributes> implements FileAttributes {
   declare id: number;
@@ -31,6 +32,7 @@ export class FileModel extends Model<FileAttributes, FileCreationAttributes> imp
   declare created_at: string;
   declare updated_at: string | null;
   declare processed: number | boolean | null;
+  declare imported: number | boolean | null;
 }
 
 // Initialize (idempotent) model definition
@@ -85,6 +87,11 @@ FileModel.init(
     processed: {
       type: DataTypes.BOOLEAN,
       allowNull: true,
+    },
+    imported: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
     },
   },
   {
