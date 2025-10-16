@@ -133,7 +133,7 @@ const DEFAULT_CONFIG: AppConfig = {
   localServicePort: 8000,
   localServiceHost: "127.0.0.1",
   // Default to local Ollama as primary LLM provider; can be changed to 'openai'
-  llmProvider: 'ollama',
+  llmProvider: 'pega',
   // Grouped configs (preferred in saved config.json)
   ollama: {
     ollamaEndpoint: "http://127.0.0.1:11434",
