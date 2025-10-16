@@ -14,7 +14,7 @@ import type {
   DirectoryStructureResponse,
   RecommendDirectoryResponse,
   TreeNode,
-  StageFileResponse,
+  ImportedFileItem,
 } from "../shared/types";
 import {
   dispatchFileImportNotification,
@@ -28,8 +28,16 @@ type FileImportProps = {
 
 type ProcessFileResult = "complete" | "pending-user-action";
 
-type QueuedImportTask = {
+type ImportMode = "new" | "retry";
+
+type EnqueueTaskPayload = {
   path: string;
+  mode: ImportMode;
+  existingFileId?: string;
+  displayName?: string;
+};
+
+type QueuedImportTask = EnqueueTaskPayload & {
   deferred: {
     resolve: () => void;
     reject: (error: unknown) => void;
@@ -58,6 +66,7 @@ const CONVERSION_KEYWORDS = [
 export type FileImportRef = {
   startImport: () => Promise<void> | void;
   importFile: (filePath: string) => Promise<void>;
+  retryImport: (file: ImportedFileItem) => Promise<void>;
 };
 
 const FileImport = forwardRef<FileImportRef, FileImportProps>(
@@ -483,8 +492,14 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
     };
 
     const processFile = useCallback(
-      async (filePath: string): Promise<ProcessFileResult> => {
-        notifyStart(filePath);
+      async (task: QueuedImportTask): Promise<ProcessFileResult> => {
+        const normalizedPath = (task.path || "").trim();
+        if (!normalizedPath) {
+          notifyError("empty_path", t("files.messages.fileImportFailed"));
+          return "complete";
+        }
+
+        notifyStart(normalizedPath);
 
         let cfg: import("../shared/types").AppConfig | undefined;
         let latestWorkDir = workDirectory;
@@ -504,40 +519,50 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         }
         const lang = (cfg?.language || "en") as "zh" | "en";
 
-        notifyProgress("stage-file", "start", t("files.messages.preparingFile"));
-        let stagedFileInfo: StageFileResponse | null = null;
-        let hideStaging: undefined | (() => void);
-        try {
-          hideStaging = message.loading(t("files.messages.preparingFile"), 0);
-          const stageResponse = await apiService.stageFileToTemp(filePath);
-          if (!stageResponse.success) {
-            const errMsg = stageResponse.message || t("files.messages.stageFailed");
-            message.error(errMsg);
-            notifyError(new Error(errMsg), errMsg);
-            return "complete";
-          }
-          stagedFileInfo = stageResponse.data as StageFileResponse;
+        const isRetry = task.mode === "retry" && typeof task.existingFileId === "string" && task.existingFileId.trim().length > 0;
+        let stagedPath = normalizedPath;
+        let stagedId = task.existingFileId ?? "";
+
+        if (isRetry) {
+          notifyProgress("stage-file", "start", t("files.messages.preparingFile"));
+          setImportFilePath(stagedPath);
+          setStagedFileId(stagedId);
           notifyProgress("stage-file", "success", t("common.success"));
-        } catch (err) {
-          message.error(t("files.messages.stageFailed"));
-          window.electronAPI?.logError?.("stageFileToTemp failed", {
-            err: String(err),
-          });
-          notifyError(err, t("files.messages.stageFailed"));
-          return "complete";
-        } finally {
-          hideStaging?.();
+        } else {
+          notifyProgress("stage-file", "start", t("files.messages.preparingFile"));
+          let hideStaging: undefined | (() => void);
+          try {
+            hideStaging = message.loading(t("files.messages.preparingFile"), 0);
+            const stageResponse = await apiService.stageFileToTemp(stagedPath);
+            if (!stageResponse.success) {
+              const errMsg = stageResponse.message || t("files.messages.stageFailed");
+              message.error(errMsg);
+              notifyError(new Error(errMsg), errMsg);
+              return "complete";
+            }
+            const data = stageResponse.data as { staged_path?: string; file_id?: string } | undefined;
+            const stagedPathFromResponse = (data?.staged_path || "").trim();
+            const stagedIdFromResponse = (data?.file_id || "").trim();
+            if (!stagedPathFromResponse || !stagedIdFromResponse) {
+              notifyError("stageFileToTemp returned empty", t("files.messages.stageFailed"));
+              return "complete";
+            }
+            stagedPath = stagedPathFromResponse;
+            stagedId = stagedIdFromResponse;
+            setImportFilePath(stagedPath);
+            setStagedFileId(stagedId);
+            notifyProgress("stage-file", "success", t("common.success"));
+          } catch (err) {
+            message.error(t("files.messages.stageFailed"));
+            window.electronAPI?.logError?.("stageFileToTemp failed", {
+              err: String(err),
+            });
+            notifyError(err, t("files.messages.stageFailed"));
+            return "complete";
+          } finally {
+            hideStaging?.();
+          }
         }
-
-        if (!stagedFileInfo) {
-          notifyError("stageFileToTemp returned empty", t("files.messages.stageFailed"));
-          return "complete";
-        }
-
-        const stagedPath = stagedFileInfo.staged_path;
-        const stagedId = stagedFileInfo.file_id;
-        setImportFilePath(stagedPath);
-        setStagedFileId(stagedId);
 
         notifyProgress("list-directory", "start");
         let directoryStructureResponse: Awaited<ReturnType<typeof apiService.listDirectoryRecursive>>;
@@ -775,7 +800,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       currentImportRef.current = nextTask;
       isProcessingRef.current = true;
       try {
-        const status = await processFile(nextTask.path);
+        const status = await processFile(nextTask);
         if (status === "complete") {
           nextTask.deferred.resolve();
           currentImportRef.current = null;
@@ -805,15 +830,16 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       void runNextImport();
     }, [runNextImport]);
 
-    const enqueueFile = useCallback(
-      (filePath: string) =>
+    const enqueueTask = useCallback(
+      (task: EnqueueTaskPayload) =>
         new Promise<void>((resolve, reject) => {
-          const normalizedPath = filePath.trim();
+          const normalizedPath = (task.path || "").trim();
           if (!normalizedPath) {
             resolve();
             return;
           }
           importQueueRef.current.push({
+            ...task,
             path: normalizedPath,
             deferred: { resolve, reject },
           });
@@ -849,7 +875,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         }
 
         normalizedPaths.forEach((path) => {
-          void enqueueFile(path);
+          void enqueueTask({ path, mode: "new" });
         });
       } catch (error) {
         message.error(t("files.messages.fileImportFailed"));
@@ -857,13 +883,48 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           err: String(error),
         });
       }
-    }, [enqueueFile, t, workDirectory]);
+    }, [enqueueTask, t, workDirectory]);
+
+    const retryImport = useCallback(
+      (file: ImportedFileItem) => {
+        const safePath = (file?.path || "").trim();
+        const fileId = (file?.file_id || "").trim();
+        if (!safePath || !fileId) {
+          const errMsg = t("files.messages.retryImportMissingSource");
+          message.error(errMsg);
+          return Promise.reject(new Error("missing retry source"));
+        }
+        message.info(
+          t("files.messages.retryImportQueued", {
+            name: file.name,
+          })
+        );
+        return enqueueTask({
+          path: safePath,
+          mode: "retry",
+          existingFileId: fileId,
+          displayName: file.name,
+        }).catch((error) => {
+          message.error(
+            t("files.messages.retryImportFailed", {
+              name: file.name,
+            })
+          );
+          return Promise.reject(error);
+        });
+      },
+      [enqueueTask, t]
+    );
 
     // Expose imperative API
     useImperativeHandle(
       ref,
-      () => ({ startImport: handleStartImport, importFile: enqueueFile }),
-      [handleStartImport, enqueueFile]
+      () => ({
+        startImport: handleStartImport,
+        importFile: (filePath: string) => enqueueTask({ path: filePath, mode: "new" }),
+        retryImport,
+      }),
+      [handleStartImport, enqueueTask, retryImport]
     );
 
     const handleImportConfirm = async () => {

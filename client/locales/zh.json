@@ -452,8 +452,8 @@
     },
     "delete": {
       "confirmTitle": "删除“{name}”？",
-      "confirmMessage": "将从知识库中移除该文件记录，此操作不可撤销。",
-      "deleteFromDiskLabel": "同时删除磁盘上的文件",
+      "confirmMessage": "将从知识库中移除该文件记录，可选择将原始文件移动到系统回收站。此操作不可撤销。",
+      "deleteFromDiskLabel": "将原始文件移动到回收站",
       "okText": "删除"
     },
     "placeholders": {
@@ -524,7 +524,13 @@
       "describingImage": "正在描述图片内容以便分析...",
       "imageDescription": "图片描述：{text}",
       "conversionError": "文件转换失败，请检查转换服务配置。",
-      "conversionErrorWithReason": "文件转换失败：{reason}"
+      "conversionErrorWithReason": "文件转换失败：{reason}",
+      "retryImportConfirmTitle": "是否重新导入“{name}”？",
+      "retryImportConfirmContent": "上次导入未完成，是否立即重试？",
+      "retryImportQueued": "已开始重新导入“{name}”。",
+      "retryImportFailed": "无法开始重新导入“{name}”。",
+      "retryImportMissingSource": "无法重新导入，临时文件已丢失，请重新从原文件导入。",
+      "retryImportUnavailable": "当前无法执行重新导入，请稍后再试。"
     ,
       "updateSuccess": "文件已更新",
       "updateFailed": "更新文件失败",

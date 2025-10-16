@@ -15,7 +15,7 @@ import { buildVisionDescribePrompt, normalizeLanguage } from "./utils/promptHelp
 import type { SupportedLang } from "./utils/promptHelper";
 import { buildExtractTagsMessages } from "./utils/promptHelper";
 import type { ProviderName } from "./utils/llm";
-import { app, nativeImage } from "electron";
+import { app, nativeImage, shell } from "electron";
 import { randomUUID } from "crypto";
 import ChunkModel from "./models/chunk";
 import { updateGlobalFaissIndex } from "./utils/vectorStore";
@@ -1075,6 +1075,35 @@ export async function deleteFileHandler(req: Request, res: Response): Promise<vo
       return;
     }
 
+    // Optionally delete the actual file from disk
+    let fileMovedToTrash = false;
+    if (confirmDelete) {
+      const absPath = fileRow.path;
+      if (absPath && typeof absPath === "string") {
+        const canTrash = typeof shell?.trashItem === "function";
+        try {
+          if (canTrash) {
+            await shell.trashItem(absPath);
+          } else {
+            await fsp.unlink(absPath);
+            logger.warn("shell.trashItem is unavailable, file permanently deleted", { path: absPath });
+          }
+          fileMovedToTrash = true;
+        } catch (e) {
+          logger.error("Failed to move file to recycle bin", { path: absPath, err: String(e) });
+          res.status(500).json({
+            success: false,
+            message: "internal_error",
+            data: null,
+            error: { code: "TRASH_FAILED", message: "Failed to move file to recycle bin", details: null },
+            timestamp: new Date().toISOString(),
+            request_id: "",
+          });
+          return;
+        }
+      }
+    }
+
     // Find all chunks belonging to this file
     const chunks = (await ChunkModel.findAll({ where: { file_id: fileId }, raw: true }).catch(() => [])) as Array<{
       id: number;
@@ -1098,19 +1127,6 @@ export async function deleteFileHandler(req: Request, res: Response): Promise<vo
       logger.warn("Failed to delete chunk rows", e as unknown);
     }
 
-    // Optionally delete the actual file from disk
-    if (confirmDelete) {
-      const absPath = fileRow.path;
-      try {
-        if (absPath && typeof absPath === "string") {
-          await fsp.unlink(absPath);
-        }
-      } catch (e) {
-        // If file missing or cannot delete, log but continue
-        logger.warn("Failed to delete file from disk", { path: absPath, err: String(e) });
-      }
-    }
-
     // Delete the file record itself
     try {
       await FileModel.destroy({ where: { file_id: fileId } });
@@ -1121,7 +1137,12 @@ export async function deleteFileHandler(req: Request, res: Response): Promise<vo
     res.status(200).json({
       success: true,
       message: "ok",
-      data: { file_id: fileId, rag_removed_chunks: chunks.length, file_deleted: confirmDelete },
+      data: {
+        file_id: fileId,
+        rag_removed_chunks: chunks.length,
+        file_deleted: confirmDelete ? fileMovedToTrash : false,
+        file_trashed: fileMovedToTrash,
+      },
       error: null,
       timestamp: new Date().toISOString(),
       request_id: "",

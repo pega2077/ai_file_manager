@@ -453,8 +453,8 @@
     },
     "delete": {
       "confirmTitle": "Delete \"{name}\"?",
-      "confirmMessage": "The file record will be removed from the knowledge base. This action cannot be undone.",
-      "deleteFromDiskLabel": "Also delete the file from disk",
+  "confirmMessage": "The file record will be removed from the knowledge base. You can also move the original file to the system recycle bin.",
+  "deleteFromDiskLabel": "Move the original file to the recycle bin",
       "okText": "Delete"
     },
     "placeholders": {
@@ -522,7 +522,13 @@
       "describingImage": "Describing image content for analysis...",
       "imageDescription": "Image description: {text}",
       "conversionError": "File conversion failed. Please verify the conversion service configuration.",
-      "conversionErrorWithReason": "File conversion failed: {reason}"
+      "conversionErrorWithReason": "File conversion failed: {reason}",
+      "retryImportConfirmTitle": "Retry importing \"{name}\"?",
+      "retryImportConfirmContent": "The previous import didn't finish. Do you want to retry now?",
+      "retryImportQueued": "Retry import started for \"{name}\".",
+      "retryImportFailed": "Failed to start retry import for \"{name}\".",
+      "retryImportMissingSource": "Cannot retry import because the staged file is missing. Please import from the original file again.",
+      "retryImportUnavailable": "Retry import is currently unavailable. Please try again later."
     ,
       "updateSuccess": "File updated",
       "updateFailed": "Failed to update file",

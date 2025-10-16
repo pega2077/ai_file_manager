@@ -57,11 +57,13 @@ interface FileListResponse {
 interface FileListProps {
   onFileSelect?: (file: ImportedFileItem) => void;
   refreshTrigger?: number;
+  onRetryImport?: (file: ImportedFileItem) => void;
 }
 
 const FileList: React.FC<FileListProps> = ({
   onFileSelect,
   refreshTrigger,
+  onRetryImport,
 }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -212,7 +214,7 @@ const FileList: React.FC<FileListProps> = ({
   };
 
   const handleDelete = (file: ImportedFileItem) => {
-    let deleteFromDisk = false;
+    let moveToRecycleBin = false;
     Modal.confirm({
       title: t("files.delete.confirmTitle", { name: file.name }),
       content: (
@@ -220,7 +222,7 @@ const FileList: React.FC<FileListProps> = ({
           <p>{t("files.delete.confirmMessage", { name: file.name })}</p>
           <Checkbox
             onChange={(e) => {
-              deleteFromDisk = e.target.checked;
+              moveToRecycleBin = e.target.checked;
             }}
           >
             {t("files.delete.deleteFromDiskLabel")}
@@ -237,7 +239,7 @@ const FileList: React.FC<FileListProps> = ({
         try {
           const resp = await apiService.deleteFile({
             file_id: file.file_id,
-            deleteFromDisk,
+            deleteFromDisk: moveToRecycleBin,
           });
           if (!resp.success) {
             handled = true;
@@ -359,6 +361,54 @@ const FileList: React.FC<FileListProps> = ({
     navigate(`/search?${params.toString()}`);
   };
 
+  const handlePendingStatusClick = useCallback(
+    (file: ImportedFileItem) => {
+      if (!onRetryImport) {
+        return;
+      }
+      Modal.confirm({
+        title: t("files.messages.retryImportConfirmTitle", { name: file.name }),
+        content: t("files.messages.retryImportConfirmContent"),
+        okText: t("common.retry"),
+        cancelText: t("common.cancel"),
+        icon: <ReloadOutlined style={{ color: "#faad14" }} />,
+        centered: true,
+        onOk: () => {
+          onRetryImport(file);
+        },
+      });
+    },
+    [onRetryImport, t]
+  );
+
+  const getCategoryLabel = useCallback(
+    (rawCategory?: string | null) => {
+      const normalized = (rawCategory ?? "").trim();
+      if (!normalized) {
+        return t("files.table.category.uncategorized");
+      }
+
+      const lower = normalized.toLowerCase();
+      const categoryLocaleMap: Record<string, string> = {
+        document: "files.options.categories.document",
+        sheet: "files.options.categories.sheet",
+        image: "files.options.categories.image",
+        video: "files.options.categories.video",
+        audio: "files.options.categories.audio",
+        archive: "files.options.categories.archive",
+        other: "files.options.categories.other",
+      };
+
+      const translationKey = categoryLocaleMap[lower];
+      if (translationKey) {
+        return t(translationKey);
+      }
+
+      return normalized;
+    },
+    [t]
+  );
+
   // 格式化文件大小
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 B";
@@ -385,27 +435,6 @@ const FileList: React.FC<FileListProps> = ({
         </div>
       ),
     },
-    // {
-    //   title: t('files.table.columns.path'),
-    //   dataIndex: 'path',
-    //   key: 'path',
-    //   ellipsis: true,
-    //   width: 200,
-    //   render: (path: string) => (
-    //     <span style={{ fontSize: '12px', color: '#666' }} title={path}>
-    //       {getRelativePath(path)}
-    //     </span>
-    //   ),
-    // },
-    // {
-    //   title: t('files.table.columns.type'),
-    //   dataIndex: 'type',
-    //   key: 'type',
-    //   width: 100,
-    //   render: (type: string) => (
-    //     <Tag color="blue">{type}</Tag>
-    //   ),
-    // },
     {
       title: t("files.table.columns.category"),
       dataIndex: "category",
@@ -413,7 +442,7 @@ const FileList: React.FC<FileListProps> = ({
       width: 120,
       render: (category: string) => (
         <Tag color="green">
-          {category || t("files.table.category.uncategorized")}
+          {getCategoryLabel(category)}
         </Tag>
       ),
     },
@@ -460,7 +489,34 @@ const FileList: React.FC<FileListProps> = ({
               <CloseCircleOutlined style={{ color: "#faad14", marginRight: 8 }} />
             )}
             <span style={{ color: record.imported ? "#52c41a" : "#faad14" }}>
-              {t("files.table.columns.importStatus")}: {record.imported ? t("files.table.importStatus.imported") : t("files.table.importStatus.pending")}
+              {t("files.table.columns.importStatus")}: {record.imported ? (
+                t("files.table.importStatus.imported")
+              ) : onRetryImport ? (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  style={{
+                    color: "#faad14",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                  }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handlePendingStatusClick(record);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handlePendingStatusClick(record);
+                    }
+                  }}
+                >
+                  {t("files.table.importStatus.pending")}
+                </span>
+              ) : (
+                t("files.table.importStatus.pending")
+              )}
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center" }}>
@@ -816,6 +872,24 @@ const FilesPage: React.FC = () => {
     setRefreshTrigger((prev) => prev + 1);
   };
 
+  const handleRetryImport = useCallback(
+    (file: ImportedFileItem) => {
+      if (!importRef.current) {
+        message.error(t("files.messages.retryImportUnavailable"));
+        return;
+      }
+      void importRef.current
+        .retryImport(file)
+        .catch((error: unknown) => {
+          window.electronAPI?.logError?.("retry import failed", {
+            err: String(error),
+            fileId: file.file_id,
+          });
+        });
+    },
+    [t]
+  );
+
   // Load workDirectory from app config
   useEffect(() => {
     const loadWorkDirectory = async () => {
@@ -919,7 +993,7 @@ const FilesPage: React.FC = () => {
             </div>
           </div>
 
-          <FileList refreshTrigger={refreshTrigger} />
+      <FileList refreshTrigger={refreshTrigger} onRetryImport={handleRetryImport} />
           <FileImport
             ref={importRef}
             onImported={() => setRefreshTrigger((prev) => prev + 1)}
