@@ -88,6 +88,10 @@
     "descriptions": {
       "llmProvider": "Choose which LLM provider to use for directory suggestions and analysis."
     },
+    "hints": {
+      "emptyDirectory": "You can pick an empty folder and let the AI create a directory structure for you.",
+      "existingDirectory": "You can also use an existing folder and skip the directory creation step."
+    },
     "messages": {
       "fetchSuccess": "Directory recommendation generated successfully",
       "fetchPresetSuccess": "Loaded preset directory structure from local configuration",
@@ -97,7 +101,19 @@
       "createSuccess": "Directory structure created successfully",
       "createError": "Failed to generate directory structure",
       "providerUpdated": "LLM provider updated",
-      "providerUpdateError": "Failed to update LLM provider"
+      "providerUpdateError": "Failed to update LLM provider",
+      "listDirectoryError": "Failed to inspect directory contents.",
+      "emptyDirectoryReady": "Selected directory is empty. AI can create the structure for you.",
+      "skipCreateSuccess": "Setup completed using the existing directory structure.",
+      "finalizeError": "Failed to save setup configuration. Please try again.",
+      "directoryHasItems": "This directory already contains {count} items. You can skip directory creation if the layout fits your needs.",
+      "directoryIsEmpty": "This directory is empty and ready for AI to generate the structure."
+    },
+    "dialogs": {
+      "existingStructureTitle": "Existing structure detected",
+      "existingStructureContent": "The selected folder ({path}) already contains {count} items. Do you want to skip directory creation and finish setup instead?",
+      "skipCreation": "Skip creation and finish",
+      "continueCreation": "Continue creating folders"
     },
     "cards": {
       "stepOne": "Step 1 - Select Working Directory",

@@ -87,6 +87,21 @@ interface FileDetail {
   };
 }
 
+export interface DirectoryListItem {
+  name: string;
+  type: 'file' | 'folder';
+  size: number | null;
+  created_at: string | null;
+  modified_at: string | null;
+  item_count: number | null;
+}
+
+export interface DirectoryListResponse {
+  directory_path: string;
+  items: DirectoryListItem[];
+  total_count: number;
+}
+
 export interface ChatSearchResultItem {
   chunk_record_id: number;
   chunk_id: string;
@@ -528,11 +543,16 @@ class ApiService {
   }
 
   // 列出目录结构
-  async listDirectory(directoryPath: string) {
-    return this.request('/files/list-directory', {
+  async listDirectory(directoryPath: string): Promise<ApiResponse<DirectoryListResponse>> {
+    const trimmedPath = directoryPath.trim();
+    if (!trimmedPath) {
+      return Promise.reject(Object.assign(new Error('Directory path is required'), { code: 'INVALID_DIRECTORY_PATH' }));
+    }
+
+    return this.request<DirectoryListResponse>('/files/list-directory', {
       method: 'POST',
       body: JSON.stringify({
-        directory_path: directoryPath,
+        directory_path: trimmedPath,
       }),
     });
   }
@@ -895,6 +915,7 @@ class ApiService {
       }),
     });
   }
+
 
   // 智能问答
   async askQuestion(question: string, options?: AskQuestionOptions): Promise<ApiResponse<QuestionResponse>> {

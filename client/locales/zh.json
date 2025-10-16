@@ -87,6 +87,10 @@
     "descriptions": {
       "llmProvider": "选择用于目录推荐和分析的大模型提供商。"
     },
+    "hints": {
+      "emptyDirectory": "可以选择一个空目录，让 AI 为你创建目录结构。",
+      "existingDirectory": "也可以使用已有目录，跳过目录创建步骤。"
+    },
     "messages": {
       "fetchSuccess": "已生成目录结构推荐",
       "fetchPresetSuccess": "已从本地预设加载目录结构",
@@ -96,7 +100,19 @@
       "createSuccess": "目录结构已生成并初始化完成",
       "createError": "生成目录结构时出现错误",
       "providerUpdated": "已更新大模型提供商",
-      "providerUpdateError": "更新大模型提供商失败"
+      "providerUpdateError": "更新大模型提供商失败",
+      "listDirectoryError": "检查目录内容失败",
+      "emptyDirectoryReady": "已选择空目录，将由 AI 创建目录结构。",
+      "skipCreateSuccess": "已使用现有目录结构完成初始化。",
+      "finalizeError": "保存初始化配置失败，请重试。",
+      "directoryHasItems": "当前目录已有 {count} 个项目，如无需调整可直接跳过目录创建。",
+      "directoryIsEmpty": "当前目录为空，可由 AI 自动生成结构。"
+    },
+    "dialogs": {
+      "existingStructureTitle": "检测到现有目录结构",
+      "existingStructureContent": "所选文件夹（{path}）中已有 {count} 个项目。是否跳过目录创建直接完成初始化？",
+      "skipCreation": "跳过创建并完成",
+      "continueCreation": "继续创建目录"
     },
     "cards": {
       "stepOne": "第1步 - 选择工作目录",

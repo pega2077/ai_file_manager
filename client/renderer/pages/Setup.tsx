@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Steps, Form, Input, Button, Card, Space, message, AutoComplete, Tree, Collapse, Select, Typography } from 'antd';
-import { apiService } from '../services/api';
+import { Layout, Steps, Form, Input, Button, Card, Space, message, AutoComplete, Tree, Collapse, Select, Typography, Modal } from 'antd';
+import { apiService, type DirectoryListItem, type DirectoryListResponse } from '../services/api';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 import { findDirectoryStructurePreset } from '../shared/directoryPresets';
 import type { DirectoryStructureEntry } from '../shared/directoryPresets';
@@ -47,6 +47,9 @@ const Setup = () => {
   const [form] = Form.useForm();
   const [directoryStructure, setDirectoryStructure] = useState<DirectoryStructure[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>('');
+  const [existingDirectoryItems, setExistingDirectoryItems] = useState<DirectoryListItem[]>([]);
+  const [checkedDirectoryPath, setCheckedDirectoryPath] = useState<string | null>(null);
+  const [checkingDirectory, setCheckingDirectory] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dirStyle, setDirStyle] = useState<'flat' | 'hierarchical'>('flat');
   const [collapseActiveKeys, setCollapseActiveKeys] = useState<string[]>([]);
@@ -148,22 +151,24 @@ const Setup = () => {
     return { treeData: root, expandedKeys };
   };
 
-  const handleGetDirectoryStructure = async () => {
+  const fetchDirectoryStructure = async (skipPreset: boolean) => {
     try {
       setLoading(true);
       const values = await form.validateFields();
-      const presetDirectories = findDirectoryStructurePreset({
-        profession: values.profession,
-        purpose: values.purpose,
-        style: dirStyle,
-        language: locale,
-      });
+      if (!skipPreset) {
+        const presetDirectories = findDirectoryStructurePreset({
+          profession: values.profession,
+          purpose: values.purpose,
+          style: dirStyle,
+          language: locale,
+        });
 
-      if (presetDirectories && presetDirectories.length > 0) {
-        setDirectoryStructure(presetDirectories);
-        setCollapseActiveKeys([]);
-        message.success(t('setup.messages.fetchPresetSuccess'));
-        return;
+        if (presetDirectories && presetDirectories.length > 0) {
+          setDirectoryStructure(presetDirectories);
+          setCollapseActiveKeys([]);
+          message.success(t('setup.messages.fetchPresetSuccess'));
+          return;
+        }
       }
       const response = await apiService.getDirectoryStructure({
         profession: values.profession,
@@ -192,8 +197,95 @@ const Setup = () => {
     }
   };
 
+  const handleGetDirectoryStructure = () => {
+    void fetchDirectoryStructure(false);
+  };
+
   const handleRegenerate = () => {
-    handleGetDirectoryStructure();
+    void fetchDirectoryStructure(true);
+  };
+
+  const logElectronError = async (title: string, details: Record<string, unknown>) => {
+    if (typeof window.electronAPI.logError !== 'function') {
+      return;
+    }
+
+    try {
+      await window.electronAPI.logError(title, details);
+    } catch {
+      // Intentionally ignore logging failures to avoid blocking user flow
+    }
+  };
+
+  const completeInitialization = async (workDirectory: string, successMessage: string): Promise<void> => {
+    try {
+      await window.electronAPI.updateAppConfig({ isInitialized: true, workDirectory });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      message.error(t('setup.messages.finalizeError'));
+      await logElectronError('Failed to finalize setup configuration', {
+        error: errorMessage,
+        workDirectory,
+      });
+      throw new Error('SETUP_FINALIZE_FAILED');
+    }
+
+    if (typeof window.electronAPI.showBotWindow === 'function') {
+      try {
+        await window.electronAPI.showBotWindow();
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        await logElectronError('Failed to show assistant window after setup', {
+          error: errorMessage,
+        });
+      }
+    }
+
+    message.success(successMessage);
+    navigate('/files');
+  };
+
+  const inspectDirectory = async (folderPath: string) => {
+    setCheckingDirectory(true);
+    try {
+      const response = await apiService.listDirectory(folderPath);
+      if (!response.success) {
+        message.error(t('setup.messages.listDirectoryError'));
+        return;
+      }
+
+      const payload = (response.data ?? undefined) as DirectoryListResponse | undefined;
+      const items = Array.isArray(payload?.items) ? payload.items : [];
+
+      setExistingDirectoryItems(items);
+      setCheckedDirectoryPath(payload?.directory_path ?? folderPath);
+
+      if (items.length === 0) {
+        message.success(t('setup.messages.emptyDirectoryReady'));
+        return;
+      }
+
+      Modal.confirm({
+        title: t('setup.dialogs.existingStructureTitle'),
+        content: t('setup.dialogs.existingStructureContent', {
+          path: payload?.directory_path ?? folderPath,
+          count: items.length,
+        }),
+        okText: t('setup.dialogs.skipCreation'),
+        cancelText: t('setup.dialogs.continueCreation'),
+        centered: true,
+        onOk: () => completeInitialization(folderPath, t('setup.messages.skipCreateSuccess')),
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      message.error(t('setup.messages.listDirectoryError'));
+      await logElectronError('Failed to inspect directory contents during setup', {
+        error: errorMessage,
+        directory: folderPath,
+      });
+    } finally {
+      setCheckingDirectory(false);
+    }
   };
 
   const providerOptions = useMemo(
@@ -208,6 +300,20 @@ const Setup = () => {
     [t],
   );
 
+  const directoryHasExistingItems = useMemo(() => {
+    if (!selectedFolder || checkedDirectoryPath !== selectedFolder) {
+      return false;
+    }
+    return existingDirectoryItems.length > 0;
+  }, [selectedFolder, checkedDirectoryPath, existingDirectoryItems]);
+
+  const directoryCheckedAndEmpty = useMemo(() => {
+    if (!selectedFolder || checkedDirectoryPath !== selectedFolder) {
+      return false;
+    }
+    return existingDirectoryItems.length === 0;
+  }, [selectedFolder, checkedDirectoryPath, existingDirectoryItems]);
+
   const handleProviderChange = async (value: LlmProvider) => {
     setLlmProvider(value);
     apiService.setProvider(value);
@@ -221,6 +327,9 @@ const Setup = () => {
   };
 
   const handleContinueToProfile = () => {
+    if (checkingDirectory) {
+      return;
+    }
     setCurrentStep(1);
   };
 
@@ -233,6 +342,9 @@ const Setup = () => {
       const folder = await window.electronAPI.selectFolder();
       if (folder) {
         setSelectedFolder(folder);
+        setExistingDirectoryItems([]);
+        setCheckedDirectoryPath(null);
+        await inspectDirectory(folder);
       }
     } catch (error) {
       message.error(t('setup.messages.selectFolderError'));
@@ -255,31 +367,14 @@ const Setup = () => {
       const response = await apiService.createFolders(selectedFolder, structure);
 
       if (response.success) {
-        await window.electronAPI.updateAppConfig({ isInitialized: true, workDirectory: selectedFolder });
-        try {
-          if (typeof window.electronAPI.showBotWindow === 'function') {
-            await window.electronAPI.showBotWindow();
-          }
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          if (typeof window.electronAPI.logError === 'function') {
-            try {
-              await window.electronAPI.logError(
-                'Failed to show assistant window after setup',
-                { error: errorMessage },
-              );
-            } catch {
-              // Intentionally ignore logging failures
-            }
-          }
-        }
-        message.success(t('setup.messages.createSuccess'));
-        navigate('/files');
+        await completeInitialization(selectedFolder, t('setup.messages.createSuccess'));
       } else {
         message.error(t('setup.messages.createError'));
       }
     } catch (error) {
-      message.error(t('setup.messages.createError'));
+      if (!(error instanceof Error && error.message === 'SETUP_FINALIZE_FAILED')) {
+        message.error(t('setup.messages.createError'));
+      }
     } finally {
       setLoading(false);
     }
@@ -292,7 +387,7 @@ const Setup = () => {
           <Card title={t('setup.cards.stepOne')} style={{ maxWidth: 600, margin: '0 auto' }}>
             <Space direction="vertical" style={{ width: '100%' }}>
               <div>
-                <Button onClick={handleSelectFolder}>
+                <Button onClick={handleSelectFolder} loading={checkingDirectory}>
                   {t('setup.actions.selectTarget')}
                 </Button>
                 {selectedFolder && (
@@ -300,6 +395,24 @@ const Setup = () => {
                     {t('setup.actions.selectedPath', { path: selectedFolder })}
                   </div>
                 )}
+                <div style={{ marginTop: 12 }}>
+                  <Text type="secondary" style={{ display: 'block' }}>
+                    {t('setup.hints.emptyDirectory')}
+                  </Text>
+                  <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
+                    {t('setup.hints.existingDirectory')}
+                  </Text>
+                  {directoryHasExistingItems && (
+                    <Text type="warning" style={{ display: 'block', marginTop: 8 }}>
+                      {t('setup.messages.directoryHasItems', { count: existingDirectoryItems.length })}
+                    </Text>
+                  )}
+                  {directoryCheckedAndEmpty && (
+                    <Text type="success" style={{ display: 'block', marginTop: 8 }}>
+                      {t('setup.messages.directoryIsEmpty')}
+                    </Text>
+                  )}
+                </div>
               </div>
               <div>
                 <Text strong>{t('setup.form.llmProviderLabel')}</Text>
@@ -316,7 +429,7 @@ const Setup = () => {
               <Button
                 type="primary"
                 onClick={handleContinueToProfile}
-                disabled={!selectedFolder}
+                disabled={!selectedFolder || checkingDirectory}
                 block
               >
                 {t('setup.actions.continue')}
