@@ -204,9 +204,18 @@
       "autoClassify": "Auto classify without confirmation",
       "useLocalService": "Use local service",
       "workDirectory": "Current workspace",
-      "apiBaseUrl": "API base URL",
-      "llmProvider": "LLM provider",
-      "pegaApiKey": "Stored Pega API key"
+    "apiBaseUrl": "API base URL",
+    "llmProvider": "LLM provider",
+    "pegaApiKey": "Stored Pega API key",
+    "pegaAccount": "Signed-in Pega account",
+    "pegaUserEmail": "Email",
+    "pegaUserPhone": "Phone",
+    "pegaUserStatus": "Status",
+    "pegaUserIp": "Last IP",
+    "pegaUserTokenBalance": "Available tokens",
+    "pegaUserMonthlyTokenQuota": "Monthly quota",
+    "pegaUserCreatedAt": "Created at",
+    "pegaUserUpdatedAt": "Updated at"
     },
     "descriptions": {
       "enablePreview": "Double-click files to preview them before opening the default app.",
@@ -247,7 +256,7 @@
       "clear": "Clear all data",
       "back": "Back to files",
       "saveApiBaseUrl": "Save API URL",
-      "managePegaAccount": "Manage Pega account"
+  "managePegaAccount": "Manage Pega account"
     },
     "messages": {
       "saveSuccess": "Settings saved",
@@ -265,7 +274,18 @@
       "unknownError": "Unknown error",
       "providerUpdated": "LLM provider updated",
       "providerUpdateError": "Failed to update LLM provider",
-      "pegaKeyMissing": "No API key saved"
+      "pegaKeyMissing": "No API key saved",
+      "pegaLoginRestriction": "未登录用户大语言模型调用频率有限制",
+      "pegaLoadingUser": "Loading account information...",
+      "pegaUserMissing": "Unable to load account information.",
+      "pegaValueUnavailable": "Unavailable",
+      "pegaLoginSuccess": "Signed in successfully",
+      "pegaLoginFailed": "Sign-in failed. Please try again.",
+      "pegaApiKeyFailed": "Failed to fetch API key",
+      "pegaApiKeySuccess": "API key retrieved and saved",
+      "pegaFetchUserFailed": "Failed to load Pega account information.",
+      "pegaUnauthorized": "Session expired. Please sign in again.",
+      "pegaUserNotFound": "No user record was returned."
     }
   },
   "pegaAuth": {

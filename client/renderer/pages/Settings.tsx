@@ -9,6 +9,9 @@
   Modal,
   Select,
   InputNumber,
+  Alert,
+  Spin,
+  Descriptions,
 } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +22,7 @@ import {
   normalizeLocale,
   type SupportedLocale,
 } from "../shared/i18n";
+import type { ApiError, PegaUser } from "../services/api";
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -73,6 +77,10 @@ const Settings = () => {
     language: locale,
   }));
   const [apiBaseUrl, setApiBaseUrl] = useState("http://localhost:8000");
+  const [pegaAuthToken, setPegaAuthTokenState] = useState("");
+  const [pegaUser, setPegaUser] = useState<PegaUser | null>(null);
+  const [pegaUserLoading, setPegaUserLoading] = useState(false);
+  const [pegaUserError, setPegaUserError] = useState<string | null>(null);
 
   const languageOptions = useMemo(
     () =>
@@ -112,6 +120,38 @@ const Settings = () => {
     return `${key.slice(0, 4)}...${key.slice(-4)}`;
   }, [settings.pegaApiKey, t]);
 
+  const hasPegaToken = useMemo(
+    () => pegaAuthToken.trim().length > 0,
+    [pegaAuthToken]
+  );
+
+  const pegaNumberFormatter = useMemo(
+    () => new Intl.NumberFormat(locale),
+    [locale]
+  );
+
+  const formatPegaValue = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined) {
+      return t("settings.messages.pegaValueUnavailable");
+    }
+    if (typeof value === "number") {
+      return pegaNumberFormatter.format(value);
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : t("settings.messages.pegaValueUnavailable");
+  };
+
+  const formatPegaDate = (value: string | null) => {
+    if (!value) {
+      return t("settings.messages.pegaValueUnavailable");
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+    return parsed.toLocaleString(locale);
+  };
+
   useEffect(() => {
     const loadSettings = async () => {
       let nextState: SettingsState = { ...DEFAULT_SETTINGS, language: locale };
@@ -128,6 +168,10 @@ const Settings = () => {
           const pegaKey =
             typeof appConfig.pega?.pegaApiKey === "string"
               ? appConfig.pega.pegaApiKey
+              : "";
+          const pegaToken =
+            typeof appConfig.pega?.pegaAuthToken === "string"
+              ? appConfig.pega.pegaAuthToken
               : "";
           nextState = {
             ...nextState,
@@ -170,6 +214,8 @@ const Settings = () => {
           }
 
           apiService.setProvider(provider);
+          apiService.setPegaAuthToken(pegaToken);
+          setPegaAuthTokenState(pegaToken);
         }
       } catch (error) {
         console.error("Failed to load app config:", error);
@@ -195,10 +241,75 @@ const Settings = () => {
   }, [locale]);
 
   useEffect(() => {
+    apiService.setLocale(locale);
+  }, [locale]);
+
+  useEffect(() => {
     if (settings.useLocalService) {
       setApiBaseUrl("http://localhost:8000");
     }
   }, [settings.useLocalService]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (settings.llmProvider !== "pega") {
+      setPegaUser(null);
+      setPegaUserError(null);
+      setPegaUserLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const normalizedToken = pegaAuthToken.trim();
+    if (!normalizedToken) {
+      setPegaUser(null);
+      setPegaUserError(null);
+      setPegaUserLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const fetchUser = async () => {
+      setPegaUserLoading(true);
+      setPegaUserError(null);
+      try {
+        const response = await apiService.getPegaCurrentUser(normalizedToken);
+        if (cancelled) {
+          return;
+        }
+        setPegaUser(response.user ?? null);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        setPegaUser(null);
+        console.error("Failed to load Pega account information:", error);
+        const maybeApiError = error as ApiError;
+        if (maybeApiError?.status === 401) {
+          setPegaUserError(t("settings.messages.pegaUnauthorized"));
+          return;
+        }
+        if (maybeApiError?.status === 404) {
+          setPegaUserError(t("settings.messages.pegaUserNotFound"));
+          return;
+        }
+        setPegaUserError(t("settings.messages.pegaFetchUserFailed"));
+      } finally {
+        if (!cancelled) {
+          setPegaUserLoading(false);
+        }
+      }
+    };
+
+    void fetchUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.llmProvider, pegaAuthToken, t]);
 
   const handleSettingChange = <K extends keyof SettingsState>(
     key: K,
@@ -211,7 +322,6 @@ const Settings = () => {
   };
 
   const handleLocaleChange = async (value: SupportedLocale) => {
-    console.log("Selected locale:", value);
     if (value !== locale) {
       const newSettings = { ...settings, language: value };
       try {
@@ -306,6 +416,10 @@ const Settings = () => {
             workDirectory: "",
           });
           setSettings((prev) => ({ ...prev, workDirectory: "" }));
+          setPegaAuthTokenState("");
+          setPegaUser(null);
+          setPegaUserError(null);
+          apiService.setPegaAuthToken(null);
         } catch (error) {
           message.error(t("settings.messages.clearException"));
           console.error("Clear data error:", error);
@@ -490,17 +604,117 @@ const Settings = () => {
               </div>
 
               {settings.llmProvider === "pega" && (
-                <div>
-                  <Text strong>{t("settings.labels.pegaApiKey")}</Text>
-                  <div style={{ marginTop: 8 }}>
-                    <Text code>{truncatedPegaKey}</Text>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                  }}
+                >
+                  <div>
+                    <Text strong>{t("settings.labels.pegaApiKey")}</Text>
+                    <div style={{ marginTop: 8 }}>
+                      <Text code>{truncatedPegaKey}</Text>
+                    </div>
+                    <Text
+                      type="secondary"
+                      style={{ display: "block", marginTop: 8 }}
+                    >
+                      {t("settings.descriptions.pegaApiKey")}
+                    </Text>
                   </div>
-                  <Text
-                    type="secondary"
-                    style={{ display: "block", marginTop: 8 }}
-                  >
-                    {t("settings.descriptions.pegaApiKey")}
-                  </Text>
+
+                  <div>
+                    <Text strong>{t("settings.labels.pegaAccount")}</Text>
+                    {hasPegaToken ? (
+                      pegaUserLoading ? (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            marginTop: 8,
+                          }}
+                        >
+                          <Spin size="small" />
+                          <Text type="secondary">
+                            {t("settings.messages.pegaLoadingUser")}
+                          </Text>
+                        </div>
+                      ) : pegaUser ? (
+                        <Descriptions
+                          size="small"
+                          column={1}
+                          style={{ marginTop: 8 }}
+                        >
+                          <Descriptions.Item
+                            label={t("settings.labels.pegaUserEmail")}
+                          >
+                            {formatPegaValue(pegaUser.email)}
+                          </Descriptions.Item>
+                          <Descriptions.Item
+                            label={t("settings.labels.pegaUserPhone")}
+                          >
+                            {formatPegaValue(pegaUser.phone)}
+                          </Descriptions.Item>
+                          <Descriptions.Item
+                            label={t("settings.labels.pegaUserStatus")}
+                          >
+                            {formatPegaValue(pegaUser.status)}
+                          </Descriptions.Item>
+                          <Descriptions.Item
+                            label={t("settings.labels.pegaUserIp")}
+                          >
+                            {formatPegaValue(pegaUser.ip)}
+                          </Descriptions.Item>
+                          <Descriptions.Item
+                            label={t("settings.labels.pegaUserTokenBalance")}
+                          >
+                            {formatPegaValue(pegaUser.tokenBalance)}
+                          </Descriptions.Item>
+                          <Descriptions.Item
+                            label={t("settings.labels.pegaUserMonthlyTokenQuota")}
+                          >
+                            {formatPegaValue(pegaUser.monthlyTokenQuota)}
+                          </Descriptions.Item>
+                          <Descriptions.Item
+                            label={t("settings.labels.pegaUserCreatedAt")}
+                          >
+                            {formatPegaDate(pegaUser.createdAt)}
+                          </Descriptions.Item>
+                          <Descriptions.Item
+                            label={t("settings.labels.pegaUserUpdatedAt")}
+                          >
+                            {formatPegaDate(pegaUser.updatedAt)}
+                          </Descriptions.Item>
+                        </Descriptions>
+                      ) : (
+                        <Alert
+                          type="warning"
+                          showIcon
+                          style={{ marginTop: 8 }}
+                          message={t("settings.messages.pegaUserMissing")}
+                        />
+                      )
+                    ) : (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        style={{ marginTop: 8 }}
+                        message={t("settings.messages.pegaLoginRestriction")}
+                      />
+                    )}
+
+                    {pegaUserError && (
+                      <Alert
+                        type="error"
+                        showIcon
+                        style={{ marginTop: 8 }}
+                        message={pegaUserError}
+                      />
+                    )}
+                  </div>
+
                   <Button
                     type="primary"
                     style={{ marginTop: 12 }}

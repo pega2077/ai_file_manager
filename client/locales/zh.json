@@ -203,9 +203,18 @@
       "autoClassify": "自动分类无需确认",
       "useLocalService": "使用本地服务",
       "workDirectory": "当前工作空间",
-      "apiBaseUrl": "API 基础地址",
-      "llmProvider": "大模型提供商",
-      "pegaApiKey": "Pega API Key"
+    "apiBaseUrl": "API 基础地址",
+    "llmProvider": "大模型提供商",
+    "pegaApiKey": "Pega API Key",
+    "pegaAccount": "已登录的 Pega 账号",
+    "pegaUserEmail": "邮箱",
+    "pegaUserPhone": "手机号",
+    "pegaUserStatus": "状态",
+    "pegaUserIp": "最近登录 IP",
+    "pegaUserTokenBalance": "可用 Token",
+    "pegaUserMonthlyTokenQuota": "月度配额",
+    "pegaUserCreatedAt": "创建时间",
+    "pegaUserUpdatedAt": "更新时间"
     },
     "descriptions": {
       "enablePreview": "双击文件以在打开默认应用前预览。",
@@ -246,7 +255,7 @@
       "clear": "清除所有数据",
       "back": "返回文件",
       "saveApiBaseUrl": "保存 API 地址",
-      "managePegaAccount": "管理 Pega 账号"
+  "managePegaAccount": "管理 Pega 账号"
     },
     "messages": {
       "saveSuccess": "设置已保存",
@@ -264,7 +273,18 @@
       "unknownError": "未知错误",
       "providerUpdated": "已更新大模型提供商",
       "providerUpdateError": "更新大模型提供商失败",
-      "pegaKeyMissing": "尚未保存 API Key"
+      "pegaKeyMissing": "尚未保存 API Key",
+      "pegaLoginRestriction": "未登录用户大语言模型调用频率有限制",
+      "pegaLoadingUser": "正在加载账号信息...",
+      "pegaUserMissing": "暂无法获取账号信息。",
+      "pegaValueUnavailable": "暂无数据",
+      "pegaLoginSuccess": "登录成功",
+      "pegaLoginFailed": "登录失败，请重试。",
+      "pegaApiKeyFailed": "获取 API Key 失败",
+      "pegaApiKeySuccess": "API Key 获取并保存成功",
+      "pegaFetchUserFailed": "获取 Pega 账号信息失败。",
+      "pegaUnauthorized": "会话已过期，请重新登录。",
+      "pegaUserNotFound": "未返回用户信息。"
     }
   },
   "pegaAuth": {

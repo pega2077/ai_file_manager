@@ -5,20 +5,13 @@ import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 import type { AppConfig } from '../shared/types';
+import { detectPegaIdentifier, maskPegaCredential } from '../shared/utils/pegaAuth';
 
 const { Content } = Layout;
 const { Title, Paragraph, Text } = Typography;
 
 const TAB_LOGIN = 'login';
 const TAB_REGISTER = 'register';
-
-type IdentifierType = 'email' | 'phone';
-
-interface IdentifierDetectionResult {
-  type: IdentifierType;
-  normalized: string;
-  raw: string;
-}
 
 interface LoginFormValues {
   identifier: string;
@@ -31,57 +24,8 @@ interface RegisterFormValues {
   confirmPassword: string;
 }
 
-const maskValue = (value: string, fallback: string): string => {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return fallback;
-  }
-  if (trimmed.length <= 8) {
-    return trimmed;
-  }
-  return `${trimmed.slice(0, 4)}...${trimmed.slice(-4)}`;
-};
-
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const phoneCandidatePattern = /^[+]?\d{6,20}$/;
-const phoneBasicPattern = /^[+]?\d+$/;
-
-const detectIdentifier = (input: string): IdentifierDetectionResult | null => {
-  const trimmed = input.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  const lowered = trimmed.toLowerCase();
-  if (emailPattern.test(lowered)) {
-    return {
-      type: 'email',
-      normalized: lowered,
-      raw: trimmed,
-    };
-  }
-
-  const sanitized = trimmed.replace(/[\s()-]/g, '');
-  if (!phoneBasicPattern.test(sanitized)) {
-    return null;
-  }
-
-  const digits = sanitized.startsWith('+') ? sanitized.slice(1) : sanitized;
-  if (!/^[0-9]{6,20}$/.test(digits)) {
-    return null;
-  }
-
-  const normalized = sanitized.startsWith('+') ? `+${digits}` : digits;
-  if (phoneCandidatePattern.test(normalized)) {
-    return {
-      type: 'phone',
-      normalized,
-      raw: trimmed,
-    };
-  }
-
-  return null;
-};
+const maskValue = maskPegaCredential;
+const detectIdentifier = detectPegaIdentifier;
 
 const PegaAuth = () => {
   const { t } = useTranslation();
@@ -104,10 +48,11 @@ const PegaAuth = () => {
         if (!mounted || !cfg) {
           return;
         }
-        const savedApiKey = typeof cfg.pega?.pegaApiKey === 'string' ? cfg.pega?.pegaApiKey : '';
-        const savedToken = typeof cfg.pega?.pegaAuthToken === 'string' ? cfg.pega?.pegaAuthToken : '';
+        const savedApiKey = typeof cfg.pega?.pegaApiKey === 'string' ? cfg.pega.pegaApiKey : '';
+        const savedToken = typeof cfg.pega?.pegaAuthToken === 'string' ? cfg.pega.pegaAuthToken : '';
         setStoredApiKey(savedApiKey ?? '');
         setStoredToken(savedToken ?? '');
+        apiService.setPegaAuthToken(savedToken ?? '');
         const fallbackProvider = ((cfg.llmProvider && cfg.llmProvider !== 'pega'
           ? cfg.llmProvider
           : cfg.pega?.pegaPreviousProvider) ?? 'ollama') as AppConfig['llmProvider'];
@@ -196,6 +141,7 @@ const PegaAuth = () => {
       };
       await window.electronAPI.updateAppConfig({ llmProvider: 'pega', pega: nextPegaConfig });
       apiService.setProvider('pega');
+      apiService.setPegaAuthToken(token);
 
       setStoredApiKey(apiKey);
       setStoredToken(token);
@@ -329,6 +275,7 @@ const PegaAuth = () => {
       } else {
         apiService.clearProviderCache();
       }
+      apiService.setPegaAuthToken(null);
       setStoredApiKey('');
       setStoredToken('');
       setPreviousProvider(fallbackProvider);

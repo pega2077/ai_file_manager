@@ -257,10 +257,23 @@ interface SystemConfigUpdate {
 
 type ProviderName = 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega';
 
+export interface PegaUser {
+  id: number;
+  email: string | null;
+  phone: string | null;
+  status: string | null;
+  ip: string | null;
+  tokenBalance: number | null;
+  monthlyTokenQuota: number | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 class ApiService {
   private locale = 'en';
   private provider: ProviderName | null = null;
   private pegaBaseUrl: string | null = null;
+  private pegaAuthToken: string | null = null;
 
   private async ensureProvider(): Promise<ProviderName> {
     // Load once from app config via IPC and cache locally
@@ -286,6 +299,20 @@ class ApiService {
   clearProviderCache() {
     this.provider = null;
     this.pegaBaseUrl = null;
+    this.pegaAuthToken = null;
+  }
+
+  setPegaAuthToken(token: string | null) {
+    if (!token) {
+      this.pegaAuthToken = null;
+      return;
+    }
+    const trimmed = token.trim();
+    this.pegaAuthToken = trimmed.length > 0 ? trimmed : null;
+  }
+
+  clearPegaAuthToken() {
+    this.pegaAuthToken = null;
   }
 
   setLocale(locale: string) {
@@ -445,6 +472,76 @@ class ApiService {
     });
 
     return this.parseJsonOrThrow<T>(response);
+  }
+
+  private async ensurePegaAuthToken(): Promise<string | null> {
+    if (this.pegaAuthToken) {
+      return this.pegaAuthToken;
+    }
+
+    if (!window.electronAPI) {
+      return null;
+    }
+
+    try {
+      const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const token = typeof cfg?.pega?.pegaAuthToken === 'string' ? cfg.pega.pegaAuthToken.trim() : '';
+      this.pegaAuthToken = token.length > 0 ? token : null;
+      return this.pegaAuthToken;
+    } catch (error) {
+      console.warn('Failed to resolve Pega auth token from config:', error);
+      return null;
+    }
+  }
+
+  private extractPegaUser(payload: unknown): PegaUser | null {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+
+    const container = payload as Record<string, unknown>;
+    const rawUser = container.user;
+    if (!rawUser || typeof rawUser !== 'object') {
+      return null;
+    }
+
+    const userRecord = rawUser as Record<string, unknown>;
+    const rawId = userRecord.id;
+    const numericId = typeof rawId === 'number' ? rawId : Number(rawId);
+    if (typeof numericId !== 'number' || Number.isNaN(numericId)) {
+      return null;
+    }
+
+    const toOptionalString = (value: unknown): string | null => {
+      if (typeof value !== 'string') {
+        return null;
+      }
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const toOptionalNumber = (value: unknown): number | null => {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === 'string' && value.trim().length > 0) {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+      return null;
+    };
+
+    return {
+      id: numericId,
+      email: toOptionalString(userRecord.email),
+      phone: toOptionalString(userRecord.phone),
+      status: toOptionalString(userRecord.status),
+      ip: toOptionalString(userRecord.ip),
+      tokenBalance: toOptionalNumber(userRecord.tokenBalance),
+      monthlyTokenQuota: toOptionalNumber(userRecord.monthlyTokenQuota),
+      createdAt: toOptionalString(userRecord.createdAt),
+      updatedAt: toOptionalString(userRecord.updatedAt),
+    };
   }
 
   private extractToken(payload: unknown): string | undefined {
@@ -962,6 +1059,26 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  }
+
+  async getPegaCurrentUser(token?: string) {
+    const providedToken = token?.trim() ?? '';
+    const authToken = providedToken.length > 0 ? providedToken : await this.ensurePegaAuthToken();
+    if (!authToken) {
+      throw new Error('Missing Pega authentication token');
+    }
+
+    this.pegaAuthToken = authToken;
+    const response = await this.requestFromPega<Record<string, unknown>>('/auth/me', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    });
+    return {
+      user: this.extractPegaUser(response),
+      raw: response,
+    };
   }
 
   async registerPegaAccount(payload: { email?: string; phone?: string; password: string }) {
