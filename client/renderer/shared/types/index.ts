@@ -118,12 +118,50 @@ export interface WebpageConversionResult {
 }
 
 // Mirror of main process AppConfig for renderer typing convenience
+export interface OllamaConfig {
+  ollamaEndpoint?: string;
+  ollamaModel?: string;
+  ollamaEmbedModel?: string;
+  ollamaVisionModel?: string;
+  ollamaApiKey?: string;
+}
+
+export interface OpenAIConfig {
+  openaiEndpoint?: string;
+  openaiApiKey?: string;
+  openaiModel?: string;
+  openaiEmbedModel?: string;
+  openaiVisionModel?: string;
+}
+
+export interface OpenRouterConfig {
+  openrouterEndpoint?: string;
+  openrouterApiKey?: string;
+  openrouterModel?: string;
+  openrouterEmbedModel?: string;
+  openrouterEmbedEndpoint?: string;
+  openrouterEmbedKey?: string;
+  openrouterVisionModel?: string;
+}
+
+export interface BailianConfig {
+  bailianEndpoint?: string;
+  bailianApiKey?: string;
+  bailianModel?: string;
+  bailianEmbedModel?: string;
+  bailianVisionModel?: string;
+}
+
 export interface AppConfig {
   useLocalService: boolean;
   localServicePort: number;
   localServiceHost: string;
   /** Selected LLM provider for chat/completions */
   llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega';
+  ollama?: OllamaConfig;
+  openai?: OpenAIConfig;
+  openrouter?: OpenRouterConfig;
+  bailian?: BailianConfig;
   ollamaEndpoint?: string;
   ollamaModel?: string;
   ollamaEmbedModel?: string;

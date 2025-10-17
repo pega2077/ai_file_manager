@@ -10,6 +10,10 @@ import Settings from './pages/Settings';
 import Bot from './pages/Bot';
 import Convert from './pages/Convert';
 import PegaAuth from './pages/PegaAuth';
+import OllamaConfig from './pages/providers/OllamaConfig';
+import OpenAIConfig from './pages/providers/OpenAIConfig';
+import OpenRouterConfig from './pages/providers/OpenRouterConfig';
+import BailianConfig from './pages/providers/BailianConfig';
 
 type NavigationPayload = {
   route?: string;
@@ -56,7 +60,11 @@ function App() {
         <Route path="/search" element={<Search />} />
         <Route path="/setup" element={<Setup />} />
         <Route path="/settings" element={<Settings />} />
-  <Route path="/settings/pega-auth" element={<PegaAuth />} />
+        <Route path="/settings/pega-auth" element={<PegaAuth />} />
+        <Route path="/settings/providers/ollama" element={<OllamaConfig />} />
+        <Route path="/settings/providers/openai" element={<OpenAIConfig />} />
+        <Route path="/settings/providers/openrouter" element={<OpenRouterConfig />} />
+        <Route path="/settings/providers/bailian" element={<BailianConfig />} />
         <Route path="/bot" element={<Bot />} />
         <Route path="/convert" element={<Convert />} />
       </Routes>

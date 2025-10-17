@@ -603,6 +603,37 @@ const Settings = () => {
                 </Text>
               </div>
 
+              <div>
+                <Text strong>{t("settings.labels.providerConfigPages")}</Text>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    marginTop: 8,
+                  }}
+                >
+                  <Button onClick={() => navigate("/settings/providers/ollama")}>
+                    {t("settings.actions.configureOllama")}
+                  </Button>
+                  <Button onClick={() => navigate("/settings/providers/openai")}>
+                    {t("settings.actions.configureOpenai")}
+                  </Button>
+                  <Button onClick={() => navigate("/settings/providers/openrouter")}>
+                    {t("settings.actions.configureOpenrouter")}
+                  </Button>
+                  <Button onClick={() => navigate("/settings/providers/bailian")}>
+                    {t("settings.actions.configureBailian")}
+                  </Button>
+                </div>
+                <Text
+                  type="secondary"
+                  style={{ display: "block", marginTop: 8 }}
+                >
+                  {t("settings.descriptions.providerConfigPages")}
+                </Text>
+              </div>
+
               {settings.llmProvider === "pega" && (
                 <div
                   style={{

@@ -204,18 +204,19 @@
       "autoClassify": "Auto classify without confirmation",
       "useLocalService": "Use local service",
       "workDirectory": "Current workspace",
-    "apiBaseUrl": "API base URL",
-    "llmProvider": "LLM provider",
-    "pegaApiKey": "Stored Pega API key",
-    "pegaAccount": "Signed-in Pega account",
-    "pegaUserEmail": "Email",
-    "pegaUserPhone": "Phone",
-    "pegaUserStatus": "Status",
-    "pegaUserIp": "Last IP",
-    "pegaUserTokenBalance": "Available tokens",
-    "pegaUserMonthlyTokenQuota": "Monthly quota",
-    "pegaUserCreatedAt": "Created at",
-    "pegaUserUpdatedAt": "Updated at"
+      "apiBaseUrl": "API base URL",
+      "llmProvider": "LLM provider",
+      "pegaApiKey": "Stored Pega API key",
+      "pegaAccount": "Signed-in Pega account",
+      "pegaUserEmail": "Email",
+      "pegaUserPhone": "Phone",
+      "pegaUserStatus": "Status",
+      "pegaUserIp": "Last IP",
+      "pegaUserTokenBalance": "Available tokens",
+      "pegaUserMonthlyTokenQuota": "Monthly quota",
+      "pegaUserCreatedAt": "Created at",
+      "pegaUserUpdatedAt": "Updated at",
+      "providerConfigPages": "LLM configuration pages"
     },
     "descriptions": {
       "enablePreview": "Double-click files to preview them before opening the default app.",
@@ -227,7 +228,8 @@
       "workDirectory": "The workspace folder is defined during setup. Re-run the setup wizard to change it.",
       "apiBaseUrl": "Base URL of this program's web service.",
       "llmProvider": "Applies to intelligent directory suggestions, embeddings, and chat analysis.",
-      "pegaApiKey": "Stored securely in config.json. Update it by signing in below when it expires."
+      "pegaApiKey": "Stored securely in config.json. Update it by signing in below when it expires.",
+      "providerConfigPages": "Open dedicated pages to manage credentials and defaults for each provider."
     },
     "placeholders": {
       "apiBaseUrl": "http://localhost:8000"
@@ -256,7 +258,11 @@
       "clear": "Clear all data",
       "back": "Back to files",
       "saveApiBaseUrl": "Save API URL",
-  "managePegaAccount": "Manage Pega account"
+      "managePegaAccount": "Manage Pega account",
+      "configureOllama": "Configure Ollama",
+      "configureOpenai": "Configure OpenAI",
+      "configureOpenrouter": "Configure OpenRouter",
+      "configureBailian": "Configure Bailian"
     },
     "messages": {
       "saveSuccess": "Settings saved",
@@ -286,6 +292,134 @@
       "pegaFetchUserFailed": "Failed to load Pega account information.",
       "pegaUnauthorized": "Session expired. Please sign in again.",
       "pegaUserNotFound": "No user record was returned."
+    }
+  },
+  "providerConfig": {
+    "common": {
+      "back": "Back to Settings",
+      "save": "Save changes",
+      "reset": "Reset",
+      "restoreDefaults": "Restore defaults",
+      "restoredDefaults": "Default values applied. Save to persist.",
+      "envHint": "Environment variables override these fields if defined at startup.",
+      "loadError": "Failed to load provider settings.",
+      "saveSuccess": "Provider settings saved.",
+      "saveError": "Failed to save provider settings.",
+      "loading": "Loading configuration..."
+    },
+    "ollama": {
+      "title": "Ollama configuration",
+      "description": "Update the local Ollama gateway endpoint and default models.",
+      "fields": {
+        "endpoint": {
+          "label": "Gateway endpoint",
+          "placeholder": "http://127.0.0.1:11434"
+        },
+        "model": {
+          "label": "Chat model",
+          "placeholder": "qwen3:8b",
+          "extra": "Default model: qwen3:8b"
+        },
+        "embedModel": {
+          "label": "Embedding model",
+          "placeholder": "bge-m3",
+          "extra": "Default embedding model: bge-m3"
+        },
+        "visionModel": {
+          "label": "Vision model",
+          "placeholder": "qwen2.5vl:7b",
+          "extra": "Default vision model: qwen2.5vl:7b"
+        },
+        "apiKey": {
+          "label": "API key",
+          "placeholder": "Leave blank when no key is required"
+        }
+      }
+    },
+    "openai": {
+      "title": "OpenAI configuration",
+      "description": "Provide organization credentials and preferred models for OpenAI.",
+      "fields": {
+        "apiKey": {
+          "label": "API key",
+          "placeholder": "sk-..."
+        },
+        "endpoint": {
+          "label": "API endpoint",
+          "placeholder": "https://api.openai.com/v1"
+        },
+        "organization": {
+          "label": "Organization ID",
+          "placeholder": "Optional organization identifier"
+        },
+        "model": {
+          "label": "Chat model",
+          "placeholder": "gpt-4o-mini",
+          "extra": "Default model: gpt-4o-mini"
+        },
+        "embedModel": {
+          "label": "Embedding model",
+          "placeholder": "text-embedding-3-large",
+          "extra": "Default embedding model: text-embedding-3-large"
+        },
+        "visionModel": {
+          "label": "Vision model",
+          "placeholder": "gpt-4o-mini",
+          "extra": "Default vision model: gpt-4o-mini"
+        }
+      }
+    },
+    "openrouter": {
+      "title": "OpenRouter configuration",
+      "description": "Connect to OpenRouter and pick preferred hosted models.",
+      "fields": {
+        "apiKey": {
+          "label": "API key",
+          "placeholder": "or-..."
+        },
+        "endpoint": {
+          "label": "API endpoint",
+          "placeholder": "https://openrouter.ai/api/v1"
+        },
+        "model": {
+          "label": "Chat model",
+          "placeholder": "openai/gpt-oss-20b:free",
+          "extra": "Default model: openai/gpt-oss-20b:free"
+        },
+        "embedEndpoint": {
+          "label": "Embedding endpoint",
+          "placeholder": "https://openrouter.ai/api/v1/embeddings"
+        },
+        "embedModel": {
+          "label": "Embedding model",
+          "placeholder": "voyage/voyage-large-2-instruct",
+          "extra": "Default embedding model: voyage/voyage-large-2-instruct"
+        }
+      }
+    },
+    "bailian": {
+      "title": "Alibaba Bailian configuration",
+      "description": "Configure Bailian credentials and default models.",
+      "fields": {
+        "apiKey": {
+          "label": "API key",
+          "placeholder": "Enter the Bailian API key"
+        },
+        "endpoint": {
+          "label": "API endpoint",
+          "placeholder": "https://dashscope.aliyuncs.com"
+        },
+        "model": {
+          "label": "Chat model",
+          "placeholder": "qwen-plus",
+          "extra": "Default model: qwen-plus"
+        },
+        "embedModel": {
+          "label": "Embedding model",
+          "placeholder": "text-embedding-v1",
+          "extra": "Default embedding model: text-embedding-v1"
+        }
+      }
     }
   },
   "pegaAuth": {

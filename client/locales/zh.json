@@ -203,18 +203,19 @@
       "autoClassify": "自动分类无需确认",
       "useLocalService": "使用本地服务",
       "workDirectory": "当前工作空间",
-    "apiBaseUrl": "API 基础地址",
-    "llmProvider": "大模型提供商",
-    "pegaApiKey": "Pega API Key",
-    "pegaAccount": "已登录的 Pega 账号",
-    "pegaUserEmail": "邮箱",
-    "pegaUserPhone": "手机号",
-    "pegaUserStatus": "状态",
-    "pegaUserIp": "最近登录 IP",
-    "pegaUserTokenBalance": "可用 Token",
-    "pegaUserMonthlyTokenQuota": "月度配额",
-    "pegaUserCreatedAt": "创建时间",
-    "pegaUserUpdatedAt": "更新时间"
+      "apiBaseUrl": "API 基础地址",
+      "llmProvider": "大模型提供商",
+      "pegaApiKey": "Pega API Key",
+      "pegaAccount": "已登录的 Pega 账号",
+      "pegaUserEmail": "邮箱",
+      "pegaUserPhone": "手机号",
+      "pegaUserStatus": "状态",
+      "pegaUserIp": "最近登录 IP",
+      "pegaUserTokenBalance": "可用 Token",
+      "pegaUserMonthlyTokenQuota": "月度配额",
+      "pegaUserCreatedAt": "创建时间",
+      "pegaUserUpdatedAt": "更新时间",
+      "providerConfigPages": "LLM 配置页面"
     },
     "descriptions": {
       "enablePreview": "双击文件以在打开默认应用前预览。",
@@ -226,7 +227,8 @@
       "workDirectory": "工作空间在初始化流程中设置，可通过重新运行向导进行修改。",
       "apiBaseUrl": "本程序web服务的基础地址",
       "llmProvider": "影响目录推荐、嵌入与智能分析所使用的大模型来源。",
-      "pegaApiKey": "保存在配置文件中，如已失效请重新登录获取。"
+      "pegaApiKey": "保存在配置文件中，如已失效请重新登录获取。",
+      "providerConfigPages": "进入各提供商的独立配置页面，管理凭据与默认模型。"
     },
     "placeholders": {
       "apiBaseUrl": "http://localhost:8000"
@@ -255,7 +257,11 @@
       "clear": "清除所有数据",
       "back": "返回文件",
       "saveApiBaseUrl": "保存 API 地址",
-  "managePegaAccount": "管理 Pega 账号"
+      "managePegaAccount": "管理 Pega 账号",
+      "configureOllama": "配置 Ollama",
+      "configureOpenai": "配置 OpenAI",
+      "configureOpenrouter": "配置 OpenRouter",
+      "configureBailian": "配置百炼"
     },
     "messages": {
       "saveSuccess": "设置已保存",
@@ -285,6 +291,134 @@
       "pegaFetchUserFailed": "获取 Pega 账号信息失败。",
       "pegaUnauthorized": "会话已过期，请重新登录。",
       "pegaUserNotFound": "未返回用户信息。"
+    }
+  },
+  "providerConfig": {
+    "common": {
+      "back": "返回设置",
+      "save": "保存修改",
+      "reset": "重置",
+      "restoreDefaults": "恢复默认值",
+      "restoredDefaults": "已填充默认值，请保存以生效。",
+      "envHint": "如果在启动时设置了环境变量，这些字段会被覆盖。",
+      "loadError": "加载配置失败。",
+      "saveSuccess": "配置已保存。",
+      "saveError": "保存配置失败。",
+      "loading": "正在加载配置..."
+    },
+    "ollama": {
+      "title": "Ollama 配置",
+      "description": "设置本地 Ollama 网关地址和默认模型。",
+      "fields": {
+        "endpoint": {
+          "label": "网关地址",
+          "placeholder": "http://127.0.0.1:11434"
+        },
+        "model": {
+          "label": "对话模型",
+          "placeholder": "qwen3:8b",
+          "extra": "默认模型：qwen3:8b"
+        },
+        "embedModel": {
+          "label": "嵌入模型",
+          "placeholder": "bge-m3",
+          "extra": "默认嵌入模型：bge-m3"
+        },
+        "visionModel": {
+          "label": "视觉模型",
+          "placeholder": "qwen2.5vl:7b",
+          "extra": "默认视觉模型：qwen2.5vl:7b"
+        },
+        "apiKey": {
+          "label": "API Key",
+          "placeholder": "无须密钥可留空"
+        }
+      }
+    },
+    "openai": {
+      "title": "OpenAI 配置",
+      "description": "填写 OpenAI 凭据与首选模型。",
+      "fields": {
+        "apiKey": {
+          "label": "API Key",
+          "placeholder": "sk-..."
+        },
+        "endpoint": {
+          "label": "API 地址",
+          "placeholder": "https://api.openai.com/v1"
+        },
+        "organization": {
+          "label": "组织 ID",
+          "placeholder": "可选，填写组织标识"
+        },
+        "model": {
+          "label": "对话模型",
+          "placeholder": "gpt-4o-mini",
+          "extra": "默认模型：gpt-4o-mini"
+        },
+        "embedModel": {
+          "label": "嵌入模型",
+          "placeholder": "text-embedding-3-large",
+          "extra": "默认嵌入模型：text-embedding-3-large"
+        },
+        "visionModel": {
+          "label": "视觉模型",
+          "placeholder": "gpt-4o-mini",
+          "extra": "默认视觉模型：gpt-4o-mini"
+        }
+      }
+    },
+    "openrouter": {
+      "title": "OpenRouter 配置",
+      "description": "连接 OpenRouter 并选择托管模型。",
+      "fields": {
+        "apiKey": {
+          "label": "API Key",
+          "placeholder": "or-..."
+        },
+        "endpoint": {
+          "label": "API 地址",
+          "placeholder": "https://openrouter.ai/api/v1"
+        },
+        "model": {
+          "label": "对话模型",
+          "placeholder": "openai/gpt-oss-20b:free",
+          "extra": "默认模型：openai/gpt-oss-20b:free"
+        },
+        "embedEndpoint": {
+          "label": "嵌入接口地址",
+          "placeholder": "https://openrouter.ai/api/v1/embeddings"
+        },
+        "embedModel": {
+          "label": "嵌入模型",
+          "placeholder": "voyage/voyage-large-2-instruct",
+          "extra": "默认嵌入模型：voyage/voyage-large-2-instruct"
+        }
+      }
+    },
+    "bailian": {
+      "title": "阿里百炼配置",
+      "description": "设置百炼凭据及默认模型。",
+      "fields": {
+        "apiKey": {
+          "label": "API Key",
+          "placeholder": "请输入百炼 API Key"
+        },
+        "endpoint": {
+          "label": "API 地址",
+          "placeholder": "https://dashscope.aliyuncs.com"
+        },
+        "model": {
+          "label": "对话模型",
+          "placeholder": "qwen-plus",
+          "extra": "默认模型：qwen-plus"
+        },
+        "embedModel": {
+          "label": "嵌入模型",
+          "placeholder": "text-embedding-v1",
+          "extra": "默认嵌入模型：text-embedding-v1"
+        }
+      }
     }
   },
   "pegaAuth": {
