@@ -57,6 +57,23 @@ export interface DirectoryResponse {
   total_count: number;
 }
 
+export interface FileRecordStatus {
+  file_id: string;
+  path: string;
+  name: string;
+  imported: boolean;
+  processed: boolean;
+  category: string;
+  size: number;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface BatchFileRecordResponse {
+  records: FileRecordStatus[];
+  missing: string[];
+}
+
 export interface StageFileResponse {
   file_id: string;
   staged_path: string;

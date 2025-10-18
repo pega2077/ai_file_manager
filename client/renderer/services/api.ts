@@ -2,7 +2,7 @@
 let ROOT_BASE_URL = 'http://localhost:8000';
 let API_BASE_URL = `${ROOT_BASE_URL}/api`;
 
-import { FileConversionResult, StageFileResponse, WebpageConversionResult } from '../shared/types';
+import { BatchFileRecordResponse, FileConversionResult, StageFileResponse, WebpageConversionResult } from '../shared/types';
 import type { AppConfig } from '../shared/types';
 
 // Function to update API base URL
@@ -650,6 +650,23 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify({
         directory_path: trimmedPath,
+      }),
+    });
+  }
+
+  async queryFilesByPaths(paths: string[]): Promise<ApiResponse<BatchFileRecordResponse>> {
+    const sanitized = paths
+      .map((p) => (typeof p === 'string' ? p.trim() : ''))
+      .filter((p) => p.length > 0);
+
+    if (sanitized.length === 0) {
+      return Promise.reject(Object.assign(new Error('paths array is required'), { code: 'INVALID_PATHS' }));
+    }
+
+    return this.request<BatchFileRecordResponse>('/files/query-by-paths', {
+      method: 'POST',
+      body: JSON.stringify({
+        paths: sanitized,
       }),
     });
   }

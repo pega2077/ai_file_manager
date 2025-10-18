@@ -684,8 +684,8 @@
       "retryImportQueued": "已开始重新导入“{name}”。",
       "retryImportFailed": "无法开始重新导入“{name}”。",
       "retryImportMissingSource": "无法重新导入，临时文件已丢失，请重新从原文件导入。",
-      "retryImportUnavailable": "当前无法执行重新导入，请稍后再试。"
-    ,
+      "retryImportUnavailable": "当前无法执行重新导入，请稍后再试。",
+      "fileInWorkspaceProcessed": "工作区内的文件已成功处理",
       "updateSuccess": "文件已更新",
       "updateFailed": "更新文件失败",
       "editInvalidName": "请输入有效的文件名",
@@ -724,7 +724,8 @@
         "type": "类型",
         "size": "大小",
         "createdAt": "创建时间",
-        "modifiedAt": "修改时间",
+    "modifiedAt": "修改时间",
+    "status": "状态",
         "actions": "操作"
       },
       "type": {
@@ -736,7 +737,13 @@
       "preview": "预览",
       "importToRag": "导入知识库",
       "openFolder": "打开文件夹",
-      "openFile": "直接打开"
+      "openFile": "直接打开",
+      "importFile": "导入"
+    },
+    "status": {
+      "imported": "已导入",
+      "processing": "处理中",
+      "notImported": "未导入"
     },
     "buttons": {
       "goUp": "返回上级",
@@ -780,7 +787,8 @@
       "createFolderSuccess": "文件夹创建成功",
       "createFolderFailed": "创建文件夹失败",
       "createFolderInvalidName": "请输入合法的文件夹名称",
-      "createFolderInvalidChars": "文件夹名称包含非法字符"
+      "createFolderInvalidChars": "文件夹名称包含非法字符",
+      "loadFileStatusFailed": "加载文件状态失败"
     }
   },
   "landing": {

@@ -260,6 +260,54 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
     const getPathSeparator = () =>
       navigator.userAgent.includes("Windows") ? "\\" : "/";
 
+    const normalizeForComparison = useCallback((value: string) => {
+      const trimmed = (value ?? "").trim();
+      if (!trimmed) {
+        return "";
+      }
+      return trimmed
+        .replace(/\\/g, "/")
+        .replace(/\/{2,}/g, "/")
+        .replace(/\/+$/g, "")
+        .toLowerCase();
+    }, []);
+
+    const isPathInsideDirectory = useCallback(
+      (filePath: string, directoryPath: string) => {
+        const normalizedDir = normalizeForComparison(directoryPath);
+        const normalizedFile = normalizeForComparison(filePath);
+        if (!normalizedDir || !normalizedFile) {
+          return false;
+        }
+        if (normalizedFile === normalizedDir) {
+          return true;
+        }
+        const dirWithSlash = `${normalizedDir}/`;
+        return normalizedFile.startsWith(dirWithSlash);
+      },
+      [normalizeForComparison],
+    );
+
+    const resolveParentDirectory = useCallback((filePath: string) => {
+      const trimmed = (filePath ?? "").trim();
+      if (!trimmed) {
+        return "";
+      }
+      const lastBackslash = trimmed.lastIndexOf("\\");
+      const lastSlash = trimmed.lastIndexOf("/");
+      const lastSeparator = Math.max(lastBackslash, lastSlash);
+      if (lastSeparator < 0) {
+        return "";
+      }
+      if (/^[a-zA-Z]:[\\/]/.test(trimmed) && lastSeparator <= 2) {
+        return trimmed.slice(0, 3);
+      }
+      if (trimmed.startsWith("/") && lastSeparator === 0) {
+        return "/";
+      }
+      return trimmed.slice(0, lastSeparator);
+    }, []);
+
     const extractDirectoriesFromStructure = useCallback(
       (structureData: DirectoryStructureResponse): string[] => {
         const directories: string[] = [];
@@ -520,8 +568,95 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         const lang = (cfg?.language || "en") as "zh" | "en";
 
         const isRetry = task.mode === "retry" && typeof task.existingFileId === "string" && task.existingFileId.trim().length > 0;
+        const insideWorkspace = isPathInsideDirectory(normalizedPath, latestWorkDir);
         let stagedPath = normalizedPath;
         let stagedId = task.existingFileId ?? "";
+
+        if (!isRetry && insideWorkspace) {
+          const parentDirectory = resolveParentDirectory(normalizedPath);
+          if (!parentDirectory) {
+            message.error(t("files.messages.fileImportFailed"));
+            notifyError("parent_directory_missing", t("files.messages.fileImportFailed"));
+            return "complete";
+          }
+
+          notifyProgress("save-file", "start");
+          let saveResponse;
+          try {
+            saveResponse = await apiService.saveFile(normalizedPath, parentDirectory, true);
+          } catch (err) {
+            message.error(t("files.messages.fileSaveFailed"));
+            window.electronAPI?.logError?.("saveFile (workspace direct) failed", {
+              err: String(err),
+              path: normalizedPath,
+            });
+            notifyError(err, t("files.messages.fileSaveFailed"));
+            return "complete";
+          }
+
+          if (!saveResponse.success) {
+            const errMsg = saveResponse.message || t("files.messages.fileSaveFailed");
+            message.error(errMsg);
+            notifyError(new Error(errMsg), errMsg);
+            return "complete";
+          }
+
+          notifyProgress("save-file", "success");
+          const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
+          onImported?.();
+
+          if (fileId && cfg?.autoSaveRAG) {
+            notifyProgress("import-rag", "start", t("files.messages.importingRag"));
+            let hideLoadingRag: undefined | (() => void);
+            try {
+              hideLoadingRag = message.loading(t("files.messages.importingRag"), 0);
+              const ragResponse = await apiService.importToRag(fileId, true);
+              if (ragResponse.success) {
+                notifyProgress("import-rag", "success", t("files.messages.importedRagSuccess"));
+                message.success(t("files.messages.importedRagSuccess"));
+              } else {
+                const failureMessage = getConversionMessage({
+                  message: ragResponse.error?.message ?? ragResponse.message,
+                  code: ragResponse.error?.code,
+                  details: ragResponse.error?.details,
+                  payload: ragResponse,
+                });
+                const fallback = t("files.messages.saveSuccessRagFailed");
+                const displayMessage = failureMessage ?? fallback;
+                notifyProgress("import-rag", failureMessage ? "error" : "success", displayMessage);
+                if (failureMessage) {
+                  message.error(displayMessage);
+                } else {
+                  message.warning(displayMessage);
+                }
+              }
+            } catch (err) {
+              const conversionMessage = getConversionMessage(err);
+              const fallback = t("files.messages.saveSuccessRagFailed");
+              const displayMessage = conversionMessage ?? fallback;
+              notifyProgress("import-rag", "error", displayMessage);
+              if (conversionMessage) {
+                message.error(displayMessage);
+              } else {
+                message.warning(displayMessage);
+              }
+              window.electronAPI?.logError?.("importToRag (workspace direct) failed", {
+                err: String(err),
+                path: normalizedPath,
+                conversionMessage: conversionMessage ?? undefined,
+              });
+            } finally {
+              hideLoadingRag?.();
+            }
+          }
+
+          setStagedFileId(null);
+          setImportFilePath("");
+          setSelectedDirectory("");
+          notifySuccess(t("files.messages.fileInWorkspaceProcessed"));
+          message.success(t("files.messages.fileInWorkspaceProcessed"));
+          return "complete";
+        }
 
         if (isRetry) {
           notifyProgress("stage-file", "start", t("files.messages.preparingFile"));
@@ -786,6 +921,8 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         notifySuccess,
         notifyError,
         getConversionMessage,
+        isPathInsideDirectory,
+        resolveParentDirectory,
       ]
   );
 

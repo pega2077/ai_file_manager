@@ -682,8 +682,8 @@
       "retryImportQueued": "Retry import started for \"{name}\".",
       "retryImportFailed": "Failed to start retry import for \"{name}\".",
       "retryImportMissingSource": "Cannot retry import because the staged file is missing. Please import from the original file again.",
-      "retryImportUnavailable": "Retry import is currently unavailable. Please try again later."
-    ,
+      "retryImportUnavailable": "Retry import is currently unavailable. Please try again later.",
+      "fileInWorkspaceProcessed": "File already in workspace processed successfully",
       "updateSuccess": "File updated",
       "updateFailed": "Failed to update file",
       "editInvalidName": "Please enter a valid file name",
@@ -722,7 +722,8 @@
         "type": "Type",
         "size": "Size",
         "createdAt": "Created Time",
-        "modifiedAt": "Modified Time",
+    "modifiedAt": "Modified Time",
+    "status": "Status",
         "actions": "Actions"
       },
       "type": {
@@ -734,7 +735,13 @@
       "preview": "Preview",
       "importToRag": "Import to Knowledge Base",
       "openFolder": "Open Folder",
-      "openFile": "Open File"
+      "openFile": "Open File",
+      "importFile": "Import"
+    },
+    "status": {
+      "imported": "Imported",
+      "processing": "Processing",
+      "notImported": "Not Imported"
     },
     "buttons": {
       "goUp": "Go Up",
@@ -778,7 +785,8 @@
       "createFolderSuccess": "Folder created successfully",
       "createFolderFailed": "Failed to create folder",
       "createFolderInvalidName": "Please enter a valid folder name",
-      "createFolderInvalidChars": "Folder name contains invalid characters"
+      "createFolderInvalidChars": "Folder name contains invalid characters",
+      "loadFileStatusFailed": "Failed to load file status"
     }
   },
   "landing": {

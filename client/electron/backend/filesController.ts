@@ -2287,6 +2287,147 @@ export async function extractTagsHandler(req: Request, res: Response): Promise<v
   }
 }
 
+interface QueryFilesByPathBody {
+  paths?: unknown;
+}
+
+export async function queryFilesByPathHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as QueryFilesByPathBody | undefined;
+    const rawPaths = Array.isArray(body?.paths) ? (body!.paths as unknown[]) : [];
+    const sanitized = rawPaths
+      .filter((p): p is string => typeof p === "string")
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+
+    if (sanitized.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "paths array is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const MAX_BATCH = 200;
+    if (sanitized.length > MAX_BATCH) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: {
+          code: "BATCH_TOO_LARGE",
+          message: `up to ${MAX_BATCH} paths are allowed per request`,
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const uniquePaths: string[] = Array.from(new Set(sanitized));
+
+    type RawFileRow = {
+      file_id: string;
+      path: string;
+      name: string;
+      imported: number | boolean | null;
+      processed: number | boolean | null;
+      category: string;
+      size: number;
+      created_at: string;
+      updated_at: string | null;
+    };
+
+    const rows = (await FileModel.findAll({
+      where: { path: { [Op.in]: uniquePaths } },
+      attributes: [
+        "file_id",
+        "path",
+        "name",
+        "imported",
+        "processed",
+        "category",
+        "size",
+        "created_at",
+        "updated_at",
+      ],
+      raw: true,
+    }).catch((err) => {
+      logger.error("queryFilesByPathHandler: DB query failed", err as unknown);
+      throw err;
+    })) as unknown as RawFileRow[];
+
+    type FileRecordSummary = {
+      file_id: string;
+      path: string;
+      name: string;
+      imported: boolean;
+      processed: boolean;
+      category: string;
+      size: number;
+      created_at: string;
+      updated_at: string | null;
+    };
+
+    const recordMap = new Map<string, FileRecordSummary>();
+
+    for (const row of rows) {
+      const normalizedPath = path.normalize(row.path);
+      recordMap.set(normalizedPath, {
+        file_id: row.file_id,
+        path: normalizedPath,
+        name: row.name,
+        imported: Boolean(row.imported ?? false),
+        processed: Boolean(row.processed ?? false),
+        category: row.category,
+        size: row.size,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      });
+    }
+
+    const records: FileRecordSummary[] = [];
+    const missing: string[] = [];
+
+    for (const originalPath of uniquePaths) {
+      const normalizedPath = path.normalize(originalPath);
+      const record = recordMap.get(normalizedPath);
+      if (record) {
+        records.push(record);
+      } else {
+        missing.push(originalPath);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        records,
+        missing,
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/files/query-by-paths failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Query files by path failed", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
 
 export function registerFilesRoutes(app: Express) {
   // POST /api/files/list
@@ -2315,4 +2456,6 @@ export function registerFilesRoutes(app: Express) {
   app.post("/api/files/delete", deleteFileHandler);
   // POST /api/files/extract-tags
   app.post("/api/files/extract-tags", extractTagsHandler);
+  // POST /api/files/query-by-paths
+  app.post("/api/files/query-by-paths", queryFilesByPathHandler);
 }
