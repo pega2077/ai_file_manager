@@ -685,8 +685,11 @@ const FileList: React.FC<FileListProps> = ({
           value={filters.search}
           onChange={(e) => handleFilterChange("search", e.target.value)}
           onPressEnter={handleSearch}
-          style={{ width: 200 }}
+          style={{ width: 300 }}
         />
+        <label style={{ display: "flex", alignItems: "center" }}>
+          {t("files.placeholders.selectCategory")}
+        </label>
         <Select
           placeholder={t("files.placeholders.selectCategory")}
           value={filters.category}
@@ -706,6 +709,9 @@ const FileList: React.FC<FileListProps> = ({
           </Option>
           <Option value="other">{t("files.options.categories.other")}</Option>
         </Select>
+        <label style={{ display: "flex", alignItems: "center" }}>
+          {t("files.placeholders.selectType")}
+        </label>
         <Select
           placeholder={t("files.placeholders.selectType")}
           value={filters.type}
