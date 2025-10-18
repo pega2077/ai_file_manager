@@ -99,6 +99,7 @@ const FileList: React.FC<FileListProps> = ({
   const [editing, setEditing] = useState(false);
   const [editingFile, setEditingFile] = useState<ImportedFileItem | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [tagGenerating, setTagGenerating] = useState<Record<string, boolean>>({});
   const [editForm] = Form.useForm<{
     name: string;
     category: string;
@@ -361,6 +362,69 @@ const FileList: React.FC<FileListProps> = ({
     navigate(`/search?${params.toString()}`);
   };
 
+  const handleGenerateTags = useCallback(
+    async (file: ImportedFileItem) => {
+      setTagGenerating((prev) => ({ ...prev, [file.file_id]: true }));
+      const hideLoading = message.loading(
+        t("files.messages.generateTagsInProgress", { name: file.name }),
+        0
+      );
+
+      try {
+        const response = await apiService.updateFileTags({
+          file_id: file.file_id,
+          overwrite: true,
+        });
+
+        if (response.success && response.data) {
+          if (response.data.updated) {
+            message.success(
+              t("files.messages.generateTagsSuccess", { name: file.name })
+            );
+            await fetchFiles(currentPageRef.current || 1);
+          } else if (response.message === "no_tags_generated") {
+            message.warning(
+              t("files.messages.generateTagsNoContent", { name: file.name })
+            );
+          } else if (response.message === "tags_exist") {
+            message.info(
+              t("files.messages.generateTagsAlreadyExists", { name: file.name })
+            );
+          } else {
+            message.info(
+              t("files.messages.generateTagsNoChange", { name: file.name })
+            );
+          }
+        } else {
+          message.error(
+            response.message ||
+              t("files.messages.generateTagsFailed", { name: file.name })
+          );
+        }
+      } catch (error) {
+        const fallbackMsg = t("files.messages.generateTagsFailed", { name: file.name });
+        const noContentMsg = t("files.messages.generateTagsNoContent", { name: file.name });
+        if (error instanceof Error && error.message) {
+          if (error.message.includes("No analyzable content")) {
+            message.warning(noContentMsg);
+          } else {
+            message.error(error.message || fallbackMsg);
+          }
+        } else {
+          message.error(fallbackMsg);
+        }
+      } finally {
+        hideLoading();
+        setTagGenerating((prev) => {
+          const next = { ...prev };
+          delete next[file.file_id];
+          return next;
+        });
+      }
+    },
+    [fetchFiles, t]
+  );
+
   const handlePendingStatusClick = useCallback(
     (file: ImportedFileItem) => {
       if (!onRetryImport) {
@@ -460,13 +524,34 @@ const FileList: React.FC<FileListProps> = ({
       key: "tags",
       fixed: "right",
       width: 200,
-      render: (tags: string[]) => (
-        <div>
-          {tags.map((tag) => (
-            <Tag key={tag}>{tag}</Tag>
-          ))}
-        </div>
-      ),
+      render: (_: string[], record: ImportedFileItem) => {
+        const tags = Array.isArray(record.tags) ? record.tags : [];
+        if (tags.length === 0) {
+          const generating = Boolean(tagGenerating[record.file_id]);
+          return (
+            <Button
+              type="link"
+              size="small"
+              loading={generating}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleGenerateTags(record);
+              }}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              {t("files.actions.generateTags")}
+            </Button>
+          );
+        }
+
+        return (
+          <div>
+            {tags.map((tag) => (
+              <Tag key={tag}>{tag}</Tag>
+            ))}
+          </div>
+        );
+      },
     },
     {
       title: t("files.table.columns.addedAt"),

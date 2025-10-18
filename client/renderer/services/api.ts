@@ -87,6 +87,16 @@ interface FileDetail {
   };
 }
 
+interface UpdateFileTagsResponse {
+  file_id: string;
+  tags: string[];
+  previous_tags: string[];
+  updated: boolean;
+  model_used: string | null;
+  language: string;
+  source: string;
+}
+
 export interface DirectoryListItem {
   name: string;
   type: 'file' | 'folder';
@@ -1006,6 +1016,41 @@ class ApiService {
     return this.request('/files/update', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  }
+
+  // 基于文件内容重新生成标签并保存
+  async updateFileTags(payload: {
+    file_id: string;
+    overwrite?: boolean;
+    top_k?: number;
+    language?: string;
+    domain_hint?: string;
+    provider?: ProviderName;
+  }): Promise<ApiResponse<UpdateFileTagsResponse>> {
+    const body: Record<string, unknown> = {
+      file_id: payload.file_id,
+    };
+
+    if (typeof payload.overwrite === 'boolean') {
+      body.overwrite = payload.overwrite;
+    }
+    if (typeof payload.top_k === 'number') {
+      body.top_k = payload.top_k;
+    }
+    if (typeof payload.language === 'string' && payload.language.trim().length > 0) {
+      body.language = payload.language.trim();
+    }
+    if (typeof payload.domain_hint === 'string' && payload.domain_hint.trim().length > 0) {
+      body.domain_hint = payload.domain_hint.trim();
+    }
+    if (payload.provider) {
+      body.provider = payload.provider;
+    }
+
+    return this.request<UpdateFileTagsResponse>('/files/update-tags', {
+      method: 'POST',
+      body: JSON.stringify(body),
     });
   }
 

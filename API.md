@@ -439,6 +439,44 @@
 说明：
 - 仅对输入文本进行标签抽取，不涉及文件读取与数据库持久化。
 
+### 1.x 更新文件标签
+
+接口: `POST /api/files/update-tags`
+
+用途：基于指定文件的内容调用 LLM 生成标签，并将结果写回数据库记录。用于补全或重新生成文件标签。
+
+请求参数:
+
+```json
+{
+  "file_id": "string",           // 必填，目标文件的唯一标识
+  "overwrite": true,              // 可选，是否覆盖已有标签，默认 false
+  "top_k": 10,                    // 可选，生成的标签数量范围 1~50，默认 10
+  "language": "zh|en",          // 可选，提示词语言，不提供时读取系统配置
+  "domain_hint": "string",      // 可选，领域提示词，如“前端开发/商务合同”等
+  "provider": "ollama|openai|azure-openai|openrouter|bailian" // 可选，临时覆盖模型提供商
+}
+```
+
+响应数据:
+
+```json
+{
+  "file_id": "string",
+  "tags": ["string"],
+  "previous_tags": ["string"],
+  "updated": true,
+  "model_used": "string|null",
+  "language": "zh|en",
+  "source": "summary|chunks|image_description|video_summary|document_text|file_text|existing"
+}
+```
+
+说明：
+- 当文件已存在标签且 `overwrite` 为 `false` 时，不会触发重新生成，`updated` 字段为 `false`。
+- 如果无法获取可分析的文本内容，会返回 409 状态码以及错误码 `NO_CONTENT_FOR_TAGS`。
+- `source` 字段指示用于提示模型的内容来源，便于排查问题。
+
 
 **接口**: `POST /api/files/preview`
 

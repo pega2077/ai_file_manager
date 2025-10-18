@@ -2287,6 +2287,324 @@ export async function extractTagsHandler(req: Request, res: Response): Promise<v
   }
 }
 
+interface UpdateFileTagsBody {
+  file_id?: unknown;
+  overwrite?: unknown;
+  top_k?: unknown;
+  language?: unknown;
+  domain_hint?: unknown;
+  provider?: unknown;
+}
+
+export async function updateFileTagsHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as UpdateFileTagsBody | undefined;
+    const rawFileId = typeof body?.file_id === "string" ? body.file_id.trim() : "";
+    const rawOverwrite = body?.overwrite;
+    const overwrite =
+      rawOverwrite === true ||
+      rawOverwrite === "true" ||
+      rawOverwrite === 1 ||
+      rawOverwrite === "1";
+    const topK = Math.max(1, Math.min(50, toNumber(body?.top_k, 10)));
+    const domainHint = typeof body?.domain_hint === "string" ? body.domain_hint : "";
+    const cfg = configManager.getConfig();
+    const language = normalizeLanguage(body?.language ?? (cfg.language ?? "zh"), "zh");
+    const providerRaw = typeof body?.provider === "string" ? body.provider.trim().toLowerCase() : undefined;
+    const provider: ProviderName | undefined = providerRaw === "openai"
+      ? "openai"
+      : providerRaw === "azure-openai" || providerRaw === "azure" || providerRaw === "azure_openai"
+      ? "azure-openai"
+      : providerRaw === "openrouter"
+      ? "openrouter"
+      : providerRaw === "bailian" || providerRaw === "aliyun" || providerRaw === "dashscope"
+      ? "bailian"
+      : providerRaw === "ollama"
+      ? "ollama"
+      : undefined;
+
+    if (!rawFileId) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "file_id is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    type RawFileRow = {
+      file_id: string;
+      path: string;
+      name: string;
+      type: string;
+      category: string;
+      summary: string | null;
+      tags: string | null;
+      size: number;
+      created_at: string;
+      updated_at: string | null;
+    };
+
+    const row = (await FileModel.findOne({ where: { file_id: rawFileId }, raw: true }).catch(() => null)) as RawFileRow | null;
+    if (!row) {
+      res.status(404).json({
+        success: false,
+        message: "not_found",
+        data: null,
+        error: { code: "RESOURCE_NOT_FOUND", message: "file not found", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const existingTags = (() => {
+      if (!row.tags) return [] as string[];
+      try {
+        const parsed = JSON.parse(row.tags) as unknown;
+        if (Array.isArray(parsed)) {
+          return parsed
+            .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+            .map((t) => t.trim());
+        }
+      } catch (e) {
+        logger.warn("updateFileTagsHandler: failed to parse existing tags", { file_id: rawFileId, err: String(e) });
+      }
+      return [] as string[];
+    })();
+    const previousTags = existingTags.slice();
+    if (existingTags.length > 0 && !overwrite) {
+      res.status(200).json({
+        success: true,
+        message: "tags_exist",
+        data: {
+          file_id: rawFileId,
+          tags: existingTags,
+          previous_tags: previousTags,
+          updated: false,
+          model_used: null,
+          language,
+          source: "existing",
+        },
+        error: null,
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const maxSnippetLength = Math.max(100, Math.min(5000, Number(cfg.tagSummaryMaxLength) || 1000));
+    let snippet = "";
+    let snippetSource = "unknown";
+    const setSnippet = (text: string | null | undefined, source: string) => {
+      if (snippet || !text) {
+        return;
+      }
+      const trimmed = text.trim();
+      if (!trimmed) {
+        return;
+      }
+      snippet = trimmed.slice(0, maxSnippetLength);
+      snippetSource = source;
+    };
+
+    setSnippet(row.summary, "summary");
+
+    if (!snippet) {
+      try {
+        const chunkRows = (await ChunkModel.findAll({
+          where: { file_id: rawFileId },
+          order: [["chunk_index", "ASC"]],
+          limit: 3,
+          raw: true,
+        }).catch(() => [])) as Array<{ content: string }>;
+        if (chunkRows.length > 0) {
+          const chunkText = chunkRows
+            .map((c) => (typeof c.content === "string" ? c.content : ""))
+            .join("\n")
+            .trim();
+          setSnippet(chunkText, "chunks");
+        }
+      } catch (e) {
+        logger.warn("updateFileTagsHandler: failed to load chunks", { file_id: rawFileId, err: String(e) });
+      }
+    }
+
+    const normalizedCategory = (row.category || "").toLowerCase();
+    const filePath = row.path;
+    const fileAccessible = await fsp
+      .access(filePath, fs.constants.R_OK)
+      .then(() => true)
+      .catch(() => false);
+
+    if (!snippet && fileAccessible) {
+      if (normalizedCategory === "image") {
+        try {
+          const buf = await fsp.readFile(filePath);
+          const base64 = buf.toString("base64");
+          const visionPrompt = buildVisionDescribePrompt(language);
+          const description = await describeImage(base64, { prompt: visionPrompt });
+          setSnippet(description, "image_description");
+        } catch (e) {
+          logger.warn("updateFileTagsHandler: image describe failed", { file_id: rawFileId, err: String(e) });
+        }
+      } else if (normalizedCategory === "video") {
+        try {
+          const summary = await summarizeVideoContent(filePath, language, cfg.videoCapture);
+          setSnippet(summary.summary, "video_summary");
+        } catch (e) {
+          logger.warn("updateFileTagsHandler: video summary failed", { file_id: rawFileId, err: String(e) });
+        }
+      } else {
+        if (normalizedCategory === "document" || normalizedCategory === "sheet") {
+          try {
+            const txtPath = await ensureTxtFile(filePath);
+            if (txtPath && txtPath.trim()) {
+              const textContent = await fsp.readFile(txtPath, "utf8");
+              setSnippet(textContent, "document_text");
+            }
+          } catch (e) {
+            logger.warn("updateFileTagsHandler: ensureTxtFile failed", { file_id: rawFileId, err: String(e) });
+          }
+        }
+
+        if (!snippet) {
+          try {
+            const fileBuffer = await fsp.readFile(filePath);
+            const decoded = decodeTextBuffer(fileBuffer);
+            setSnippet(decoded.text, "file_text");
+          } catch (e) {
+            logger.warn("updateFileTagsHandler: raw text read failed", { file_id: rawFileId, err: String(e) });
+          }
+        }
+      }
+    }
+
+    if (!snippet) {
+      res.status(409).json({
+        success: false,
+        message: "no_content",
+        data: null,
+        error: { code: "NO_CONTENT_FOR_TAGS", message: "No analyzable content for tag generation", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const promptSnippet = snippet.length > 5000 ? snippet.slice(0, 5000) : snippet;
+    const messages: LlmMessage[] = buildExtractTagsMessages({ language, text: promptSnippet, topK, domainHint });
+    const responseFormat: StructuredResponseFormat = {
+      json_schema: {
+        name: "extract_tags_schema",
+        schema: {
+          type: "object",
+          properties: {
+            tags: { type: "array", items: { type: "string" } },
+          },
+          required: ["tags"],
+          additionalProperties: false,
+        },
+        strict: true,
+      },
+    } as const;
+
+    let result: unknown;
+    try {
+      result = await generateStructuredJson(messages, responseFormat, 0.2, 800, "", language, provider);
+    } catch (e) {
+      logger.error("/api/files/update-tags LLM failed", e as unknown);
+      res.status(500).json({
+        success: false,
+        message: "llm_error",
+        data: null,
+        error: { code: "LLM_ERROR", message: (e as Error).message, details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const obj = (result || {}) as Record<string, unknown>;
+    const tags = Array.isArray(obj.tags)
+      ? (obj.tags as unknown[])
+          .filter((t: unknown): t is string => typeof t === "string" && t.trim().length > 0)
+          .map((t) => t.trim())
+      : [];
+
+    if (tags.length === 0) {
+      res.status(200).json({
+        success: true,
+        message: "no_tags_generated",
+        data: {
+          file_id: rawFileId,
+          tags,
+          previous_tags: previousTags,
+          updated: false,
+          model_used: getActiveModelName("chat", provider),
+          language,
+          source: snippetSource,
+        },
+        error: null,
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    try {
+      await FileModel.update(
+        {
+          tags: JSON.stringify(tags),
+          updated_at: new Date().toISOString(),
+        },
+        { where: { file_id: rawFileId } }
+      );
+    } catch (e) {
+      logger.error("/api/files/update-tags DB update failed", e as unknown);
+      res.status(500).json({
+        success: false,
+        message: "db_update_failed",
+        data: null,
+        error: { code: "DB_UPDATE_FAILED", message: "Failed to persist generated tags", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "tags_updated",
+      data: {
+        file_id: rawFileId,
+        tags,
+        previous_tags: previousTags,
+        updated: true,
+        model_used: getActiveModelName("chat", provider),
+        language,
+        source: snippetSource,
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/files/update-tags failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Update file tags failed", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
 interface QueryFilesByPathBody {
   paths?: unknown;
 }
@@ -2454,6 +2772,8 @@ export function registerFilesRoutes(app: Express) {
   app.get("/api/files/:file_id", getFileDetailsHandler);
   // POST /api/files/delete
   app.post("/api/files/delete", deleteFileHandler);
+  // POST /api/files/update-tags
+  app.post("/api/files/update-tags", updateFileTagsHandler);
   // POST /api/files/extract-tags
   app.post("/api/files/extract-tags", extractTagsHandler);
   // POST /api/files/query-by-paths

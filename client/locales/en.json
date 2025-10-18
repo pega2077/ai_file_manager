@@ -597,7 +597,8 @@
       "importToRag": "Import to Knowledge Base",
       "askQuestion": "Ask Question",
       "editFile": "Edit",
-      "delete": "Delete"
+  "generateTags": "Generate Tags",
+  "delete": "Delete"
     },
     "edit": {
       "modalTitle": "Edit File",
@@ -688,7 +689,13 @@
       "updateFailed": "Failed to update file",
       "editInvalidName": "Please enter a valid file name",
       "deleteSuccess": "File \"{name}\" deleted",
-      "deleteFailed": "Failed to delete file \"{name}\""
+      "deleteFailed": "Failed to delete file \"{name}\"",
+      "generateTagsInProgress": "Generating tags for \"{name}\"...",
+      "generateTagsSuccess": "Updated tags for \"{name}\".",
+      "generateTagsFailed": "Failed to generate tags for \"{name}\".",
+      "generateTagsNoContent": "Cannot generate tags because no analyzable content is available.",
+      "generateTagsAlreadyExists": "\"{name}\" already has tags. Enable overwrite to regenerate them.",
+      "generateTagsNoChange": "Tags for \"{name}\" remain unchanged."
     },
     "createFolder": {
       "modalTitle": "Create Folder",
