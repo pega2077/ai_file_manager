@@ -517,32 +517,32 @@
     ],
     "directories": [
       {
-        "path": "01_Strategy",
-        "description": "Audience research, brand guidelines, and campaign goals"
+        "path": "01_Scripts_Copy",
+        "description": "Script outlines, storyboards, copy drafts, and revision history"
       },
       {
-        "path": "02_Ideation",
-        "description": "Brainstorming notes, idea banks, and briefs"
+        "path": "02_Video_Source",
+        "description": "Raw video footage, teleprompter recordings, and capture bundles"
       },
       {
-        "path": "03_Pre-Production",
-        "description": "Scripts, shot lists, and production checklists"
+        "path": "03_Video_Final",
+        "description": "Edited video masters and platform-specific export sets"
       },
       {
-        "path": "04_Production",
-        "description": "Raw footage, photoshoots, and recording assets"
+        "path": "04_Audio_Assets",
+        "description": "Voiceovers, background music, sound effects, and mix sessions"
       },
       {
-        "path": "05_Post-Production",
-        "description": "Edits, graphics, and review versions"
+        "path": "05_Graphics",
+        "description": "Thumbnails, illustrations, infographics, and branded visuals"
       },
       {
-        "path": "06_Publishing",
-        "description": "Content calendar, scheduling, and final exports"
+        "path": "06_Publishing_Assets",
+        "description": "Titles, descriptions, hashtags, and release templates"
       },
       {
-        "path": "07_Performance",
-        "description": "Analytics reports, feedback, and optimization notes"
+        "path": "07_Performance_Reports",
+        "description": "Analytics exports, audience feedback, and campaign retrospectives"
       }
     ]
   },
@@ -569,36 +569,36 @@
     ],
     "directories": [
       {
-        "path": "Planning/Strategy",
-        "description": "Channel strategy, personas, and messaging frameworks"
+        "path": "Writing/Scripts_Copy",
+        "description": "Story outlines, scripts, narration drafts, and revision logs"
       },
       {
-        "path": "Planning/Calendar",
-        "description": "Editorial calendar, launch dates, and milestones"
+        "path": "Media/Video/Raw_Footage",
+        "description": "Camera originals, capture sessions, and production reports"
       },
       {
-        "path": "Production/Pre-Production",
-        "description": "Storyboards, scripts, and asset checklists"
+        "path": "Media/Video/Final_Cuts",
+        "description": "Approved edits, aspect-ratio variants, and captioned versions"
       },
       {
-        "path": "Production/Assets/Raw",
-        "description": "Raw recordings, photos, and design files"
+        "path": "Media/Audio",
+        "description": "Voice tracks, music beds, sound design stems, and mixdowns"
       },
       {
-        "path": "Production/Assets/Final",
-        "description": "Final deliverables ready for publishing"
+        "path": "Media/Graphics",
+        "description": "Thumbnails, overlays, lower thirds, and graphic kits"
       },
       {
-        "path": "Distribution/Channels",
-        "description": "Platform-specific export packages and metadata"
+        "path": "Distribution/Channel_Packages",
+        "description": "Platform-specific metadata, copy blocks, and upload bundles"
       },
       {
-        "path": "Distribution/Partnerships",
-        "description": "Sponsored content agreements and collaboration briefs"
+        "path": "Distribution/Campaign_Kits",
+        "description": "Sponsorship assets, paid media creatives, and collaboration files"
       },
       {
-        "path": "Insights/Analytics",
-        "description": "Performance dashboards, learnings, and iteration plans"
+        "path": "Insights/Reports",
+        "description": "Performance dashboards, analytics exports, and recap notes"
       }
     ]
   },
@@ -628,32 +628,36 @@
     ],
     "directories": [
       {
-        "path": "01_Discovery",
-        "description": "Research summaries, personas, and project briefs"
+        "path": "01_Project_Docs",
+        "description": "Briefs, contracts, schedules, and client correspondence"
       },
       {
-        "path": "02_Concepts",
-        "description": "Mood boards, sketches, and iterative concepts"
+        "path": "02_Research_Notes",
+        "description": "User research, competitive audits, personas, and insights"
       },
       {
-        "path": "03_Design_Files",
-        "description": "Working design files and linked libraries"
+        "path": "03_Reference_Assets",
+        "description": "Mood boards, inspiration libraries, color, and typography references"
       },
       {
-        "path": "04_Prototypes",
-        "description": "Interactive prototypes, presentations, and demos"
+        "path": "04_Source_Files",
+        "description": "Editable design files including Figma, PSD, AI, and working comps"
       },
       {
-        "path": "05_Client_Reviews",
-        "description": "Feedback logs, review notes, and revision requests"
+        "path": "05_Component_Libraries",
+        "description": "Design systems, reusable components, and template assets"
       },
       {
-        "path": "06_Final_Deliverables",
-        "description": "Exported assets, style guides, and handoff packages"
+        "path": "06_Exported_Assets",
+        "description": "PNG, SVG, PDF, and other production-ready exports"
       },
       {
-        "path": "07_Archive",
-        "description": "Closed project artifacts and learnings"
+        "path": "07_Presentation_Materials",
+        "description": "Pitch decks, walkthrough videos, and showcase boards"
+      },
+      {
+        "path": "08_Feedback_Log",
+        "description": "Review notes, change requests, and approval records"
       }
     ]
   },
@@ -682,36 +686,40 @@
     ],
     "directories": [
       {
-        "path": "Discovery/Research",
-        "description": "User interviews, market studies, and competitive audits"
+        "path": "Documents/Project_Briefs",
+        "description": "Engagement briefs, contracts, timelines, and meeting notes"
       },
       {
-        "path": "Discovery/Strategy",
-        "description": "Personas, journey maps, and experience principles"
+        "path": "Documents/Research_Insights",
+        "description": "Research synthesis, personas, journey maps, and opportunity summaries"
       },
       {
-        "path": "Design/Concepts",
-        "description": "Sketches, explorations, and mood boards"
+        "path": "Asset_Library/Reference_Images",
+        "description": "Inspiration boards, brand references, and visual benchmarks"
       },
       {
-        "path": "Design/Production/Working",
-        "description": "Editable design files, components, and shared libraries"
+        "path": "Asset_Library/Fonts_Resources",
+        "description": "Typeface files, icon sets, textures, and licensed resources"
       },
       {
-        "path": "Design/Production/Prototypes",
-        "description": "Interactive prototypes and presentation decks"
+        "path": "Design_Output/Source_Files",
+        "description": "Editable design files with version history and annotations"
       },
       {
-        "path": "Collaboration/Reviews",
-        "description": "Client feedback, internal critiques, and revision logs"
+        "path": "Design_Output/Component_Library",
+        "description": "Design system components, tokens, and documentation"
       },
       {
-        "path": "Handoff/Deliverables",
-        "description": "Export packages, specifications, and style guides"
+        "path": "Deliverables/Exported_Files",
+        "description": "Production-ready exports, handoff packages, and specification sheets"
       },
       {
-        "path": "Operations/Admin",
-        "description": "Contracts, invoices, and project schedules"
+        "path": "Deliverables/Presentation_Materials",
+        "description": "Client presentations, demo videos, and showcase assets"
+      },
+      {
+        "path": "Feedback/Review_Records",
+        "description": "Feedback summaries, revision history, and approval sign-offs"
       }
     ]
   }
