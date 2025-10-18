@@ -643,6 +643,7 @@
     "buttons": {
       "search": "Search",
       "refresh": "Refresh",
+      "importUrl": "Import URL",
       "importFile": "Import File",
       "createFolder": "Create Folder"
     },

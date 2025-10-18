@@ -642,6 +642,7 @@
     "buttons": {
       "search": "搜索",
       "refresh": "刷新",
+      "importUrl": "导入网址",
       "importFile": "导入文件",
       "createFolder": "创建文件夹"
     },

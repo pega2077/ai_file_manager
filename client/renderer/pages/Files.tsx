@@ -27,6 +27,7 @@ import {
   QuestionCircleOutlined,
   FileAddOutlined,
   FolderAddOutlined,
+  LinkOutlined,
   EditOutlined,
   DeleteOutlined,
   ExclamationCircleOutlined,
@@ -41,6 +42,15 @@ import { useTranslation } from "../shared/i18n/I18nProvider";
 
 const { Content } = Layout;
 const { Option } = Select;
+
+const isValidHttpUrl = (value: string): boolean => {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
 
 interface PaginationInfo {
   current_page: number;
@@ -949,6 +959,7 @@ const FilesPage: React.FC = () => {
   const selectedMenu = "file-list";
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const importRef = useRef<FileImportRef>(null);
+  const [webImporting, setWebImporting] = useState(false);
 
   // Work directory for creating folders under
   const [workDirectory, setWorkDirectory] = useState<string>("workdir");
@@ -958,6 +969,107 @@ const FilesPage: React.FC = () => {
   const [form] = Form.useForm<{ folderName: string }>();
 
   // Import flow is encapsulated in FileImport component now.
+
+  const importFileFromPath = useCallback(
+    async (filePath: string) => {
+      try {
+        await importRef.current?.importFile(filePath);
+      } catch (error) {
+        window.electronAPI?.logError?.("files-import-file-failed", {
+          err: String(error),
+          filePath,
+        });
+        message.error(t("files.messages.fileImportFailed"));
+      }
+    },
+    [t]
+  );
+
+  const readClipboardText = useCallback(async (): Promise<string> => {
+    if (navigator?.clipboard?.readText) {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          return text;
+        }
+      } catch (error) {
+        window.electronAPI?.logError?.("files-read-clipboard-browser-failed", {
+          err: String(error),
+        });
+      }
+    }
+
+    if (window.electronAPI?.readClipboardText) {
+      try {
+        return await window.electronAPI.readClipboardText();
+      } catch (error) {
+        window.electronAPI?.logError?.("files-read-clipboard-electron-failed", {
+          err: String(error),
+        });
+      }
+    }
+
+    return "";
+  }, []);
+
+  const handleWebImport = useCallback(
+    async (rawUrl: string) => {
+      const trimmed = rawUrl.trim();
+      if (!trimmed) {
+        message.warning(t("bot.messages.invalidUrl"));
+        return;
+      }
+      if (!isValidHttpUrl(trimmed)) {
+        message.error(t("bot.messages.invalidUrl"));
+        return;
+      }
+      if (webImporting) {
+        message.info(t("bot.messages.webImportInProgress"));
+        return;
+      }
+
+      setWebImporting(true);
+      let hideLoading: (() => void) | undefined;
+      try {
+        hideLoading = message.loading(t("bot.messages.fetchingWebpage"), 0);
+        const response = await apiService.convertWebpage({ url: trimmed });
+        const data = response.data as { output_file_path?: string };
+        if (!data || !data.output_file_path) {
+          throw new Error("missing_output_path");
+        }
+        await importFileFromPath(data.output_file_path);
+        message.success(t("bot.messages.webImportSuccess"));
+      } catch (error) {
+        window.electronAPI?.logError?.("files-web-import-failed", {
+          url: trimmed,
+          err: String(error),
+        });
+        message.error(t("bot.messages.webImportFailed"));
+      } finally {
+        if (hideLoading) {
+          hideLoading();
+        }
+        setWebImporting(false);
+      }
+    },
+    [importFileFromPath, t, webImporting]
+  );
+
+  const handleImportClipboardUrl = useCallback(async () => {
+    try {
+      const urlFromClipboard = await readClipboardText();
+      if (!urlFromClipboard) {
+        message.warning(t("bot.messages.clipboardEmpty"));
+        return;
+      }
+      await handleWebImport(urlFromClipboard);
+    } catch (error) {
+      window.electronAPI?.logError?.("files-import-clipboard-url-failed", {
+        err: String(error),
+      });
+      message.error(t("bot.messages.webImportFailed"));
+    }
+  }, [handleWebImport, readClipboardText, t]);
 
   const handleRefresh = () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -995,6 +1107,35 @@ const FilesPage: React.FC = () => {
     };
     void loadWorkDirectory();
   }, []);
+
+  useEffect(() => {
+    const handlePasteShortcut = (event: ClipboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tagName = target.tagName?.toLowerCase();
+        if (
+          tagName === "input" ||
+          tagName === "textarea" ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+      }
+
+      const pastedText = event.clipboardData?.getData("text")?.trim();
+      if (!pastedText || !isValidHttpUrl(pastedText)) {
+        return;
+      }
+
+      event.preventDefault();
+      void handleWebImport(pastedText);
+    };
+
+    window.addEventListener("paste", handlePasteShortcut);
+    return () => {
+      window.removeEventListener("paste", handlePasteShortcut);
+    };
+  }, [handleWebImport]);
 
   // Validate and create folder
   const handleCreateFolder = async () => {
@@ -1072,6 +1213,15 @@ const FilesPage: React.FC = () => {
                 size="large"
               >
                 {t("files.buttons.createFolder")}
+              </Button>
+              <Button
+                icon={<LinkOutlined />}
+                onClick={handleImportClipboardUrl}
+                size="large"
+                loading={webImporting}
+                disabled={webImporting}
+              >
+                {t("files.buttons.importUrl")}
               </Button>
               <Button
                 type="primary"
