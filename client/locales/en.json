@@ -741,7 +741,8 @@
     "status": {
       "imported": "Imported",
       "processing": "Processing",
-      "notImported": "Not Imported"
+      "notImported": "Not Imported",
+      "notImportedLabel": "{status} · {label}"
     },
     "buttons": {
       "goUp": "Go Up",

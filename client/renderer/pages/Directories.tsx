@@ -500,7 +500,23 @@ const Directories = () => {
           if (status?.processed) {
             return <Tag color="orange">{t('home.status.processing')}</Tag>;
           }
-          return <Tag color="default">{t('home.status.notImported')}</Tag>;
+          return (
+            <Tag
+              color="default"
+              style={{ cursor: 'pointer' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!statusLoading) {
+                  void handleImport(record);
+                }
+              }}
+            >
+              {t('home.status.notImportedLabel', {
+                status: t('home.status.notImported'),
+                label: t('home.actions.importFile'),
+              })}
+            </Tag>
+          );
         },
       },
       {

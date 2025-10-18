@@ -743,7 +743,8 @@
     "status": {
       "imported": "已导入",
       "processing": "处理中",
-      "notImported": "未导入"
+      "notImported": "未导入",
+      "notImportedLabel": "{status} · {label}"
     },
     "buttons": {
       "goUp": "返回上级",
