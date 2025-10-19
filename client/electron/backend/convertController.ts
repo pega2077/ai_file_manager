@@ -436,33 +436,8 @@ export function registerConversionRoutes(appExp: Express): void {
         return;
       }
 
-      const tempDir = await ensureTempDir();
-      const htmlBase = sanitizeFileBaseName(fileNameInput || title, normalizedUrl.hostname || "article");
-      const tempHtmlPath = path.join(tempDir, `${Date.now()}_${htmlBase}.html`);
-      await fsp.writeFile(tempHtmlPath, html, "utf8");
-
-      let convertedPath = "";
-      try {
-        convertedPath = await convertFileViaService(tempHtmlPath, "html", "md");
-      } catch (error) {
-        logger.error("/api/files/convert/webpage conversion failed", {
-          url: finalUrl,
-          htmlPath: tempHtmlPath,
-          err: String(error),
-        });
-        res.status(502).json({
-          success: false,
-          message: "conversion_failed",
-          data: null,
-          error: { code: "CONVERSION_FAILED", message: "Failed to convert webpage content", details: null },
-          timestamp: new Date().toISOString(),
-          request_id: "",
-        });
-        return;
-      }
-
       const baseName = sanitizeFileBaseName(fileNameInput || title, normalizedUrl.hostname || "article");
-      const buildOutPath = (suffix?: string) => path.join(destinationDir, `${baseName}${suffix ? ` ${suffix}` : ""}.md`);
+      const buildOutPath = (suffix?: string) => path.join(destinationDir, `${baseName}${suffix ? ` ${suffix}` : ""}.html`);
       let outPath = buildOutPath();
       if (!overwrite) {
         for (let idx = 1; idx <= 1000; idx += 1) {
@@ -475,10 +450,9 @@ export function registerConversionRoutes(appExp: Express): void {
         }
       }
 
-      await fsp.copyFile(convertedPath, outPath);
-      const outStat = await fsp.stat(outPath).catch(() => null);
-      const size = outStat?.size ?? 0;
-      logger.info("Webpage converted via service", { sourceUrl: finalUrl, htmlPath: tempHtmlPath, output: outPath, size });
+      await fsp.writeFile(outPath, html, "utf8");
+      const size = Buffer.byteLength(html, "utf8");
+      logger.info("Webpage saved as HTML", { sourceUrl: finalUrl, output: outPath, size });
 
       res.status(200).json({
         success: true,
@@ -489,11 +463,11 @@ export function registerConversionRoutes(appExp: Express): void {
           byline: "",
           excerpt: "",
           content_type: contentType,
-          html_temp_file_path: tempHtmlPath,
+          html_temp_file_path: outPath,
           output_file_path: outPath,
-          output_format: "md",
+          output_format: "html",
           size,
-          message: "converted",
+          message: "saved_html",
         },
         error: null,
         timestamp: new Date().toISOString(),

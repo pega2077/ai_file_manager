@@ -128,6 +128,7 @@ export interface WebpageConversionResult {
   byline: string;
   excerpt: string;
   content_type: string;
+  html_temp_file_path?: string;
   output_file_path: string;
   output_format: string;
   size: number;
