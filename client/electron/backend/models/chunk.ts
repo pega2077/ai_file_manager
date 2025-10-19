@@ -1,5 +1,4 @@
-import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../db";
+import { DataTypes, Model, Optional, type Sequelize } from "sequelize";
 
 export interface ChunkAttributes {
   id: number;
@@ -33,70 +32,81 @@ export class ChunkModel extends Model<ChunkAttributes, ChunkCreationAttributes> 
   declare created_at: string;
 }
 
-ChunkModel.init(
-  {
-    id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true,
-    },
-    chunk_id: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true,
-    },
-    file_id: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    chunk_index: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-    },
-    content: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-    },
-    content_type: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-      defaultValue: "text",
-    },
-    char_count: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-    },
-    token_count: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
-    embedding_id: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-    },
-    start_pos: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
-    end_pos: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
-    created_at: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-    },
-  },
-  {
-    sequelize,
-    tableName: "chunks",
-    timestamps: false,
-    indexes: [
-      { fields: ["file_id"] },
-      { fields: ["chunk_id"], unique: true },
-      { fields: ["file_id", "chunk_index"], unique: true },
-    ],
+let initialized = false;
+
+export const initializeChunkModel = (sequelize: Sequelize): typeof ChunkModel => {
+  if (initialized) {
+    return ChunkModel;
   }
-);
+
+  ChunkModel.init(
+    {
+      id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true,
+      },
+      chunk_id: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true,
+      },
+      file_id: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+      chunk_index: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
+      content: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+      },
+      content_type: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+        defaultValue: "text",
+      },
+      char_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
+      token_count: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      embedding_id: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      start_pos: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      end_pos: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      created_at: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+      },
+    },
+    {
+      sequelize,
+      tableName: "chunks",
+      timestamps: false,
+      indexes: [
+        { fields: ["file_id"] },
+        { fields: ["chunk_id"], unique: true },
+        { fields: ["file_id", "chunk_index"], unique: true },
+      ],
+    }
+  );
+
+  initialized = true;
+  return ChunkModel;
+};
 
 export default ChunkModel;

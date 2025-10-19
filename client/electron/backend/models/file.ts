@@ -1,5 +1,4 @@
-import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../db";
+import { DataTypes, Model, Optional, type Sequelize } from "sequelize";
 
 export interface FileAttributes {
   id: number;
@@ -35,70 +34,80 @@ export class FileModel extends Model<FileAttributes, FileCreationAttributes> imp
   declare imported: number | boolean | null;
 }
 
-// Initialize (idempotent) model definition
-FileModel.init(
-  {
-    id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true,
-    },
-    file_id: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true,
-    },
-    path: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-    },
-    name: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-    },
-    type: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    category: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    summary: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-    },
-    tags: {
-      type: DataTypes.TEXT, // JSON string
-      allowNull: true,
-    },
-    size: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-    },
-    created_at: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-    },
-    updated_at: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-    },
-    processed: {
-      type: DataTypes.BOOLEAN,
-      allowNull: true,
-    },
-    imported: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false,
-    },
-  },
-  {
-    sequelize,
-    tableName: "files",
-    timestamps: false,
+let initialized = false;
+
+export const initializeFileModel = (sequelize: Sequelize): typeof FileModel => {
+  if (initialized) {
+    return FileModel;
   }
-);
+
+  FileModel.init(
+    {
+      id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true,
+      },
+      file_id: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true,
+      },
+      path: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+      },
+      name: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+      },
+      type: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+      category: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+      summary: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      tags: {
+        type: DataTypes.TEXT, // JSON string persisted in SQLite
+        allowNull: true,
+      },
+      size: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
+      created_at: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+      },
+      updated_at: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      processed: {
+        type: DataTypes.BOOLEAN,
+        allowNull: true,
+      },
+      imported: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+    },
+    {
+      sequelize,
+      tableName: "files",
+      timestamps: false,
+    }
+  );
+
+  initialized = true;
+  return FileModel;
+};
 
 export default FileModel;

@@ -1,36 +1,83 @@
-import { QueryTypes, Sequelize } from "sequelize";
-import path from "path";
 import fs from "fs";
+import { promises as fsp } from "fs";
+import path from "path";
+import { QueryTypes, Sequelize } from "sequelize";
 import { configManager } from "../configManager";
 import { logger } from "../logger";
+import { initializeFileModel } from "./models/file";
+import { initializeChunkModel } from "./models/chunk";
 
-// Initialize Sequelize with SQLite using configured database path
-const config = configManager.loadConfig();
-const dbPath = path.isAbsolute(config.sqliteDbPath)
-  ? config.sqliteDbPath
-  : path.join(configManager.getAppRoot(), config.sqliteDbPath);
+let sequelizeInstance: Sequelize | null = null;
+let ensuredDirectoryFor: string | null = null;
 
-// Ensure directory exists (best-effort) without blocking
-try {
-  const dir = path.dirname(dbPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+const resolveDatabasePath = (): string => {
+  const config = configManager.loadConfig();
+  const configuredPath = typeof config.sqliteDbPath === "string" && config.sqliteDbPath.trim().length > 0
+    ? config.sqliteDbPath.trim()
+    : "database/files.db";
+
+  const absolutePath = path.isAbsolute(configuredPath)
+    ? configuredPath
+    : path.join(configManager.getAppRoot(), configuredPath);
+
+  return absolutePath;
+};
+
+const ensureDatabaseDirectory = async (storagePath: string): Promise<void> => {
+  if (ensuredDirectoryFor === storagePath) {
+    return;
   }
-} catch (err) {
-  logger.warn("Failed to ensure SQLite directory exists", err as unknown);
-}
 
-export const sequelize = new Sequelize({
-  dialect: "sqlite",
-  storage: dbPath,
-  // logging: (msg: string) => (logger.debug(msg)),
-  logging: false,
-});
+  const dir = path.dirname(storagePath);
+  try {
+    await fsp.mkdir(dir, { recursive: true });
+    ensuredDirectoryFor = storagePath;
+  } catch (error) {
+    const nodeError = error as NodeJS.ErrnoException;
+    if (nodeError.code === "EEXIST") {
+      ensuredDirectoryFor = storagePath;
+      return;
+    }
+    logger.warn("Failed to ensure SQLite directory exists", {
+      directory: dir,
+      error: String(error),
+    });
+  }
+};
+
+const databaseFileExists = async (storagePath: string): Promise<boolean> => {
+  try {
+    await fsp.access(storagePath, fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const getOrCreateSequelize = (): Sequelize => {
+  const storagePath = resolveDatabasePath();
+  if (sequelizeInstance) {
+    return sequelizeInstance;
+  }
+
+  sequelizeInstance = new Sequelize({
+    dialect: "sqlite",
+    storage: storagePath,
+    logging: false,
+  });
+
+  return sequelizeInstance;
+};
+
+export const getSequelize = (): Sequelize => getOrCreateSequelize();
 
 export async function authenticateDB(): Promise<void> {
   try {
+    const storagePath = resolveDatabasePath();
+    await ensureDatabaseDirectory(storagePath);
+    const sequelize = getOrCreateSequelize();
     await sequelize.authenticate();
-    logger.info("Sequelize connected to SQLite database", dbPath);
+    logger.info("Sequelize connected to SQLite database", { storagePath });
   } catch (error) {
     logger.error("Sequelize failed to connect to SQLite", error as unknown);
     throw error;
@@ -43,12 +90,15 @@ export async function authenticateDB(): Promise<void> {
  */
 export async function initializeDB(): Promise<void> {
   try {
-    const existedBefore = fs.existsSync(dbPath);
-    // Ensure FK is enforced and use WAL for better concurrency
+    const storagePath = resolveDatabasePath();
+    await ensureDatabaseDirectory(storagePath);
+    const existedBefore = await databaseFileExists(storagePath);
+
+    const sequelize = getOrCreateSequelize();
+
     await sequelize.query("PRAGMA foreign_keys = ON;");
     await sequelize.query("PRAGMA journal_mode = WAL;");
 
-    // Create files table
     await sequelize.query(
       `CREATE TABLE IF NOT EXISTS files (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,7 +117,6 @@ export async function initializeDB(): Promise<void> {
       );`
     );
 
-    // Create indexes for files
     await sequelize.query(
       `CREATE INDEX IF NOT EXISTS idx_files_file_id ON files(file_id);`
     );
@@ -75,7 +124,6 @@ export async function initializeDB(): Promise<void> {
       `CREATE INDEX IF NOT EXISTS idx_files_category ON files(category);`
     );
 
-    // Create chunks table
     await sequelize.query(
       `CREATE TABLE IF NOT EXISTS chunks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,7 +143,6 @@ export async function initializeDB(): Promise<void> {
       );`
     );
 
-    // Create indexes for chunks
     await sequelize.query(
       `CREATE INDEX IF NOT EXISTS idx_chunks_file_id ON chunks(file_id);`
     );
@@ -117,8 +164,13 @@ export async function initializeDB(): Promise<void> {
       logger.warn("Failed to ensure 'imported' column exists on files table", migrationError as unknown);
     }
 
+    initializeFileModel(sequelize);
+    initializeChunkModel(sequelize);
+
     logger.info("SQLite schema verified/initialized successfully");
-    logger.info(`SQLite database file ${existedBefore ? "already existed" : "was created/initialized"}: ${dbPath}`);
+    logger.info(
+      `SQLite database file ${existedBefore ? "already existed" : "was created/initialized"}: ${storagePath}`
+    );
   } catch (error) {
     logger.error("Failed to initialize SQLite schema", error as unknown);
     throw error;
@@ -126,10 +178,17 @@ export async function initializeDB(): Promise<void> {
 }
 
 export async function closeDB(): Promise<void> {
+  if (!sequelizeInstance) {
+    return;
+  }
+
   try {
-    await sequelize.close();
+    await sequelizeInstance.close();
     logger.info("Sequelize connection closed");
   } catch (error) {
     logger.error("Failed to close Sequelize connection", error as unknown);
+  } finally {
+    sequelizeInstance = null;
+    ensuredDirectoryFor = null;
   }
 }
