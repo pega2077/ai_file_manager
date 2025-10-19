@@ -481,11 +481,28 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       (text: string) => {
         try {
           const normalized = String(text ?? "").replace(/\r\n/g, "\n");
-          const segments = normalized
+          const rawSegments = normalized
             .split(/[。.\n]+/)
             .map((s) => s.trim())
             .filter(Boolean);
-          segments.forEach((seg, idx) => {
+          const mergedSegments: string[] = [];
+          const MIN_SEGMENT_LENGTH = 5;
+
+          for (let i = 0; i < rawSegments.length; i += 1) {
+            let current = rawSegments[i];
+            if (current.length < MIN_SEGMENT_LENGTH) {
+              const next = rawSegments[i + 1];
+              if (next) {
+                current = `${current} ${next}`.replace(/\s+/g, " ").trim();
+                i += 1;
+              }
+            }
+            if (current) {
+              mergedSegments.push(current);
+            }
+          }
+
+          mergedSegments.forEach((seg, idx) => {
             setTimeout(() => {
               try {
                 if (idx === 0) {
