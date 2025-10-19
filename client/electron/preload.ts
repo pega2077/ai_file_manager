@@ -1,5 +1,6 @@
 import { ipcRenderer, contextBridge } from 'electron'
 import { webUtils } from 'electron'
+import { pathToFileURL } from 'url'
 import type { FileImportNotification } from '../renderer/shared/events/fileImportEvents'
 
 // --------- Expose some API to the Renderer process ---------
@@ -30,6 +31,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   copyToClipboard: (text: string) => ipcRenderer.invoke('copy-to-clipboard', text),
   readClipboardText: () => ipcRenderer.invoke('read-clipboard-text'),
   importFile: () => ipcRenderer.invoke('import-file'),
+  toFileUrl: (filePath: string) => {
+    try {
+      return pathToFileURL(filePath).toString()
+    } catch {
+      return ''
+    }
+  },
   getApiBaseUrl: () => ipcRenderer.invoke('get-api-base-url'),
   setApiBaseUrl: (url: string) => ipcRenderer.invoke('set-api-base-url', url),
   getAppConfig: () => ipcRenderer.invoke('get-app-config'),

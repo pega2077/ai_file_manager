@@ -28,6 +28,8 @@ function getTextConversionFailedMessage(): string {
   return i18n.t("backend.files.errors.textConversionFailed", "Failed to convert file to text");
 }
 
+const HTML_PREVIEW_EXTENSIONS = new Set(["html", "htm", "xhtml"]);
+
 async function summarizeVideoContent(
   videoPath: string,
   language: SupportedLang,
@@ -500,6 +502,7 @@ export async function previewFileHandler(req: Request, res: Response): Promise<v
     const ext = path.extname(filePath).replace(/^\./, "");
     const mime = getMimeByExt(ext);
     const size = stat.size;
+    const isHtmlExt = HTML_PREVIEW_EXTENSIONS.has(ext.toLowerCase());
 
     if (isImageExt(ext)) {
       try {
@@ -571,6 +574,28 @@ export async function previewFileHandler(req: Request, res: Response): Promise<v
         });
         return;
       }
+    }
+
+    if (isHtmlExt) {
+      const buffer = await fsp.readFile(filePath);
+      const { text, encoding } = decodeTextBuffer(buffer);
+      res.status(200).json({
+        success: true,
+        message: "ok",
+        data: {
+          file_path: filePath,
+          file_type: "html",
+          mime_type: "text/html",
+          content: text,
+          size,
+          truncated: false,
+          encoding,
+        },
+        error: null,
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
     }
 
     // Text-like preview (default)

@@ -1,6 +1,6 @@
 import { Modal, Button, Spin, message, Space } from 'antd';
 import { FolderOpenOutlined, GlobalOutlined } from '@ant-design/icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from '../shared/i18n/I18nProvider';
@@ -15,17 +15,32 @@ interface FilePreviewProps {
 
 interface PreviewData {
   file_path: string;
-  file_type: 'text' | 'image';
+  file_type: 'text' | 'image' | 'html';
   mime_type: string;
   content: string;
   size: number;
   truncated?: boolean;
+  encoding?: string;
 }
 
 const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+
+  const htmlSrcDoc = useMemo(() => {
+    if (!previewData || previewData.file_type !== 'html') {
+      return null;
+    }
+    const fileUrl = window.electronAPI?.toFileUrl?.(previewData.file_path);
+    if (!fileUrl) {
+      return previewData.content;
+    }
+    const lastSlashIndex = fileUrl.lastIndexOf('/');
+    const baseHref = lastSlashIndex >= 0 ? fileUrl.slice(0, lastSlashIndex + 1) : fileUrl;
+    const safeBase = baseHref.replace(/"/g, '&quot;');
+    return `<base href="${safeBase}">\n${previewData.content}`;
+  }, [previewData]);
 
   useEffect(() => {
     const loadPreview = async () => {
@@ -99,6 +114,29 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
               maxWidth: '100%',
               maxHeight: '60vh',
               objectFit: 'contain'
+            }}
+          />
+        </div>
+      );
+    } else if (previewData.file_type === 'html') {
+      return (
+        <div
+          style={{
+            maxHeight: '60vh',
+            borderRadius: '4px',
+            overflow: 'hidden',
+            border: '1px solid #f0f0f0'
+          }}
+        >
+          <iframe
+            title={fileName}
+            sandbox="allow-same-origin"
+            srcDoc={htmlSrcDoc ?? previewData.content}
+            style={{
+              width: '100%',
+              height: '60vh',
+              border: 'none',
+              background: '#fff'
             }}
           />
         </div>

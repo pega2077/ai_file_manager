@@ -10,6 +10,7 @@ declare global {
       copyToClipboard: (text: string) => Promise<boolean>
   readClipboardText: () => Promise<string>
       importFile: () => Promise<{ success: boolean; message: string }>
+  toFileUrl: (filePath: string) => string
       getApiBaseUrl: () => Promise<string>
       setApiBaseUrl: (url: string) => Promise<boolean>
       getAppConfig: () => Promise<unknown>
