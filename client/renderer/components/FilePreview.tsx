@@ -1,6 +1,8 @@
 import { Modal, Button, Spin, message, Space } from 'antd';
 import { FolderOpenOutlined, GlobalOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 import { apiService } from '../services/api';
 
@@ -29,7 +31,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
     const loadPreview = async () => {
       setLoading(true);
       try {
-  const response = await apiService.previewFile(filePath, { origin: true });
+        const response = await apiService.previewFile(filePath, { origin: true });
         if (response.success) {
           setPreviewData(response.data as PreviewData);
         } else {
@@ -52,7 +54,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
 
   const handleOpenInFolder = async () => {
     try {
-      // 使用系统默认方式打开文件所在文件夹
+      // Use system default handler to open the file directory
       const folderPath = filePath.substring(0, filePath.lastIndexOf(getPathSeparator()));
       await window.electronAPI.openFile(folderPath);
     } catch (error) {
@@ -74,6 +76,16 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
     return navigator.userAgent.includes('Windows') ? '\\' : '/';
   };
 
+  const isMarkdownPreview = (data: PreviewData) => {
+    const mimeType = data.mime_type?.toLowerCase() ?? '';
+    if (mimeType.includes('markdown')) {
+      return true;
+    }
+
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    return extension === 'md' || extension === 'markdown';
+  };
+
   const renderPreviewContent = () => {
     if (!previewData) return null;
 
@@ -92,6 +104,29 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
         </div>
       );
     } else if (previewData.file_type === 'text') {
+      if (isMarkdownPreview(previewData)) {
+        return (
+          <div
+            style={{
+              maxHeight: '60vh',
+              overflow: 'auto',
+              background: '#fff',
+              padding: '16px',
+              borderRadius: '4px',
+              color: '#1f1f1f',
+              lineHeight: 1.6
+            }}
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{previewData.content}</ReactMarkdown>
+            {previewData.truncated && (
+              <div style={{ marginTop: '16px', color: '#999', fontStyle: 'italic' }}>
+                {t('filePreview.messages.truncatedMessage')}
+              </div>
+            )}
+          </div>
+        );
+      }
+
       return (
         <div
           style={{
