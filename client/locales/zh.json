@@ -904,7 +904,9 @@
     "buttons": {
       "openInFolder": "在文件夹中打开",
       "openWithDefault": "用默认程序打开",
-      "close": "关闭"
+      "close": "关闭",
+      "maximize": "最大化",
+      "restore": "还原"
     },
     "messages": {
       "loadFailed": "加载预览失败",

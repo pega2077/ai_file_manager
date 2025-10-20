@@ -598,6 +598,27 @@ export async function previewFileHandler(req: Request, res: Response): Promise<v
       return;
     }
 
+    // PDF preview: return base64 data URL for embedding in iframe/object
+    if (ext.toLowerCase() === 'pdf') {
+      const data = await fsp.readFile(filePath);
+      const base64 = data.toString('base64');
+      res.status(200).json({
+        success: true,
+        message: 'ok',
+        data: {
+          file_path: filePath,
+          file_type: 'pdf',
+          mime_type: 'application/pdf',
+          content: `data:application/pdf;base64,${base64}`,
+          size,
+        },
+        error: null,
+        timestamp: new Date().toISOString(),
+        request_id: '',
+      });
+      return;
+    }
+
     // Text-like preview (default)
     const fd = await fsp.open(filePath, "r");
     try {

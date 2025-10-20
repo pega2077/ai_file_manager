@@ -1,5 +1,5 @@
 import { Modal, Button, Spin, message, Space } from 'antd';
-import { FolderOpenOutlined, GlobalOutlined } from '@ant-design/icons';
+import { FolderOpenOutlined, GlobalOutlined, FullscreenOutlined, FullscreenExitOutlined } from '@ant-design/icons';
 import { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -15,7 +15,7 @@ interface FilePreviewProps {
 
 interface PreviewData {
   file_path: string;
-  file_type: 'text' | 'image' | 'html';
+  file_type: 'text' | 'image' | 'html' | 'pdf';
   mime_type: string;
   content: string;
   size: number;
@@ -27,6 +27,10 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  // When maximized we allow the preview to take most of the viewport height
+  const previewMaxHeight = isMaximized ? 'calc(100vh - 150px)' : '60vh';
 
   const htmlSrcDoc = useMemo(() => {
     if (!previewData || previewData.file_type !== 'html') {
@@ -66,6 +70,26 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
       loadPreview();
     }
   }, [visible, filePath, onClose, t]);
+
+  // When maximized, intercept Escape to exit maximize mode instead of closing modal
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (isMaximized && e.key === 'Escape') {
+        setIsMaximized(false);
+        e.stopPropagation();
+      }
+    };
+
+    if (isMaximized) window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isMaximized]);
+
+  // Reset maximize state when modal is closed
+  useEffect(() => {
+    if (!visible) {
+      setIsMaximized(false);
+    }
+  }, [visible]);
 
   const handleOpenInFolder = async () => {
     try {
@@ -112,7 +136,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
             alt={fileName}
             style={{
               maxWidth: '100%',
-              maxHeight: '60vh',
+              maxHeight: previewMaxHeight,
               objectFit: 'contain'
             }}
           />
@@ -122,7 +146,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
       return (
         <div
           style={{
-            maxHeight: '60vh',
+            maxHeight: previewMaxHeight,
             borderRadius: '4px',
             overflow: 'hidden',
             border: '1px solid #f0f0f0'
@@ -134,19 +158,41 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
             srcDoc={htmlSrcDoc ?? previewData.content}
             style={{
               width: '100%',
-              height: '60vh',
+              height: previewMaxHeight,
               border: 'none',
               background: '#fff'
             }}
           />
         </div>
       );
+          } else if (previewData.file_type === 'pdf') {
+            return (
+              <div
+                style={{
+                  maxHeight: previewMaxHeight,
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  border: '1px solid #f0f0f0'
+                }}
+              >
+                <iframe
+                  title={fileName}
+                  src={previewData.content}
+                  style={{
+                    width: '100%',
+                    height: previewMaxHeight,
+                    border: 'none',
+                    background: '#fff'
+                  }}
+                />
+              </div>
+            );
     } else if (previewData.file_type === 'text') {
       if (isMarkdownPreview(previewData)) {
         return (
           <div
             style={{
-              maxHeight: '60vh',
+              maxHeight: previewMaxHeight,
               overflow: 'auto',
               background: '#fff',
               padding: '16px',
@@ -168,7 +214,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
       return (
         <div
           style={{
-            maxHeight: '60vh',
+            maxHeight: previewMaxHeight,
             overflow: 'auto',
             background: '#f5f5f5',
             padding: '16px',
@@ -196,7 +242,11 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
       title={t('filePreview.modalTitle', { fileName })}
       open={visible}
       onCancel={onClose}
-      width={800}
+      width={isMaximized ? '100%' : 800}
+      style={isMaximized ? { top: 0, padding: 0 } : undefined}
+      bodyStyle={isMaximized ? { height: 'calc(100vh - 150px)', padding: '24px' } : undefined}
+      keyboard={!isMaximized}
+      maskClosable={!isMaximized}
       footer={
         <Space>
           <Button icon={<FolderOpenOutlined />} onClick={handleOpenInFolder}>
@@ -204,6 +254,12 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
           </Button>
           <Button icon={<GlobalOutlined />} onClick={handleOpenWithDefault}>
             {t('filePreview.buttons.openWithDefault')}
+          </Button>
+          <Button
+            icon={isMaximized ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+            onClick={() => setIsMaximized((s) => !s)}
+          >
+            {isMaximized ? t('filePreview.buttons.restore') : t('filePreview.buttons.maximize')}
           </Button>
           <Button onClick={onClose}>
             {t('filePreview.buttons.close')}

@@ -45,6 +45,7 @@ export function getMimeByExt(ext: string): string {
     case "webp": return "image/webp";
     case "svg": return "image/svg+xml";
     case "ico": return "image/x-icon";
+    case "pdf": return "application/pdf";
     default: return "application/octet-stream";
   }
 }

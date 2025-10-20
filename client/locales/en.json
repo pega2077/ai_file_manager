@@ -902,7 +902,9 @@
     "buttons": {
       "openInFolder": "Open in Folder",
       "openWithDefault": "Open with Default App",
-      "close": "Close"
+      "close": "Close",
+      "maximize": "Maximize",
+      "restore": "Restore"
     },
     "messages": {
       "loadFailed": "Failed to load preview",
