@@ -1,8 +1,9 @@
 import type { Request, Response, Express } from "express";
-import { sequelize } from "./db";
+import type { Transaction } from "sequelize";
 import fs from "fs";
 import { promises as fsp } from "fs";
 import { logger } from "../logger";
+import { getSequelize } from "./db";
 import { getGlobalIndexPath } from "./utils/vectorStore";
 
 // Route handlers for system-level operations
@@ -13,10 +14,11 @@ const status = (_req: Request, res: Response) => {
 // Clear all application data: SQLite rows and vector index
 const clearData = async (_req: Request, res: Response) => {
   try {
+    const sequelize = getSequelize();
     // 1) Clear SQLite tables (order matters due to FK: chunks -> files)
-    await sequelize.transaction(async (t) => {
-      await sequelize.query("DELETE FROM chunks;", { transaction: t });
-      await sequelize.query("DELETE FROM files;", { transaction: t });
+    await sequelize.transaction(async (transaction: Transaction) => {
+      await sequelize.query("DELETE FROM chunks;", { transaction });
+      await sequelize.query("DELETE FROM files;", { transaction });
     });
     // VACUUM outside of transaction (SQLite requirement)
     try {
