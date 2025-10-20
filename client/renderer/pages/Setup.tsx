@@ -414,7 +414,7 @@ const Setup = () => {
                   )}
                 </div>
               </div>
-              <div>
+              {/* <div>
                 <Text strong>{t('setup.form.llmProviderLabel')}</Text>
                 <Select
                   style={{ width: '100%', marginTop: 8 }}
@@ -425,7 +425,7 @@ const Setup = () => {
                 <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
                   {t('setup.descriptions.llmProvider')}
                 </Text>
-              </div>
+              </div> */}
               <Button
                 type="primary"
                 onClick={handleContinueToProfile}
