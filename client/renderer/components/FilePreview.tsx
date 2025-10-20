@@ -1,4 +1,4 @@
-import { Modal, Button, Spin, message, Space } from 'antd';
+import { Modal, Button, Spin, message, Space, Alert } from 'antd';
 import { FolderOpenOutlined, GlobalOutlined, FullscreenOutlined, FullscreenExitOutlined } from '@ant-design/icons';
 import { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -15,7 +15,7 @@ interface FilePreviewProps {
 
 interface PreviewData {
   file_path: string;
-  file_type: 'text' | 'image' | 'html' | 'pdf';
+  file_type: 'text' | 'image' | 'html' | 'pdf' | 'video';
   mime_type: string;
   content: string;
   size: number;
@@ -28,6 +28,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
   const [loading, setLoading] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
   // When maximized we allow the preview to take most of the viewport height
   const previewMaxHeight = isMaximized ? 'calc(100vh - 150px)' : '60vh';
@@ -91,6 +92,10 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
     }
   }, [visible]);
 
+  useEffect(() => {
+    setVideoError(false);
+  }, [previewData?.file_path, previewData?.file_type]);
+
   const handleOpenInFolder = async () => {
     try {
       // Use system default handler to open the file directory
@@ -127,6 +132,64 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
 
   const renderPreviewContent = () => {
     if (!previewData) return null;
+
+    if (previewData.file_type === 'video') {
+      const source = (() => {
+        const content = previewData.content || '';
+        if (/^(data:|blob:|https?:|file:)/i.test(content)) {
+          return content;
+        }
+        const fileUrl = window.electronAPI?.toFileUrl?.(previewData.file_path);
+        return fileUrl && fileUrl.length > 0 ? fileUrl : content;
+      })();
+
+      const handleVideoError = () => {
+        setVideoError(true);
+        message.warning(t('filePreview.messages.videoPlaybackNotSupported'));
+      };
+
+      if (videoError) {
+        return (
+          <Alert
+            type="warning"
+            showIcon
+            message={t('filePreview.messages.videoPlaybackNotSupported')}
+            action={
+              <Button type="primary" onClick={handleOpenWithDefault}>
+                {t('filePreview.buttons.openWithDefault')}
+              </Button>
+            }
+          />
+        );
+      }
+
+      return (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}
+        >
+          <video
+            key={source}
+            controls
+            controlsList="nodownload"
+            preload="metadata"
+            style={{
+              width: '100%',
+              maxHeight: previewMaxHeight,
+              borderRadius: '4px',
+              backgroundColor: '#000'
+            }}
+            onError={handleVideoError}
+          >
+            <source src={source} type={previewData.mime_type || 'video/mp4'} />
+            {t('filePreview.messages.videoPlaybackNotSupported')}
+          </video>
+        </div>
+      );
+    }
 
     if (previewData.file_type === 'image') {
       return (
@@ -244,7 +307,16 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
       onCancel={onClose}
       width={isMaximized ? '100%' : 800}
       style={isMaximized ? { top: 0, padding: 0 } : undefined}
-      bodyStyle={isMaximized ? { height: 'calc(100vh - 150px)', padding: '24px' } : undefined}
+      styles={
+        isMaximized
+          ? {
+              body: {
+                height: 'calc(100vh - 150px)',
+                padding: '24px'
+              }
+            }
+          : undefined
+      }
       keyboard={!isMaximized}
       maskClosable={!isMaximized}
       footer={

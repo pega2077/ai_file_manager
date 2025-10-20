@@ -911,7 +911,8 @@
       "unsupportedFileType": "Unsupported file type",
       "truncatedMessage": "... File content is too long, truncated display (first 10KB)...",
       "openFolderFailed": "Failed to open folder",
-      "openFileFailed": "Failed to open file"
+      "openFileFailed": "Failed to open file",
+      "videoPlaybackNotSupported": "Your environment cannot play this video."
     },
     "loading": {
       "loadingPreview": "Loading preview..."

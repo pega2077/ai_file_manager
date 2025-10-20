@@ -913,7 +913,8 @@
       "unsupportedFileType": "不支持的文件类型",
       "truncatedMessage": "... 文件内容过长，已截断显示（前10KB）...",
       "openFolderFailed": "打开文件夹失败",
-      "openFileFailed": "打开文件失败"
+      "openFileFailed": "打开文件失败",
+      "videoPlaybackNotSupported": "当前环境无法播放此视频。"
     },
     "loading": {
       "loadingPreview": "正在加载预览..."

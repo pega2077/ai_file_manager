@@ -5,7 +5,7 @@ import { logger } from "../logger";
 import path from "path";
 import fs from "fs";
 import { promises as fsp } from "fs";
-import { MAX_TEXT_PREVIEW_BYTES, getMimeByExt, isImageExt, decodeTextBuffer, CATEGORY_EXTENSIONS, toNumber, isNonEmptyString, parseTags } from "./utils/fileHelpers";
+import { MAX_TEXT_PREVIEW_BYTES, getMimeByExt, isImageExt, isVideoExt, decodeTextBuffer, CATEGORY_EXTENSIONS, toNumber, isNonEmptyString, parseTags } from "./utils/fileHelpers";
 import { ensureTxtFile, chunkText } from "./utils/fileConversion";
 import { ensureTempDir } from "./utils/pathHelper";
 import { embedText, generateStructuredJson, describeImage, getActiveModelName } from "./utils/llm";
@@ -16,6 +16,7 @@ import type { SupportedLang } from "./utils/promptHelper";
 import { buildExtractTagsMessages } from "./utils/promptHelper";
 import type { ProviderName } from "./utils/llm";
 import { app, nativeImage, shell } from "electron";
+import { pathToFileURL } from "url";
 import { randomUUID } from "crypto";
 import ChunkModel from "./models/chunk";
 import { updateGlobalFaissIndex } from "./utils/vectorStore";
@@ -619,6 +620,36 @@ export async function previewFileHandler(req: Request, res: Response): Promise<v
       return;
     }
 
+    if (mime.startsWith("video/") || isVideoExt(ext)) {
+      const normalizedMime = mime.startsWith("video/") && mime.length > 0 ? mime : `video/${ext.toLowerCase()}`;
+      const streamPath = `/api/files/stream?file_path=${encodeURIComponent(filePath)}`;
+      const host = req.get("host");
+      const protocol = (req.protocol || "http").replace(/:$/, "");
+      const cfg = configManager.getConfig();
+      const fallbackHost = typeof cfg.localServiceHost === "string" && cfg.localServiceHost.trim().length > 0 ? cfg.localServiceHost.trim() : "127.0.0.1";
+      const fallbackPort = typeof cfg.localServicePort === "number" && cfg.localServicePort > 0 ? cfg.localServicePort : 8000;
+      const fallbackBase = `${protocol}://${fallbackHost}:${fallbackPort}`;
+      const streamUrl = host ? `${protocol}://${host}${streamPath}` : `${fallbackBase}${streamPath}`;
+      const fileUrl = pathToFileURL(filePath).toString();
+      res.status(200).json({
+        success: true,
+        message: "ok",
+        data: {
+          file_path: filePath,
+          file_type: "video",
+          mime_type: normalizedMime,
+          content: streamUrl,
+          stream_url: streamUrl,
+          file_url: fileUrl,
+          size,
+        },
+        error: null,
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
     // Text-like preview (default)
     const fd = await fsp.open(filePath, "r");
     try {
@@ -655,6 +686,239 @@ export async function previewFileHandler(req: Request, res: Response): Promise<v
       timestamp: new Date().toISOString(),
       request_id: "",
     });
+  }
+}
+
+export async function streamFileHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const rawPath = Array.isArray(req.query?.file_path) ? req.query.file_path[0] : req.query?.file_path;
+    const filePath = typeof rawPath === "string" ? rawPath : undefined;
+
+    if (!filePath) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "file_path is required", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    if (!path.isAbsolute(filePath)) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: { code: "INVALID_REQUEST", message: "file_path must be an absolute path", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const stat = await fsp.stat(filePath).catch(() => null);
+    if (!stat || !stat.isFile()) {
+      res.status(404).json({
+        success: false,
+        message: "not_found",
+        data: null,
+        error: { code: "RESOURCE_NOT_FOUND", message: "file not found", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const totalSize = stat.size;
+    const ext = path.extname(filePath).replace(/^\./, "").toLowerCase();
+    const mimeGuess = getMimeByExt(ext);
+    const mimeType = mimeGuess && mimeGuess.trim().length > 0 ? mimeGuess : "application/octet-stream";
+
+    res.setHeader("Accept-Ranges", "bytes");
+    res.setHeader("Cache-Control", "private, max-age=0, must-revalidate");
+    res.setHeader("Last-Modified", stat.mtime.toUTCString());
+
+    const rangeHeader = typeof req.headers.range === "string" ? req.headers.range : undefined;
+    if (rangeHeader) {
+      const rangeMatch = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
+      if (!rangeMatch) {
+        res.status(416).json({
+          success: false,
+          message: "invalid_request",
+          data: null,
+          error: { code: "INVALID_RANGE", message: "Invalid Range header", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+
+      const startStr = rangeMatch[1];
+      const endStr = rangeMatch[2];
+      const hasStart = startStr !== "";
+      const hasEnd = endStr !== "";
+
+      if (!hasStart && !hasEnd) {
+        res.status(416).json({
+          success: false,
+          message: "invalid_request",
+          data: null,
+          error: { code: "INVALID_RANGE", message: "Invalid Range header", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+
+      let start: number | undefined;
+      let end: number | undefined;
+
+      if (hasStart) {
+        start = Number.parseInt(startStr, 10);
+        if (Number.isNaN(start) || start < 0) {
+          res.status(416).json({
+            success: false,
+            message: "invalid_request",
+            data: null,
+            error: { code: "INVALID_RANGE", message: "Invalid Range header", details: null },
+            timestamp: new Date().toISOString(),
+            request_id: "",
+          });
+          return;
+        }
+      }
+
+      if (hasEnd) {
+        end = Number.parseInt(endStr, 10);
+        if (Number.isNaN(end) || end < 0) {
+          res.status(416).json({
+            success: false,
+            message: "invalid_request",
+            data: null,
+            error: { code: "INVALID_RANGE", message: "Invalid Range header", details: null },
+            timestamp: new Date().toISOString(),
+            request_id: "",
+          });
+          return;
+        }
+      }
+
+      if (!hasStart && hasEnd) {
+  const suffixLength = end ?? 0;
+        if (suffixLength <= 0) {
+          res.status(416).json({
+            success: false,
+            message: "invalid_request",
+            data: null,
+            error: { code: "INVALID_RANGE", message: "Invalid Range header", details: null },
+            timestamp: new Date().toISOString(),
+            request_id: "",
+          });
+          return;
+        }
+        start = Math.max(0, totalSize - suffixLength);
+        end = totalSize - 1;
+      } else {
+        start = start ?? 0;
+        end = end ?? totalSize - 1;
+      }
+
+      if (start >= totalSize) {
+        res.status(416).json({
+          success: false,
+          message: "invalid_request",
+          data: null,
+          error: { code: "INVALID_RANGE", message: "Range start exceeds file size", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+
+      end = Math.min(end, totalSize - 1);
+      if (start > end) {
+        res.status(416).json({
+          success: false,
+          message: "invalid_request",
+          data: null,
+          error: { code: "INVALID_RANGE", message: "Invalid Range header", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+
+      const chunkSize = end - start + 1;
+      res.status(206);
+      res.setHeader("Content-Range", `bytes ${start}-${end}/${totalSize}`);
+      res.setHeader("Content-Length", chunkSize);
+      res.setHeader("Content-Type", mimeType);
+
+      const rangeStream = fs.createReadStream(filePath, { start, end });
+      const handleStreamError = (streamErr: NodeJS.ErrnoException) => {
+        logger.error("streamFileHandler: stream error", { filePath, err: String(streamErr) });
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            message: "internal_error",
+            data: null,
+            error: { code: "STREAM_ERROR", message: "Failed to stream file", details: null },
+            timestamp: new Date().toISOString(),
+            request_id: "",
+          });
+        } else {
+          res.destroy(streamErr);
+        }
+      };
+      rangeStream.on("error", handleStreamError);
+      res.on("close", () => {
+        rangeStream.destroy();
+      });
+      rangeStream.pipe(res);
+      return;
+    }
+
+    res.status(200);
+    res.setHeader("Content-Length", totalSize);
+    res.setHeader("Content-Type", mimeType);
+
+    const fileStream = fs.createReadStream(filePath);
+    const handleStreamError = (streamErr: NodeJS.ErrnoException) => {
+      logger.error("streamFileHandler: stream error", { filePath, err: String(streamErr) });
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: "internal_error",
+          data: null,
+          error: { code: "STREAM_ERROR", message: "Failed to stream file", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+      } else {
+        res.destroy(streamErr);
+      }
+    };
+    fileStream.on("error", handleStreamError);
+    res.on("close", () => {
+      fileStream.destroy();
+    });
+    fileStream.pipe(res);
+  } catch (err) {
+    logger.error("/api/files/stream failed", err as unknown);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: "internal_error",
+        data: null,
+        error: { code: "INTERNAL_ERROR", message: "Stream file failed", details: null },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+    } else {
+      res.destroy();
+    }
   }
 }
 
@@ -2798,6 +3062,8 @@ export function registerFilesRoutes(app: Express) {
   app.post("/api/files/list", listFilesHandler);
   // POST /api/files/preview
   app.post("/api/files/preview", previewFileHandler);
+  // GET /api/files/stream
+  app.get("/api/files/stream", streamFileHandler);
   // POST /api/files/stage
   app.post("/api/files/stage", stageFileHandler);
   // POST /api/files/save-file

@@ -21,6 +21,7 @@ export const MAX_TEXT_PREVIEW_BYTES = 10 * 1024; // 10KB
 
 // Image extension set
 const IMAGE_EXTENSIONS = new Set<string>(["jpg", "jpeg", "png", "gif", "bmp", "webp", "svg", "ico"]);
+const VIDEO_EXTENSIONS = new Set<string>(["mp4", "avi", "mkv", "mov", "wmv", "flv", "webm", "m4v", "mpg", "mpeg"]);
 
 // Mime type by extension
 export function getMimeByExt(ext: string): string {
@@ -46,12 +47,26 @@ export function getMimeByExt(ext: string): string {
     case "svg": return "image/svg+xml";
     case "ico": return "image/x-icon";
     case "pdf": return "application/pdf";
+    case "mp4":
+    case "m4v": return "video/mp4";
+    case "mov": return "video/quicktime";
+    case "webm": return "video/webm";
+    case "avi": return "video/x-msvideo";
+    case "wmv": return "video/x-ms-wmv";
+    case "flv": return "video/x-flv";
+    case "mkv": return "video/x-matroska";
+    case "mpg":
+    case "mpeg": return "video/mpeg";
     default: return "application/octet-stream";
   }
 }
 
 export function isImageExt(ext: string): boolean {
   return IMAGE_EXTENSIONS.has(ext.toLowerCase());
+}
+
+export function isVideoExt(ext: string): boolean {
+  return VIDEO_EXTENSIONS.has(ext.toLowerCase());
 }
 
 // BOM helpers
