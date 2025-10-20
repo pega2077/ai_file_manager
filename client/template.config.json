@@ -12,9 +12,9 @@
   },
   "pega": {
     "pegaEndpoint": "https://llm.pega.example.com",
-    "pegaModel": "pega-chat",
-    "pegaEmbedModel": "pega-embed",
-    "pegaVisionModel": "pega-vision",
+    "pegaModel": "qwen3:8b",
+    "pegaEmbedModel": "bge-m3",
+    "pegaVisionModel": "qwen2.5vl:7b",
     "pegaApiKey": "",
     "pegaAuthToken": ""
   },
@@ -27,8 +27,8 @@
   },
   "openrouter": {
     "openrouterEndpoint": "https://openrouter.ai/api/v1",
-    "openrouterApiKey": "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",
-    "openrouterModel": "openrouter/auto",
+    "openrouterApiKey": "your_api_key_here",
+    "openrouterModel": "openai/gpt-oss-20b:free",
     "openrouterEmbedModel": "all-MiniLM-L6-v2",
     "openrouterEmbedEndpoint": "https://embed.pegamob.com",
     "openrouterEmbedKey": "",
