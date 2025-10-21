@@ -208,6 +208,12 @@ export interface AnalyzeChunkSelection {
   match_reason: string;
 }
 
+export interface QueryPurposeResult {
+  purpose: 'retrieval' | 'summary';
+  confidence: number;
+  reasoning?: string;
+}
+
 export interface SearchKnowledgeOptions {
   context_limit?: number;
   similarity_threshold?: number;
@@ -252,6 +258,44 @@ export interface AnalyzeQuestionOptions {
   override_model?: string;
   language?: string;
   providerOverride?: string;
+}
+
+export interface SummarizeDocumentsDocument {
+  file_id: string;
+  file_name: string;
+  file_path: string;
+  category: string;
+  tags: string[];
+  chunk_count: number;
+  extracted_characters: number;
+}
+
+export interface SummarizeDocumentsResult {
+  summary: string;
+  confidence: number;
+  highlights: string[];
+  documents: SummarizeDocumentsDocument[];
+  missing_documents: string[];
+  metadata: {
+    instruction: string;
+    language: string;
+    model_used: string;
+    response_time_ms: number;
+    temperature: number;
+    max_tokens: number;
+    per_document_char_limit: number;
+    documents_summarized: number;
+  };
+}
+
+export interface SummarizeDocumentsOptions {
+  instruction?: string;
+  user_instruction?: string;
+  temperature?: number;
+  max_tokens?: number;
+  per_document_char_limit?: number;
+  language?: string;
+  providerOverride?: ProviderName;
 }
 
 interface SystemConfigUpdate {
@@ -869,6 +913,132 @@ class ApiService {
     }
 
     return this.request<SemanticSearchResponse>('/search/semantic', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async queryPurpose(
+    question: string,
+    options?: {
+      temperature?: number;
+      max_tokens?: number;
+      language?: string;
+      providerOverride?: ProviderName;
+    }
+  ): Promise<ApiResponse<QueryPurposeResult>> {
+    const trimmed = question.trim();
+    if (!trimmed) {
+      return Promise.reject(
+        Object.assign(new Error('question is required'), {
+          code: 'INVALID_QUESTION',
+        })
+      );
+    }
+
+    const provider = options?.providerOverride ?? (await this.ensureProvider());
+    const payload: Record<string, unknown> = {
+      query: trimmed,
+    };
+
+    if (provider) {
+      payload.provider = provider;
+    }
+
+    if (typeof options?.language === 'string' && options.language.trim()) {
+      payload.language = options.language.trim();
+    }
+
+    if (typeof options?.temperature === 'number' && Number.isFinite(options.temperature)) {
+      const bounded = Math.max(0, Math.min(2, options.temperature));
+      payload.temperature = bounded;
+    }
+
+    if (typeof options?.max_tokens === 'number' && Number.isFinite(options.max_tokens)) {
+      const bounded = Math.max(64, Math.min(800, Math.floor(options.max_tokens)));
+      payload.max_tokens = bounded;
+    }
+
+    return this.request<QueryPurposeResult>('/chat/query-purpose', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async summarizeDocuments(
+    documentIds: string[],
+    options?: SummarizeDocumentsOptions
+  ): Promise<ApiResponse<SummarizeDocumentsResult>> {
+    const sanitizedIds = documentIds
+      .map((value) => {
+        if (typeof value === 'string' && value.trim()) {
+          return value.trim();
+        }
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          return String(value);
+        }
+        return '';
+      })
+      .filter((value) => value.length > 0);
+
+    if (sanitizedIds.length === 0) {
+      return Promise.reject(
+        Object.assign(new Error('document_ids must contain at least one identifier'), {
+          code: 'INVALID_DOCUMENT_IDS',
+        })
+      );
+    }
+
+    const instructionCandidates = [
+      typeof options?.instruction === 'string' ? options.instruction.trim() : '',
+      typeof options?.user_instruction === 'string' ? options.user_instruction.trim() : '',
+    ];
+    const instruction = instructionCandidates.find((value) => value.length > 0);
+
+    if (!instruction) {
+      return Promise.reject(
+        Object.assign(new Error('instruction is required for summarization'), {
+          code: 'INVALID_INSTRUCTION',
+        })
+      );
+    }
+
+    const provider = options?.providerOverride ?? (await this.ensureProvider());
+    const payload: Record<string, unknown> = {
+      document_ids: sanitizedIds,
+      instruction,
+    };
+
+    if (provider) {
+      payload.provider = provider;
+    }
+
+    if (typeof options?.language === 'string' && options.language.trim()) {
+      payload.language = options.language.trim();
+    }
+
+    if (typeof options?.temperature === 'number' && Number.isFinite(options.temperature)) {
+      const bounded = Math.max(0, Math.min(2, options.temperature));
+      payload.temperature = bounded;
+    }
+
+    if (typeof options?.max_tokens === 'number' && Number.isFinite(options.max_tokens)) {
+      const bounded = Math.max(200, Math.min(4000, Math.floor(options.max_tokens)));
+      payload.max_tokens = bounded;
+    }
+
+    if (
+      typeof options?.per_document_char_limit === 'number' &&
+      Number.isFinite(options.per_document_char_limit)
+    ) {
+      const bounded = Math.max(
+        500,
+        Math.min(6000, Math.floor(options.per_document_char_limit))
+      );
+      payload.per_document_char_limit = bounded;
+    }
+
+    return this.request<SummarizeDocumentsResult>('/chat/summarize-documents', {
       method: 'POST',
       body: JSON.stringify(payload),
     });

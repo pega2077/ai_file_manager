@@ -838,7 +838,10 @@
       "openFileFailed": "Failed to open the file.",
       "openFileNotSupported": "Opening files is not supported on this platform.",
       "searchNoResults": "No results found. Try adjusting filters or keywords.",
-      "noChunksSelected": "Please select at least one chunk before analyzing."
+      "noChunksSelected": "Please select at least one chunk before analyzing.",
+      "queryPurposeFallback": "Failed to analyze question intent. Falling back to retrieval mode.",
+      "summaryNoDocuments": "No referenced documents available for summarization. Using retrieval instead.",
+      "summaryFailed": "Failed to summarize selected documents."
     },
     "loading": {
       "searching": "Searching...",
@@ -889,7 +892,10 @@
         "vector": "Vector fallback",
         "manual": "Manual selection",
         "none": "Not searched"
-      }
+      },
+      "summaryConfidence": "Summary Confidence",
+      "summaryHighlights": "Key Highlights",
+      "summaryDocumentsTitle": "Summarized Documents"
     },
     "preview": {
       "contentType": "Content Type:",

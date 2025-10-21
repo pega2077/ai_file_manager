@@ -839,8 +839,11 @@
       "copyFailed": "复制失败。",
       "openFileFailed": "打开文件失败。",
       "openFileNotSupported": "当前平台不支持打开文件。",
-      "searchNoResults": "未找到结果，请调整筛选条件或关键字。",
-      "noChunksSelected": "请选择至少一个分段再进行分析。"
+  "searchNoResults": "未找到结果，请调整筛选条件或关键字。",
+  "noChunksSelected": "请选择至少一个分段再进行分析。",
+  "queryPurposeFallback": "分析提问意图失败，将回退到检索模式。",
+  "summaryNoDocuments": "没有可总结的参考文档，将改用检索模式。",
+  "summaryFailed": "文档总结失败，请稍后重试。"
     },
     "loading": {
       "searching": "正在搜索中...",
@@ -891,7 +894,10 @@
         "vector": "向量回退",
         "manual": "手动选择",
         "none": "尚未检索"
-      }
+      },
+      "summaryConfidence": "总结置信度",
+      "summaryHighlights": "重点要点",
+      "summaryDocumentsTitle": "参与总结的文档"
     },
     "preview": {
       "contentType": "内容类型:",

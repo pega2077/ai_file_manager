@@ -19,6 +19,7 @@ import {
   apiService,
   QuestionResponse,
   SemanticSearchResult,
+  SummarizeDocumentsResult,
 } from "../services/api";
 import Sidebar from "../components/Sidebar";
 import { useTranslation } from "../shared/i18n/I18nProvider";
@@ -37,15 +38,17 @@ interface SearchResult {
   tags: string[];
 }
 
+type AnswerResult =
+  | { kind: "retrieval"; payload: QuestionResponse }
+  | { kind: "summary"; payload: SummarizeDocumentsResult };
+
 const SearchPage = () => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [searchParams] = useSearchParams();
   const selectedMenu = "search";
 
   const [questionQuery, setQuestionQuery] = useState("");
-  const [questionResult, setQuestionResult] = useState<QuestionResponse | null>(
-    null
-  );
+  const [answerResult, setAnswerResult] = useState<AnswerResult | null>(null);
   const [answerLoading, setAnswerLoading] = useState(false);
   const [referencedFiles, setReferencedFiles] = useState<SearchResult[]>([]);
   const [similarityThreshold, setSimilarityThreshold] = useState(0.4);
@@ -130,16 +133,72 @@ const SearchPage = () => {
     }
 
     setQuestionQuery(value);
-    setQuestionResult(null);
+    setAnswerResult(null);
     setSearchResults([]);
     setAnswerLoading(true);
-    setSearchLoading(true);
-    setHasSearched(true);
+    setSearchLoading(false);
+    setHasSearched(false);
 
     const referencedFileIds = referencedFiles
       .map((file) => file.file_id)
       .filter((id): id is string => Boolean(id && id.trim()));
 
+    let detectedPurpose: "retrieval" | "summary" = "retrieval";
+    try {
+      const purposeResponse = await apiService.queryPurpose(query, {
+        temperature,
+        max_tokens: maxTokens,
+        language: locale,
+      });
+
+      if (purposeResponse.success && purposeResponse.data) {
+        detectedPurpose = purposeResponse.data.purpose;
+      } else {
+        message.warning(
+          purposeResponse.message || t("search.messages.queryPurposeFallback")
+        );
+      }
+    } catch (error) {
+      console.error("Query purpose analysis failed:", error);
+      message.warning(t("search.messages.queryPurposeFallback"));
+    }
+
+    if (detectedPurpose === "summary" && referencedFileIds.length === 0) {
+      message.warning(t("search.messages.summaryNoDocuments"));
+      detectedPurpose = "retrieval";
+    }
+
+    if (detectedPurpose === "summary") {
+      try {
+        const summaryResponse = await apiService.summarizeDocuments(
+          referencedFileIds,
+          {
+            instruction: query,
+            temperature,
+            max_tokens: maxTokens,
+            language: locale,
+          }
+        );
+
+        if (summaryResponse.success && summaryResponse.data) {
+          setAnswerResult({ kind: "summary", payload: summaryResponse.data });
+        } else {
+          message.error(
+            summaryResponse.message || t("search.messages.summaryFailed")
+          );
+        }
+      } catch (error) {
+        console.error("Summarize documents error:", error);
+        message.error(t("search.messages.summaryFailed"));
+      } finally {
+        setAnswerLoading(false);
+      }
+
+      return;
+    }
+
+    setHasSearched(true);
+    setSearchLoading(true);
     let semanticResults: SemanticSearchResult[] = [];
     let semanticSearchFailed = false;
 
@@ -203,7 +262,7 @@ const SearchPage = () => {
       });
 
       if (response.success) {
-        setQuestionResult(response.data);
+        setAnswerResult({ kind: "retrieval", payload: response.data });
       } else {
         message.error(response.message || t("search.messages.askFailed"));
       }
@@ -415,17 +474,70 @@ const SearchPage = () => {
                   {t("search.loading.thinking")}
                 </div>
               </div>
-            ) : questionResult ? (
-              <div
-                style={{
-                  fontSize: "16px",
-                  lineHeight: 1.7,
-                  whiteSpace: "pre-wrap",
-                  color: "#222",
-                }}
-              >
-                {questionResult.answer}
-              </div>
+            ) : answerResult ? (
+              answerResult.kind === "retrieval" ? (
+                <div
+                  style={{
+                    fontSize: "16px",
+                    lineHeight: 1.7,
+                    whiteSpace: "pre-wrap",
+                    color: "#222",
+                  }}
+                >
+                  {answerResult.payload.answer}
+                </div>
+              ) : (
+                <div style={{ color: "#222" }}>
+                  <div
+                    style={{
+                      fontSize: "16px",
+                      lineHeight: 1.7,
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {answerResult.payload.summary}
+                  </div>
+                  <div style={{ marginTop: "16px", fontSize: "13px" }}>
+                    <strong>{t("search.qa.summaryConfidence")}:</strong>{" "}
+                    {(answerResult.payload.confidence * 100).toFixed(0)}%
+                  </div>
+                  {answerResult.payload.highlights &&
+                    answerResult.payload.highlights.length > 0 && (
+                    <div style={{ marginTop: "16px" }}>
+                      <div style={{ fontWeight: "bold", marginBottom: "8px" }}>
+                        {t("search.qa.summaryHighlights")}
+                      </div>
+                      <ul style={{ paddingLeft: "18px", marginBottom: 0 }}>
+                        {answerResult.payload.highlights.map((item, index) => (
+                          <li key={`${item}-${index}`} style={{ marginBottom: "4px" }}>
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {answerResult.payload.documents &&
+                    answerResult.payload.documents.length > 0 && (
+                    <div style={{ marginTop: "16px" }}>
+                      <div style={{ fontWeight: "bold", marginBottom: "8px" }}>
+                        {t("search.qa.summaryDocumentsTitle")}
+                      </div>
+                      <ul style={{ paddingLeft: "18px", marginBottom: 0 }}>
+                        {answerResult.payload.documents.map((doc) => (
+                          <li key={doc.file_id} style={{ marginBottom: "6px" }}>
+                            <div style={{ fontWeight: 500 }}>{doc.file_name || doc.file_path}</div>
+                            {doc.file_path && (
+                              <div style={{ fontSize: "12px", color: "#666" }}>
+                                {doc.file_path}
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )
             ) : (
               <div style={{ color: "#999", textAlign: "center" }}>
                 {t("search.qa.answerPlaceholder")}
