@@ -8,12 +8,13 @@ import {
   buildRecommendDirectoryMessages,
   buildDirectoryStructureMessages,
   buildChatAskMessages,
+  buildQueryPurposeMessages,
+  buildVisionDescribePrompt,
   normalizeLanguage,
   normalizeDirectoryStyle,
   type DirectoryStyle,
   type SupportedLang,
 } from "./utils/promptHelper";
-import { buildVisionDescribePrompt } from "./utils/promptHelper";
 import ChunkModel, { type ChunkAttributes } from "./models/chunk";
 import FileModel, { type FileAttributes } from "./models/file";
 import {
@@ -28,6 +29,8 @@ export function registerChatRoutes(app: Express) {
   app.post("/api/chat/recommend-directory", chatRecommendDirectoryHandler);
   // POST /api/chat/directory-structure
   app.post("/api/chat/directory-structure", chatDirectoryStructureHandler);
+  // POST /api/chat/query-purpose
+  app.post("/api/chat/query-purpose", chatQueryPurposeHandler);
   // POST /api/chat/ask
   app.post("/api/chat/ask", chatAskHandler);
   // POST /api/chat/describe-image
@@ -405,6 +408,145 @@ export async function chatDescribeImageHandler(
   }
 }
 
+export async function chatQueryPurposeHandler(
+  req: Request,
+  res: Response
+): Promise<void> {
+  const startTs = Date.now();
+  try {
+    const body = req.body as ChatQueryPurposeBody | undefined;
+    const inputCandidates: unknown[] = [body?.text, body?.content, body?.query];
+    let rawText = "";
+    for (const candidate of inputCandidates) {
+      if (typeof candidate === "string" && candidate.trim()) {
+        rawText = candidate;
+        break;
+      }
+    }
+    const text = rawText.trim();
+
+    if (!text) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "text is required",
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const temperatureRaw =
+      typeof body?.temperature === "number" &&
+      Number.isFinite(body.temperature)
+        ? body.temperature
+        : undefined;
+    const maxTokensRaw =
+      typeof body?.max_tokens === "number" &&
+      Number.isFinite(body.max_tokens)
+        ? body.max_tokens
+        : undefined;
+    const temperature = Math.max(0, Math.min(2, temperatureRaw ?? 0.2));
+    const maxTokensBase = maxTokensRaw ?? 256;
+    const maxTokens = Math.max(
+      64,
+      Math.min(800, Math.floor(maxTokensBase))
+    );
+
+    const language: SupportedLang = normalizeLanguage(body?.language);
+    const provider = normalizeProviderName(body?.provider);
+
+    const messages = buildQueryPurposeMessages({
+      language,
+      text,
+      purposeOptions: QUERY_PURPOSE_VALUES,
+    });
+
+    let result: unknown;
+    try {
+      result = await generateStructuredJson(
+        messages,
+        QUERY_PURPOSE_RESPONSE_FORMAT,
+        temperature,
+        maxTokens,
+        undefined,
+        language,
+        provider
+      );
+    } catch (err) {
+      logger.error("/api/chat/query-purpose LLM failed", err as unknown);
+      res.status(500).json({
+        success: false,
+        message: "llm_error",
+        data: null,
+        error: {
+          code: "LLM_ERROR",
+          message: (err as Error).message,
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const obj = (result as Record<string, unknown>) ?? {};
+    const rawPurpose =
+      typeof obj.purpose === "string" ? obj.purpose.trim().toLowerCase() : "";
+    const purpose: QueryPurpose = isQueryPurpose(rawPurpose)
+      ? rawPurpose
+      : "retrieval";
+    const confidenceRaw =
+      typeof obj.confidence === "number"
+        ? obj.confidence
+        : typeof obj.confidence === "string"
+        ? Number(obj.confidence)
+        : 0;
+    const confidence = Number.isFinite(confidenceRaw)
+      ? Math.max(0, Math.min(1, confidenceRaw))
+      : 0;
+    const reasoning =
+      typeof obj.reasoning === "string" ? obj.reasoning.trim() : "";
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        purpose,
+        confidence,
+        reasoning,
+        metadata: {
+          model_used: getActiveModelName("chat", provider) || "",
+          tokens_used: 0,
+          response_time_ms: Date.now() - startTs,
+        },
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/chat/query-purpose failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Query purpose detection failed",
+        details: null,
+      },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
 type ParsedFileFilters = {
   file_ids?: string[];
   categories?: string[];
@@ -457,6 +599,32 @@ const QA_RESPONSE_FORMAT = {
     strict: true,
   },
 } as const;
+
+const QUERY_PURPOSE_VALUES = ["retrieval", "summary"] as const;
+type QueryPurpose = (typeof QUERY_PURPOSE_VALUES)[number];
+
+const QUERY_PURPOSE_RESPONSE_FORMAT = {
+  json_schema: {
+    name: "query_purpose_schema",
+    schema: {
+      type: "object",
+      properties: {
+        purpose: {
+          type: "string",
+          enum: QUERY_PURPOSE_VALUES as unknown as string[],
+        },
+        confidence: { type: "number" },
+        reasoning: { type: "string" },
+      },
+      required: ["purpose", "confidence"],
+    },
+    strict: true,
+  },
+} as const;
+
+function isQueryPurpose(value: string): value is QueryPurpose {
+  return QUERY_PURPOSE_VALUES.includes(value as QueryPurpose);
+}
 
 function parseFileFilters(input: unknown): ParsedFileFilters {
   if (!input || typeof input !== "object") return {};
@@ -1131,6 +1299,16 @@ type SemanticSearchBody = {
   similarity_threshold?: unknown;
   file_filters?: unknown;
   include_context?: unknown;
+};
+
+type ChatQueryPurposeBody = {
+  text?: unknown;
+  content?: unknown;
+  query?: unknown;
+  language?: unknown;
+  temperature?: unknown;
+  max_tokens?: unknown;
+  provider?: unknown;
 };
 
 export async function semanticSearchHandler(

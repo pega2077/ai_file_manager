@@ -147,6 +147,53 @@ export function buildDirectoryStructureMessages(params: {
   ];
 }
 
+export function buildQueryPurposeMessages(params: {
+  language: SupportedLang;
+  text: string;
+  purposeOptions: readonly string[];
+}): Message[] {
+  const { language, text, purposeOptions } = params;
+  const optionsList = purposeOptions.join(", ");
+
+  if (language === "zh") {
+    return [
+      {
+        role: "system",
+        content:
+          "你是一名查询意图识别助手。你需要判断用户输入文本的主要目的，只能在预定义选项中选择，并严格输出 JSON。",
+      },
+      {
+        role: "user",
+        content:
+          `可选查询目的：${purposeOptions
+            .map((opt) =>
+              opt === "retrieval"
+                ? "retrieval（用户希望检索资料或寻找信息）"
+                : "summary（用户希望对已有内容进行总结）"
+            )
+            .join("；")}
+输入文本：${text}
+请返回 JSON：{\n  "purpose": "retrieval" | "summary",\n  "confidence": number,\n  "reasoning": string\n}\n注意：confidence 范围为 0 到 1；reasoning 用简短中文解释判断依据。`,
+      },
+    ];
+  }
+
+  return [
+    {
+      role: "system",
+      content:
+        "You are an intent classification assistant. Determine the user's primary goal and choose only from the predefined options. Always output strict JSON.",
+    },
+    {
+      role: "user",
+      content:
+        `Available purposes: ${optionsList} (retrieval = user wants to look up information; summary = user wants a concise summary of provided content).
+Input text: ${text}
+Return JSON: {\n  "purpose": "retrieval" | "summary",\n  "confidence": number,\n  "reasoning": string\n}\nNotes: confidence must be between 0 and 1; reasoning should briefly justify the choice in English.`,
+    },
+  ];
+}
+
 export function buildChatAskMessages(params: {
   question: string;
   contextStr: string;
