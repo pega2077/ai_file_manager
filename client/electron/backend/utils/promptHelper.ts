@@ -194,6 +194,47 @@ Return JSON: {\n  "purpose": "retrieval" | "summary",\n  "confidence": number,\n
   ];
 }
 
+export function buildDocumentSummaryMessages(params: {
+  language: SupportedLang;
+  instruction: string;
+  documents: Array<{ title: string; content: string; fileId: string }>;
+}): Message[] {
+  const { language, instruction, documents } = params;
+  const renderedDocs = documents
+    .map((doc, index) => {
+      return `[#${index + 1}] Title: ${doc.title}\nFile ID: ${doc.fileId}\nContent:\n${doc.content}`;
+    })
+    .join("\n\n---\n\n");
+
+  if (language === "zh") {
+    return [
+      {
+        role: "system",
+        content:
+          "你是一名资深文档整理和总结助手。请根据给定的多份文档内容以及用户的总结要求，输出结构化的 JSON 结果。",
+      },
+      {
+        role: "user",
+        content:
+          `用户需求：${instruction}\n\n文档内容如下：\n${renderedDocs}\n\n请返回 JSON：{\n  "summary": string,\n  "confidence": number,\n  "highlights": string[]\n}\n说明：summary 为综合总结；confidence 介于 0 到 1；highlights 为 3-6 条要点。`,
+      },
+    ];
+  }
+
+  return [
+    {
+      role: "system",
+      content:
+        "You are an expert documentation summarization assistant. Follow the user's instructions and output strictly formatted JSON.",
+    },
+    {
+      role: "user",
+      content:
+        `User instruction: ${instruction}\n\nDocument contexts:\n${renderedDocs}\n\nReturn JSON only: {\n  "summary": string,\n  "confidence": number,\n  "highlights": string[]\n}\nNotes: summary must follow the instruction, confidence should be between 0 and 1, and provide 3-6 concise highlight bullets.`,
+    },
+  ];
+}
+
 export function buildChatAskMessages(params: {
   question: string;
   contextStr: string;

@@ -8,6 +8,7 @@ import {
   buildRecommendDirectoryMessages,
   buildDirectoryStructureMessages,
   buildChatAskMessages,
+  buildDocumentSummaryMessages,
   buildQueryPurposeMessages,
   buildVisionDescribePrompt,
   normalizeLanguage,
@@ -31,6 +32,8 @@ export function registerChatRoutes(app: Express) {
   app.post("/api/chat/directory-structure", chatDirectoryStructureHandler);
   // POST /api/chat/query-purpose
   app.post("/api/chat/query-purpose", chatQueryPurposeHandler);
+  // POST /api/chat/summarize-documents
+  app.post("/api/chat/summarize-documents", chatSummarizeDocumentsHandler);
   // POST /api/chat/ask
   app.post("/api/chat/ask", chatAskHandler);
   // POST /api/chat/describe-image
@@ -412,7 +415,6 @@ export async function chatQueryPurposeHandler(
   req: Request,
   res: Response
 ): Promise<void> {
-  const startTs = Date.now();
   try {
     const body = req.body as ChatQueryPurposeBody | undefined;
     const inputCandidates: unknown[] = [body?.text, body?.content, body?.query];
@@ -452,7 +454,7 @@ export async function chatQueryPurposeHandler(
         ? body.max_tokens
         : undefined;
     const temperature = Math.max(0, Math.min(2, temperatureRaw ?? 0.2));
-    const maxTokensBase = maxTokensRaw ?? 256;
+  const maxTokensBase = maxTokensRaw ?? 256;
     const maxTokens = Math.max(
       64,
       Math.min(800, Math.floor(maxTokensBase))
@@ -513,19 +515,23 @@ export async function chatQueryPurposeHandler(
     const reasoning =
       typeof obj.reasoning === "string" ? obj.reasoning.trim() : "";
 
+    const responseData: {
+      purpose: QueryPurpose;
+      confidence: number;
+      reasoning?: string;
+    } = {
+      purpose,
+      confidence,
+    };
+
+    if (reasoning) {
+      responseData.reasoning = reasoning;
+    }
+
     res.status(200).json({
       success: true,
       message: "ok",
-      data: {
-        purpose,
-        confidence,
-        reasoning,
-        metadata: {
-          model_used: getActiveModelName("chat", provider) || "",
-          tokens_used: 0,
-          response_time_ms: Date.now() - startTs,
-        },
-      },
+      data: responseData,
       error: null,
       timestamp: new Date().toISOString(),
       request_id: "",
@@ -539,6 +545,320 @@ export async function chatQueryPurposeHandler(
       error: {
         code: "INTERNAL_ERROR",
         message: "Query purpose detection failed",
+        details: null,
+      },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+export async function chatSummarizeDocumentsHandler(
+  req: Request,
+  res: Response
+): Promise<void> {
+  const startTs = Date.now();
+  try {
+    const body = req.body as ChatSummarizeDocumentsBody | undefined;
+    const rawIds = Array.isArray(body?.document_ids)
+      ? (body!.document_ids as unknown[])
+      : [];
+    const documentIds: string[] = rawIds
+      .map((value) => {
+        if (typeof value === "string" && value.trim()) return value.trim();
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return String(value);
+        }
+        return "";
+      })
+      .filter((value) => value.length > 0);
+
+    if (documentIds.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "document_ids is required",
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    if (documentIds.length > MAX_DOCUMENT_IDS) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: {
+          code: "INVALID_REQUEST",
+          message: `document_ids cannot exceed ${MAX_DOCUMENT_IDS}`,
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const instructionCandidates = [
+      typeof body?.instruction === "string" ? body.instruction : "",
+      typeof body?.user_instruction === "string" ? body.user_instruction : "",
+      typeof body?.query === "string" ? body.query : "",
+    ];
+    const instruction = instructionCandidates
+      .map((value) => value.trim())
+      .find((value) => value.length > 0);
+
+    if (!instruction) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "instruction is required",
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const temperatureRaw =
+      typeof body?.temperature === "number" &&
+      Number.isFinite(body.temperature)
+        ? body.temperature
+        : undefined;
+    const maxTokensRaw =
+      typeof body?.max_tokens === "number" &&
+      Number.isFinite(body.max_tokens)
+        ? body.max_tokens
+        : undefined;
+    const perDocCharLimitRaw =
+      typeof body?.per_document_char_limit === "number" &&
+      Number.isFinite(body.per_document_char_limit)
+        ? Math.floor(body.per_document_char_limit)
+        : undefined;
+
+    const temperature = Math.max(0, Math.min(2, temperatureRaw ?? 0.3));
+    const maxTokens = Math.max(
+      200,
+      Math.min(4000, Math.floor(maxTokensRaw ?? 1200))
+    );
+    const perDocCharLimit = Math.max(
+      MIN_PER_DOCUMENT_CHAR_LIMIT,
+      Math.min(
+        MAX_PER_DOCUMENT_CHAR_LIMIT,
+        perDocCharLimitRaw ?? DEFAULT_PER_DOCUMENT_CHAR_LIMIT
+      )
+    );
+
+    const language: SupportedLang = normalizeLanguage(body?.language);
+    const provider = normalizeProviderName(body?.provider);
+
+    const files = (await FileModel.findAll({
+      where: { file_id: documentIds },
+      raw: true,
+    }).catch(() => [])) as FileAttributes[];
+
+    const fileMap = new Map<string, FileAttributes>();
+    for (const file of files) {
+      if (file.file_id) {
+        fileMap.set(file.file_id, file);
+      }
+    }
+
+    const foundDocumentIds = documentIds.filter((id) => fileMap.has(id));
+    const missingDocumentIds = documentIds.filter((id) => !fileMap.has(id));
+
+    if (foundDocumentIds.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: "not_found",
+        data: null,
+        error: {
+          code: "NOT_FOUND",
+          message: "No documents found for provided document_ids",
+          details: { missing_document_ids: missingDocumentIds },
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const chunkRows = (await ChunkModel.findAll({
+      where: { file_id: foundDocumentIds },
+      order: [
+        ["file_id", "ASC"],
+        ["chunk_index", "ASC"],
+      ],
+      raw: true,
+    }).catch(() => [])) as ChunkAttributes[];
+
+    const chunksByFile = new Map<string, ChunkAttributes[]>();
+    for (const chunk of chunkRows) {
+      if (!chunk.file_id) continue;
+      const list = chunksByFile.get(chunk.file_id) ?? [];
+      list.push(chunk);
+      chunksByFile.set(chunk.file_id, list);
+    }
+
+    const documentsForPrompt: Array<{
+      title: string;
+      content: string;
+      fileId: string;
+    }> = [];
+    const documentsMetadata: Array<{
+      file_id: string;
+      file_name: string;
+      file_path: string;
+      category: string;
+      tags: string[];
+      chunk_count: number;
+      extracted_characters: number;
+    }> = [];
+
+    for (const fileId of foundDocumentIds) {
+      const file = fileMap.get(fileId);
+      if (!file) continue;
+      const chunkList = chunksByFile.get(fileId) ?? [];
+      const content = buildDocumentContentFromChunks(
+        chunkList,
+        perDocCharLimit
+      );
+      documentsForPrompt.push({
+        title: file.name || file.path || file.file_id,
+        content: content || "No extractable content available.",
+        fileId,
+      });
+      documentsMetadata.push({
+        file_id: file.file_id,
+        file_name: file.name ?? "",
+        file_path: file.path ?? "",
+        category: file.category ?? "",
+        tags: parseTags(file.tags ?? null),
+        chunk_count: chunkList.length,
+        extracted_characters: content.length,
+      });
+    }
+
+    if (documentsForPrompt.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: "not_found",
+        data: null,
+        error: {
+          code: "NO_CONTENT",
+          message: "No content available for summarization",
+          details: { missing_document_ids: missingDocumentIds },
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const messages = buildDocumentSummaryMessages({
+      language,
+      instruction,
+      documents: documentsForPrompt,
+    });
+
+    let llmResult: Record<string, unknown> | undefined;
+    try {
+      const result = await generateStructuredJson(
+        messages,
+        DOCUMENT_SUMMARY_RESPONSE_FORMAT,
+        temperature,
+        maxTokens,
+        undefined,
+        language,
+        provider
+      );
+      llmResult = (result as Record<string, unknown>) ?? undefined;
+    } catch (err) {
+      logger.error("/api/chat/summarize-documents LLM failed", err as unknown);
+      res.status(500).json({
+        success: false,
+        message: "llm_error",
+        data: null,
+        error: {
+          code: "LLM_ERROR",
+          message: (err as Error).message,
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const summaryRaw =
+      typeof llmResult?.summary === "string" ? llmResult.summary.trim() : "";
+    const confidenceRaw =
+      typeof llmResult?.confidence === "number"
+        ? llmResult.confidence
+        : typeof llmResult?.confidence === "string"
+        ? Number(llmResult.confidence)
+        : 0;
+    const highlightsRaw = Array.isArray(llmResult?.highlights)
+      ? (llmResult!.highlights as unknown[])
+      : [];
+
+    const highlights = highlightsRaw
+      .map((value) => (typeof value === "string" ? value.trim() : ""))
+      .filter((value) => value.length > 0)
+      .slice(0, 6);
+
+    const summary =
+      summaryRaw ||
+      "Summary not available. Please review the selected documents manually.";
+    const confidence = Number.isFinite(confidenceRaw)
+      ? Math.max(0, Math.min(1, confidenceRaw))
+      : 0;
+
+    const modelUsed = getActiveModelName("chat", provider) || "";
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        summary,
+        confidence,
+        highlights,
+        documents: documentsMetadata,
+        missing_documents: missingDocumentIds,
+        metadata: {
+          instruction,
+          language,
+          model_used: modelUsed,
+          response_time_ms: Date.now() - startTs,
+          temperature,
+          max_tokens: maxTokens,
+          per_document_char_limit: perDocCharLimit,
+          documents_summarized: documentsMetadata.length,
+        },
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/chat/summarize-documents failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Document summarization failed",
         details: null,
       },
       timestamp: new Date().toISOString(),
@@ -626,6 +946,30 @@ function isQueryPurpose(value: string): value is QueryPurpose {
   return QUERY_PURPOSE_VALUES.includes(value as QueryPurpose);
 }
 
+const DOCUMENT_SUMMARY_RESPONSE_FORMAT = {
+  json_schema: {
+    name: "document_summary_schema",
+    schema: {
+      type: "object",
+      properties: {
+        summary: { type: "string" },
+        confidence: { type: "number" },
+        highlights: {
+          type: "array",
+          items: { type: "string" },
+        },
+      },
+      required: ["summary", "confidence"],
+    },
+    strict: true,
+  },
+} as const;
+
+const MAX_DOCUMENT_IDS = 10;
+const MIN_PER_DOCUMENT_CHAR_LIMIT = 500;
+const MAX_PER_DOCUMENT_CHAR_LIMIT = 6000;
+const DEFAULT_PER_DOCUMENT_CHAR_LIMIT = 3000;
+
 function parseFileFilters(input: unknown): ParsedFileFilters {
   if (!input || typeof input !== "object") return {};
   const obj = input as Record<string, unknown>;
@@ -675,6 +1019,33 @@ function createDefaultSnippet(text: string, maxLength = 240): string {
   if (!text) return "";
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength)}...`;
+}
+
+function buildDocumentContentFromChunks(
+  chunks: ChunkAttributes[],
+  charLimit: number
+): string {
+  if (!chunks.length || charLimit <= 0) {
+    return "";
+  }
+  let remaining = charLimit;
+  const parts: string[] = [];
+  for (const chunk of chunks) {
+    const content = typeof chunk.content === "string" ? chunk.content : "";
+    if (!content) continue;
+    if (remaining <= 0) break;
+    const normalized = content.trim();
+    if (!normalized) continue;
+    if (normalized.length <= remaining) {
+      parts.push(normalized);
+      remaining -= normalized.length;
+    } else {
+      parts.push(normalized.slice(0, remaining));
+      remaining = 0;
+      break;
+    }
+  }
+  return parts.join("\n");
 }
 
 function buildSnippet(text: string, keyword?: string, maxLength = 240): string {
@@ -1308,6 +1679,18 @@ type ChatQueryPurposeBody = {
   language?: unknown;
   temperature?: unknown;
   max_tokens?: unknown;
+  provider?: unknown;
+};
+
+type ChatSummarizeDocumentsBody = {
+  document_ids?: unknown;
+  instruction?: unknown;
+  user_instruction?: unknown;
+  query?: unknown;
+  language?: unknown;
+  temperature?: unknown;
+  max_tokens?: unknown;
+  per_document_char_limit?: unknown;
   provider?: unknown;
 };
 
