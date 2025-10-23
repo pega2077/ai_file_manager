@@ -530,7 +530,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       [t]
     );
 
-    const fileToBase64 = async (path: string): Promise<string> => {
+    const fileToBase64 = useCallback(async (path: string): Promise<string> => {
       // Use backend preview with downscaling to avoid large payloads.
       try {
         const preview = await apiService.previewFile(path, {
@@ -554,7 +554,35 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         // ignore
       }
       return "";
-    };
+    }, []);
+
+    const describeImageContent = useCallback(
+      async (
+      imagePath: string,
+      language: "zh" | "en",
+      ): Promise<string> => {
+        const dataUrl = await fileToBase64(imagePath);
+        if (!dataUrl) {
+          throw new Error("describe-image: empty preview content");
+        }
+        const response = await apiService.describeImage(dataUrl, language);
+        const description =
+          response?.success &&
+          response.data &&
+          typeof response.data.description === "string"
+            ? response.data.description.trim()
+            : "";
+        if (!description) {
+          const detailMessage =
+            (response as { error?: { message?: string } })?.error?.message ||
+            (response as { message?: string })?.message ||
+            "describe-image failed";
+          throw new Error(detailMessage);
+        }
+        return description;
+      },
+      [fileToBase64],
+    );
 
     const processFile = useCallback(
       async (task: QueuedImportTask): Promise<ProcessFileResult> => {
@@ -747,25 +775,19 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           notifyProgress("describe-image", "start", t("files.messages.describingImage"));
           message.info(t("files.messages.describingImage"));
           try {
-            const dataUrl = await fileToBase64(stagedPath);
-            if (dataUrl) {
-              const descResp = await apiService.describeImage(dataUrl, lang);
-              if (
-                descResp.success &&
-                descResp.data &&
-                typeof descResp.data.description === "string"
-              ) {
-                contentForAnalysis = descResp.data.description;
-                showSegmentedInfo(contentForAnalysis);
-              }
-            }
+            contentForAnalysis = await describeImageContent(stagedPath, lang);
+            showSegmentedInfo(contentForAnalysis);
             notifyProgress("describe-image", "success");
           } catch (e) {
-            notifyProgress("describe-image", "success", t("common.error"));
-            window.electronAPI?.logError?.(
-              "describe-image failed, continuing without content override",
-              { err: String(e) }
-            );
+            const displayMessage = t("files.messages.describeImageFailed");
+            notifyProgress("describe-image", "error", displayMessage);
+            message.error(displayMessage);
+            window.electronAPI?.logError?.("describe-image failed", {
+              err: String(e),
+              path: stagedPath,
+            });
+            notifyError(e, displayMessage);
+            return "complete";
           }
         }
 
@@ -933,6 +955,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         showImportConfirmationDialog,
         onImported,
         showSegmentedInfo,
+        describeImageContent,
         notifyStart,
         notifyProgress,
         notifySuccess,
@@ -1126,36 +1149,26 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             try {
               if (isImagePath(importFilePath)) {
                 notifyProgress("describe-image", "start", t("files.messages.describingImage"));
-                const dataUrl = await fileToBase64(importFilePath);
-                if (dataUrl) {
-                  const cfg4 =
-                    (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
-                  const lang = (cfg4?.language || "en") as "zh" | "en";
-                  const descResp = await apiService.describeImage(
-                    dataUrl,
-                    lang
-                  );
-                  if (
-                    descResp.success &&
-                    descResp.data &&
-                    typeof descResp.data.description === "string"
-                  ) {
-                    contentForAnalysis = descResp.data.description;
-                    try {
-                      showSegmentedInfo(contentForAnalysis);
-                    } catch {
-                      // ignore message rendering failures
-                    }
-                  }
+                message.info(t("files.messages.describingImage"));
+                const cfg4 =
+                  (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
+                const langConfirm = (cfg4?.language || "en") as "zh" | "en";
+                contentForAnalysis = await describeImageContent(importFilePath, langConfirm);
+                try {
+                  showSegmentedInfo(contentForAnalysis);
+                } catch {
+                  // ignore message rendering failures
                 }
                 notifyProgress("describe-image", "success");
               }
             } catch (e) {
-              notifyProgress("describe-image", "success", t("common.error"));
-              window.electronAPI?.logError?.(
-                "describe-image (confirm) failed, continuing",
-                { err: String(e) }
-              );
+              const displayMessage = t("files.messages.describeImageFailed");
+              notifyProgress("describe-image", "error", displayMessage);
+              message.error(displayMessage);
+              window.electronAPI?.logError?.("describe-image (confirm) failed", {
+                err: String(e),
+                path: importFilePath,
+              });
             }
             try {
               const cfg5 =

@@ -697,6 +697,7 @@
       "importedRagSuccess": "File successfully imported to RAG library",
       "saveSuccessRagFailed": "File saved successfully, but importing to RAG library failed",
       "describingImage": "Describing image content for analysis...",
+  "describeImageFailed": "Failed to analyze the image. Please check the vision model configuration and try again.",
       "imageDescription": "Image description: {text}",
       "conversionError": "File conversion failed. Please verify the conversion service configuration.",
       "conversionErrorWithReason": "File conversion failed: {reason}",

@@ -254,6 +254,10 @@
         "openrouter": "OpenRouter",
         "bailian": "阿里百炼",
         "azureOpenai": "Azure OpenAI"
+      },
+      "pegaModes": {
+        "ollama": "Pega Ollama 网关",
+        "openrouter": "Pega OpenRouter 代理"
       }
     },
     "common": {
@@ -699,6 +703,7 @@
       "importedRagSuccess": "文件已成功导入RAG库",
       "saveSuccessRagFailed": "文件保存成功，但导入RAG库失败",
       "describingImage": "正在描述图片内容以便分析...",
+  "describeImageFailed": "图片描述失败，请检查视觉模型配置后重试。",
       "imageDescription": "图片描述：{text}",
       "conversionError": "文件转换失败，请检查转换服务配置。",
       "conversionErrorWithReason": "文件转换失败：{reason}",

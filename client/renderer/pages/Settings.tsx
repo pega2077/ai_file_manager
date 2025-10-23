@@ -429,7 +429,7 @@ const Settings = () => {
           : "";
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <Tag color="green">{t("settings.messages.pegaStatusAvailable")}</Tag>
+            <Tag color="green" style={{ maxWidth: '40px', textAlign: 'center', display: 'inline-block' }}>{t("settings.messages.pegaStatusAvailable")}</Tag>
             {modelsPreview && (
               <Text type="secondary">
                 {t("settings.messages.pegaStatusModels", { models: modelsPreview })}
@@ -440,7 +440,7 @@ const Settings = () => {
       }
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <Tag color="red">{t("settings.messages.pegaStatusUnavailable")}</Tag>
+          <Tag color="red" style={{ maxWidth: '120px', display: 'inline-block' }}>{t("settings.messages.pegaStatusUnavailable")}</Tag>
           {status.error && <Text type="secondary">{status.error}</Text>}
         </div>
       );
