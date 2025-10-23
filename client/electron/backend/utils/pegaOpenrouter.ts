@@ -39,7 +39,7 @@ function resolvePegaOpenRouterConfig(): PegaOpenRouterResolvedConfig {
       section.pegaOpenrouterModel ||
       (section.pegaMode === "openrouter" ? section.pegaModel : undefined) ||
       cfg.pegaOpenrouterModel ||
-      (cfg.pegaMode === "openrouter" ? cfg.pegaModel : undefined) ||
+      (cfg.pega?.pegaMode === "openrouter" ? cfg.pegaModel : undefined) ||
       section.pegaModel ||
       cfg.pegaModel,
     embedModel: section.pegaEmbedModel || cfg.pegaEmbedModel,
@@ -47,7 +47,7 @@ function resolvePegaOpenRouterConfig(): PegaOpenRouterResolvedConfig {
       section.pegaOpenrouterVisionModel ||
       (section.pegaMode === "openrouter" ? section.pegaVisionModel : undefined) ||
       cfg.pegaOpenrouterVisionModel ||
-      (cfg.pegaMode === "openrouter" ? cfg.pegaVisionModel : undefined) ||
+      (cfg.pega?.pegaMode === "openrouter" ? cfg.pegaVisionModel : undefined) ||
       section.pegaVisionModel ||
       cfg.pegaVisionModel,
   };

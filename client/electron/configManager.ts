@@ -97,7 +97,6 @@ export interface AppConfig {
   pegaOpenrouterVisionModel?: string;
   pegaApiKey?: string;
   pegaAuthToken?: string;
-  pegaMode?: "ollama" | "openrouter";
   openaiEndpoint?: string;
   openaiApiKey?: string;
   openaiModel?: string;
@@ -170,10 +169,9 @@ const DEFAULT_CONFIG: AppConfig = {
     pegaOpenrouterVisionModel: "qwen/qwen2.5-vl-32b-instruct:free",
     pegaApiKey: undefined,
     pegaAuthToken: undefined,
-    pegaMode: "ollama",
+    pegaMode: "openrouter",
     pegaPreviousProvider: undefined,
   },
-  pegaMode: "ollama",
   openai: {
     openaiEndpoint: "https://api.openai.com/v1",
     openaiApiKey: undefined,
@@ -294,8 +292,7 @@ export class ConfigManager {
           userConfig.pegaEmbedModel ||
           userConfig.pegaVisionModel ||
           userConfig.pegaApiKey ||
-          userConfig.pegaAuthToken ||
-          userConfig.pegaMode
+          userConfig.pegaAuthToken
         ) {
           merged.pega = {
             ...(merged.pega || {}),
@@ -305,7 +302,6 @@ export class ConfigManager {
             pegaVisionModel: userConfig.pegaVisionModel ?? merged.pega?.pegaVisionModel,
             pegaApiKey: userConfig.pegaApiKey ?? merged.pega?.pegaApiKey,
             pegaAuthToken: userConfig.pegaAuthToken ?? merged.pega?.pegaAuthToken,
-            pegaMode: userConfig.pegaMode ?? merged.pega?.pegaMode,
           };
         }
         if (
@@ -383,13 +379,11 @@ export class ConfigManager {
         }
 
         const userPegaMode = (() => {
-          const direct = typeof userConfig.pegaMode === "string" ? userConfig.pegaMode : undefined;
           const nested = typeof userConfig.pega?.pegaMode === "string" ? userConfig.pega.pegaMode : undefined;
-          return direct || nested || merged.pega?.pegaMode;
+          return nested || merged.pega?.pegaMode;
         })();
         const normalizedMode = userPegaMode === "openrouter" ? "openrouter" : "ollama";
         merged.pega = { ...(merged.pega || {}), pegaMode: normalizedMode };
-        merged.pegaMode = normalizedMode;
 
         // Ensure pega endpoint always use default endpoint
         // if (!merged.pega) {

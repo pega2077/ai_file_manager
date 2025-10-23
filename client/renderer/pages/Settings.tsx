@@ -192,7 +192,7 @@ const Settings = () => {
             typeof appConfig.pega?.pegaAuthToken === "string"
               ? appConfig.pega.pegaAuthToken
               : "";
-          const rawPegaMode = (appConfig.pega?.pegaMode ?? appConfig.pegaMode) as SettingsState['pegaMode'] | undefined;
+          const rawPegaMode = appConfig.pega?.pegaMode as SettingsState['pegaMode'] | undefined;
           const pegaMode = rawPegaMode === "openrouter" ? "openrouter" : "ollama";
           nextState = {
             ...nextState,
@@ -491,7 +491,6 @@ const Settings = () => {
       };
       await window.electronAPI.updateAppConfig({
         pega: nextPegaConfig,
-        pegaMode: nextMode,
       });
       message.success(t("settings.messages.pegaModeUpdated"));
       if (settings.llmProvider === "pega") {

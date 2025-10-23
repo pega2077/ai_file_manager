@@ -38,8 +38,7 @@ export type ProviderName = "ollama" | "openai" | "azure-openai" | "openrouter" |
 function getPegaMode(): "ollama" | "openrouter" {
   const cfg = configManager.getConfig();
   const nested = cfg.pega?.pegaMode;
-  const legacy = cfg.pegaMode;
-  return nested === "openrouter" || legacy === "openrouter" ? "openrouter" : "ollama";
+  return nested === "openrouter" ? "openrouter" : "ollama";
 }
 
 export function getActiveProvider(): ProviderName {
