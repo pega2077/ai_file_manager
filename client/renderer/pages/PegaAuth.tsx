@@ -52,6 +52,7 @@ const PegaAuth = () => {
         const savedToken = typeof cfg.pega?.pegaAuthToken === 'string' ? cfg.pega.pegaAuthToken : '';
         setStoredApiKey(savedApiKey ?? '');
         setStoredToken(savedToken ?? '');
+        apiService.setPegaApiKey(savedApiKey ?? '');
         apiService.setPegaAuthToken(savedToken ?? '');
         const fallbackProvider = ((cfg.llmProvider && cfg.llmProvider !== 'pega'
           ? cfg.llmProvider
@@ -141,6 +142,7 @@ const PegaAuth = () => {
       };
       await window.electronAPI.updateAppConfig({ llmProvider: 'pega', pega: nextPegaConfig });
       apiService.setProvider('pega');
+  apiService.setPegaApiKey(apiKey);
       apiService.setPegaAuthToken(token);
 
       setStoredApiKey(apiKey);
@@ -276,6 +278,7 @@ const PegaAuth = () => {
         apiService.clearProviderCache();
       }
       apiService.setPegaAuthToken(null);
+      apiService.setPegaApiKey(null);
       setStoredApiKey('');
       setStoredToken('');
       setPreviousProvider(fallbackProvider);

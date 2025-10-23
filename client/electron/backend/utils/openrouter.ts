@@ -14,7 +14,7 @@ import type {
 } from "openai/resources/chat/completions";
 
 // Ensure JSON Schema compatibility for providers requiring additionalProperties=false
-function normalizeJsonSchema<T>(input: T): T {
+export function normalizeJsonSchema<T>(input: T): T {
   // Recursively enforce additionalProperties: false for all object type schemas
   const seen = new WeakSet<object>();
   function walk(node: unknown): unknown {

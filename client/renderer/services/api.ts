@@ -323,11 +323,25 @@ export interface PegaUser {
   updatedAt: string | null;
 }
 
+export interface PegaStatusResponse {
+  ollama?: {
+    available?: boolean;
+    models?: string[];
+    error?: string;
+  } | null;
+  openrouter?: {
+    available?: boolean;
+    models?: string[];
+    error?: string;
+  } | null;
+}
+
 class ApiService {
   private locale = 'en';
   private provider: ProviderName | null = null;
   private pegaBaseUrl: string | null = null;
   private pegaAuthToken: string | null = null;
+  private pegaApiKey: string | null = null;
 
   private async ensureProvider(): Promise<ProviderName> {
     // Load once from app config via IPC and cache locally
@@ -354,6 +368,7 @@ class ApiService {
     this.provider = null;
     this.pegaBaseUrl = null;
     this.pegaAuthToken = null;
+    this.pegaApiKey = null;
   }
 
   setPegaAuthToken(token: string | null) {
@@ -363,6 +378,15 @@ class ApiService {
     }
     const trimmed = token.trim();
     this.pegaAuthToken = trimmed.length > 0 ? trimmed : null;
+  }
+
+  setPegaApiKey(key: string | null) {
+    if (!key) {
+      this.pegaApiKey = null;
+      return;
+    }
+    const trimmed = key.trim();
+    this.pegaApiKey = trimmed.length > 0 ? trimmed : null;
   }
 
   clearPegaAuthToken() {
@@ -544,6 +568,28 @@ class ApiService {
       return this.pegaAuthToken;
     } catch (error) {
       console.warn('Failed to resolve Pega auth token from config:', error);
+      return null;
+    }
+  }
+
+  private async ensurePegaApiKey(): Promise<string | null> {
+    if (this.pegaApiKey) {
+      return this.pegaApiKey;
+    }
+
+    if (!window.electronAPI) {
+      return null;
+    }
+
+    try {
+      const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const apiKey = typeof cfg?.pega?.pegaApiKey === 'string' ? cfg.pega.pegaApiKey.trim() : '';
+      const tokenFallback = typeof cfg?.pega?.pegaAuthToken === 'string' ? cfg.pega.pegaAuthToken.trim() : '';
+      const value = apiKey.length > 0 ? apiKey : tokenFallback;
+      this.pegaApiKey = value.length > 0 ? value : null;
+      return this.pegaApiKey;
+    } catch (error) {
+      console.warn('Failed to resolve Pega API key from config:', error);
       return null;
     }
   }
@@ -1291,6 +1337,26 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  }
+
+  async getPegaStatus(): Promise<PegaStatusResponse> {
+    const baseUrl = await this.ensurePegaBaseUrl();
+    const apiKey = await this.ensurePegaApiKey();
+    const headers: Record<string, string> = {};
+    if (apiKey) {
+      headers.Authorization = `Bearer ${apiKey}`;
+    }
+    const mergedHeaders = this.mergeHeaders(headers);
+    try {
+      const response = await fetch(`${baseUrl}/status`, {
+        method: 'GET',
+        headers: mergedHeaders,
+      });
+      return this.parseJsonOrThrow<PegaStatusResponse>(response);
+    } catch (error) {
+      console.error('Failed to fetch Pega status:', error);
+      throw error;
+    }
   }
 
   async getPegaCurrentUser(token?: string) {

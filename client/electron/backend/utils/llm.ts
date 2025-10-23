@@ -18,16 +18,29 @@ import {
   embedWithOpenRouter,
 } from "./openrouter";
 import {
+  embedWithPegaOpenRouter,
+  generateStructuredJsonWithPegaOpenRouter,
+  describeImageWithPegaOpenRouter,
+} from "./pegaOpenrouter";
+import {
   embedWithBailian,
   generateStructuredJsonWithBailian,
   describeImageWithBailian,
 } from "./bailian";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 export type LlmMessage = OllamaMessage; // role + string content
 
 export type LlmTask = "chat" | "embed" | "vision";
 
 export type ProviderName = "ollama" | "openai" | "azure-openai" | "openrouter" | "bailian" | "pega";
+
+function getPegaMode(): "ollama" | "openrouter" {
+  const cfg = configManager.getConfig();
+  const nested = cfg.pega?.pegaMode;
+  const legacy = cfg.pegaMode;
+  return nested === "openrouter" || legacy === "openrouter" ? "openrouter" : "ollama";
+}
 
 export function getActiveProvider(): ProviderName {
   const cfg = configManager.getConfig();
@@ -85,7 +98,9 @@ export async function embedText(inputs: string[], overrideModel?: string): Promi
     return embedWithBailian(inputs, overrideModel);
   }
   if (provider === "pega") {
-    return pegaOllamaClient.embed(inputs, overrideModel);
+    return getPegaMode() === "openrouter"
+      ? embedWithPegaOpenRouter(inputs, overrideModel)
+      : pegaOllamaClient.embed(inputs, overrideModel);
   }
   return ollamaClient.embed(inputs, overrideModel);
 }
@@ -117,6 +132,17 @@ export async function generateStructuredJson(
     return generateStructuredJsonWithBailian(oaMessages, schema, temperature, maxTokens, overrideModel || undefined);
   }
   if (provider === "pega") {
+    if (getPegaMode() === "openrouter") {
+      const oaMessages: ChatCompletionMessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
+      const schema = responseFormat?.json_schema?.schema as Record<string, unknown> | undefined;
+      return generateStructuredJsonWithPegaOpenRouter(
+        oaMessages,
+        schema,
+        temperature,
+        maxTokens,
+        overrideModel || undefined
+      );
+    }
     return pegaOllamaClient.generateStructuredJson(
       messages,
       responseFormat,
@@ -169,6 +195,15 @@ export async function describeImage(
       }
     : undefined;
   if (provider === "pega") {
+    if (getPegaMode() === "openrouter") {
+      const img = imgs[0];
+      return describeImageWithPegaOpenRouter(
+        img,
+        options?.prompt,
+        options?.overrideModel,
+        options?.maxTokens
+      );
+    }
     return pegaOllamaClient.describeImage(imgs, describeOptions);
   }
   return ollamaClient.describeImage(imgs, describeOptions);

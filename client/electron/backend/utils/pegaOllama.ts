@@ -6,8 +6,9 @@ export class PegaOllamaClient extends BaseOllamaClient {
 
   protected resolveConfig(cfg: AppConfig): OllamaResolvedConfig {
     const section = cfg.pega ?? {};
+    const baseEndpoint = this.trimEndpoint(section.pegaEndpoint || cfg.pegaEndpoint);
     return {
-      endpoint: section.pegaEndpoint + "/ollama",
+      endpoint: baseEndpoint ? `${baseEndpoint}/ollama` : "",
       chatModel: section.pegaModel || cfg.pegaModel,
       embedModel: section.pegaEmbedModel || cfg.pegaEmbedModel,
       visionModel: section.pegaVisionModel || cfg.pegaVisionModel,

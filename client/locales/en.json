@@ -160,7 +160,11 @@
         "openrouter": "OpenRouter",
         "bailian": "Alibaba Bailian",
         "azureOpenai": "Azure OpenAI"
-      }
+        },
+        "pegaModes": {
+          "ollama": "Pega Ollama gateway",
+          "openrouter": "Pega OpenRouter proxy"
+        }
     }
   },
   "backend": {
@@ -208,6 +212,10 @@
       "llmProvider": "LLM provider",
       "pegaApiKey": "Stored Pega API key",
       "pegaAccount": "Signed-in Pega account",
+  "pegaMode": "Pega mode",
+  "pegaStatus": "Pega service status",
+  "pegaOllamaStatus": "Ollama gateway",
+  "pegaOpenrouterStatus": "OpenRouter proxy",
       "pegaUserEmail": "Email",
       "pegaUserPhone": "Phone",
       "pegaUserStatus": "Status",
@@ -229,6 +237,7 @@
       "apiBaseUrl": "Base URL of this program's web service.",
       "llmProvider": "Applies to intelligent directory suggestions, embeddings, and chat analysis.",
       "pegaApiKey": "Stored securely in config.json. Update it by signing in below when it expires.",
+  "pegaMode": "Choose which backend the Pega platform should use for LLM requests.",
       "providerConfigPages": "Open dedicated pages to manage credentials and defaults for each provider."
     },
     "placeholders": {
@@ -262,7 +271,8 @@
       "configureOllama": "Configure Ollama",
       "configureOpenai": "Configure OpenAI",
       "configureOpenrouter": "Configure OpenRouter",
-      "configureBailian": "Configure Bailian"
+      "configureBailian": "Configure Bailian",
+      "refreshPegaStatus": "Check status"
     },
     "messages": {
       "saveSuccess": "Settings saved",
@@ -291,7 +301,18 @@
       "pegaApiKeySuccess": "API key retrieved and saved",
       "pegaFetchUserFailed": "Failed to load Pega account information.",
       "pegaUnauthorized": "Session expired. Please sign in again.",
-      "pegaUserNotFound": "No user record was returned."
+      "pegaUserNotFound": "No user record was returned.",
+      "pegaStatusCredentialHint": "Sign in to load the Pega API key before checking status.",
+      "pegaStatusLoading": "Checking Pega status...",
+      "pegaStatusMissingCredential": "No API key or token available. Sign in first.",
+      "pegaStatusUnauthorized": "Authentication failed when contacting Pega. Sign in again.",
+      "pegaStatusFetchFailed": "Failed to load Pega service status.",
+      "pegaStatusAvailable": "Available",
+      "pegaStatusUnavailable": "Unavailable",
+      "pegaStatusModels": "Models: {models}",
+      "pegaStatusNoData": "No status data yet.",
+      "pegaModeUpdated": "Pega mode updated",
+      "pegaModeUpdateError": "Failed to update Pega mode"
     }
   },
   "providerConfig": {

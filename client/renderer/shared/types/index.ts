@@ -191,8 +191,10 @@ export interface AppConfig {
     pegaVisionModel?: string;
     pegaApiKey?: string;
     pegaAuthToken?: string;
+    pegaMode?: "ollama" | "openrouter";
     pegaPreviousProvider?: AppConfig['llmProvider'];
   };
+  pegaMode?: "ollama" | "openrouter";
   fileConvertEndpoint?: string;
   sqliteDbPath: string;
   language?: string;

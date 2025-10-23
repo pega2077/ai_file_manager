@@ -159,7 +159,11 @@
         "openrouter": "OpenRouter",
         "bailian": "阿里百炼",
         "azureOpenai": "Azure OpenAI"
-      }
+        },
+        "pegaModes": {
+          "ollama": "Pega Ollama 网关",
+          "openrouter": "Pega OpenRouter 代理"
+        }
     }
   },
   "backend": {
@@ -207,6 +211,10 @@
       "llmProvider": "大模型提供商",
       "pegaApiKey": "Pega API Key",
       "pegaAccount": "已登录的 Pega 账号",
+  "pegaMode": "Pega 模式",
+  "pegaStatus": "Pega 服务状态",
+  "pegaOllamaStatus": "Ollama 网关",
+  "pegaOpenrouterStatus": "OpenRouter 代理",
       "pegaUserEmail": "邮箱",
       "pegaUserPhone": "手机号",
       "pegaUserStatus": "状态",
@@ -228,6 +236,7 @@
       "apiBaseUrl": "本程序web服务的基础地址",
       "llmProvider": "影响目录推荐、嵌入与智能分析所使用的大模型来源。",
       "pegaApiKey": "保存在配置文件中，如已失效请重新登录获取。",
+  "pegaMode": "选择 Pega 平台转发请求时要使用的后端服务。",
       "providerConfigPages": "进入各提供商的独立配置页面，管理凭据与默认模型。"
     },
     "placeholders": {
@@ -261,7 +270,8 @@
       "configureOllama": "配置 Ollama",
       "configureOpenai": "配置 OpenAI",
       "configureOpenrouter": "配置 OpenRouter",
-      "configureBailian": "配置百炼"
+      "configureBailian": "配置百炼",
+      "refreshPegaStatus": "检查状态"
     },
     "messages": {
       "saveSuccess": "设置已保存",
@@ -290,7 +300,18 @@
       "pegaApiKeySuccess": "API Key 获取并保存成功",
       "pegaFetchUserFailed": "获取 Pega 账号信息失败。",
       "pegaUnauthorized": "会话已过期，请重新登录。",
-      "pegaUserNotFound": "未返回用户信息。"
+      "pegaUserNotFound": "未返回用户信息。",
+      "pegaStatusCredentialHint": "请先登录获取 Pega API Key 再检查状态。",
+      "pegaStatusLoading": "正在检查 Pega 状态…",
+      "pegaStatusMissingCredential": "没有可用的 API Key 或 Token，请先登录。",
+      "pegaStatusUnauthorized": "访问 Pega 时认证失败，请重新登录。",
+      "pegaStatusFetchFailed": "获取 Pega 服务状态失败。",
+      "pegaStatusAvailable": "可用",
+      "pegaStatusUnavailable": "不可用",
+      "pegaStatusModels": "模型：{models}",
+      "pegaStatusNoData": "暂无状态数据。",
+      "pegaModeUpdated": "Pega 模式已更新",
+      "pegaModeUpdateError": "更新 Pega 模式失败"
     }
   },
   "providerConfig": {

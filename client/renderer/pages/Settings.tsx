@@ -12,8 +12,9 @@
   Alert,
   Spin,
   Descriptions,
+  Tag,
 } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiService } from "../services/api";
 import { useTranslation } from "../shared/i18n/I18nProvider";
@@ -22,7 +23,7 @@ import {
   normalizeLocale,
   type SupportedLocale,
 } from "../shared/i18n";
-import type { ApiError, PegaUser } from "../services/api";
+import type { ApiError, PegaStatusResponse, PegaUser } from "../services/api";
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -50,6 +51,7 @@ interface SettingsState {
   useLocalService: boolean;
   llmProvider: LlmProvider;
   pegaApiKey: string;
+  pegaMode: "ollama" | "openrouter";
 }
 
 const DEFAULT_SETTINGS: SettingsState = {
@@ -66,6 +68,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   useLocalService: true,
   llmProvider: "ollama",
   pegaApiKey: "",
+  pegaMode: "ollama",
 };
 
 const Settings = () => {
@@ -81,6 +84,9 @@ const Settings = () => {
   const [pegaUser, setPegaUser] = useState<PegaUser | null>(null);
   const [pegaUserLoading, setPegaUserLoading] = useState(false);
   const [pegaUserError, setPegaUserError] = useState<string | null>(null);
+  const [pegaStatus, setPegaStatus] = useState<PegaStatusResponse | null>(null);
+  const [pegaStatusLoading, setPegaStatusLoading] = useState(false);
+  const [pegaStatusError, setPegaStatusError] = useState<string | null>(null);
 
   const languageOptions = useMemo(
     () =>
@@ -109,6 +115,14 @@ const Settings = () => {
     [t]
   );
 
+  const pegaModeOptions = useMemo(
+    () => [
+      { value: "ollama", label: t("settings.options.pegaModes.ollama") },
+      { value: "openrouter", label: t("settings.options.pegaModes.openrouter") },
+    ],
+    [t]
+  );
+
   const truncatedPegaKey = useMemo(() => {
     const key = settings.pegaApiKey.trim();
     if (!key) {
@@ -123,6 +137,11 @@ const Settings = () => {
   const hasPegaToken = useMemo(
     () => pegaAuthToken.trim().length > 0,
     [pegaAuthToken]
+  );
+
+  const hasPegaCredential = useMemo(
+    () => settings.pegaApiKey.trim().length > 0 || pegaAuthToken.trim().length > 0,
+    [settings.pegaApiKey, pegaAuthToken]
   );
 
   const pegaNumberFormatter = useMemo(
@@ -173,6 +192,8 @@ const Settings = () => {
             typeof appConfig.pega?.pegaAuthToken === "string"
               ? appConfig.pega.pegaAuthToken
               : "";
+          const rawPegaMode = (appConfig.pega?.pegaMode ?? appConfig.pegaMode) as SettingsState['pegaMode'] | undefined;
+          const pegaMode = rawPegaMode === "openrouter" ? "openrouter" : "ollama";
           nextState = {
             ...nextState,
             theme: appConfig.theme ?? DEFAULT_SETTINGS.theme,
@@ -207,6 +228,7 @@ const Settings = () => {
             ),
             llmProvider: provider,
             pegaApiKey: pegaKey,
+            pegaMode,
           };
 
           if (normalizedLanguage !== locale) {
@@ -214,6 +236,7 @@ const Settings = () => {
           }
 
           apiService.setProvider(provider);
+          apiService.setPegaApiKey(pegaKey);
           apiService.setPegaAuthToken(pegaToken);
           setPegaAuthTokenState(pegaToken);
         }
@@ -311,6 +334,55 @@ const Settings = () => {
     };
   }, [settings.llmProvider, pegaAuthToken, t]);
 
+  useEffect(() => {
+    if (settings.llmProvider !== "pega") {
+      setPegaStatus(null);
+      setPegaStatusError(null);
+      setPegaStatusLoading(false);
+      return;
+    }
+
+    if (!hasPegaCredential) {
+      setPegaStatus(null);
+      setPegaStatusError(null);
+      setPegaStatusLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      setPegaStatusLoading(true);
+      setPegaStatusError(null);
+      try {
+        const status = await apiService.getPegaStatus();
+        if (!cancelled) {
+          setPegaStatus(status);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to load Pega status:", error);
+          const maybeApiError = error as ApiError;
+          if (maybeApiError?.status === 401) {
+            setPegaStatusError(t("settings.messages.pegaStatusUnauthorized"));
+          } else {
+            setPegaStatusError(t("settings.messages.pegaStatusFetchFailed"));
+          }
+          setPegaStatus(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setPegaStatusLoading(false);
+        }
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.llmProvider, settings.pegaMode, hasPegaCredential, t]);
+
   const handleSettingChange = <K extends keyof SettingsState>(
     key: K,
     value: SettingsState[K]
@@ -320,6 +392,61 @@ const Settings = () => {
       [key]: value,
     }));
   };
+
+  const fetchPegaStatus = useCallback(async () => {
+    if (!hasPegaCredential) {
+      setPegaStatus(null);
+      setPegaStatusError(t("settings.messages.pegaStatusMissingCredential"));
+      return;
+    }
+    setPegaStatusLoading(true);
+    setPegaStatusError(null);
+    try {
+      const status = await apiService.getPegaStatus();
+      setPegaStatus(status);
+    } catch (error) {
+      console.error("Failed to load Pega status:", error);
+      const maybeApiError = error as ApiError;
+      if (maybeApiError?.status === 401) {
+        setPegaStatusError(t("settings.messages.pegaStatusUnauthorized"));
+      } else {
+        setPegaStatusError(t("settings.messages.pegaStatusFetchFailed"));
+      }
+      setPegaStatus(null);
+    } finally {
+      setPegaStatusLoading(false);
+    }
+  }, [hasPegaCredential, t]);
+
+  const renderPegaAvailability = useCallback(
+    (status: PegaStatusResponse[keyof PegaStatusResponse]) => {
+      if (!status) {
+        return <Text type="secondary">{t("settings.messages.pegaStatusNoData")}</Text>;
+      }
+      if (status.available) {
+        const modelsPreview = Array.isArray(status.models)
+          ? status.models.slice(0, 5).join(", ")
+          : "";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <Tag color="green">{t("settings.messages.pegaStatusAvailable")}</Tag>
+            {modelsPreview && (
+              <Text type="secondary">
+                {t("settings.messages.pegaStatusModels", { models: modelsPreview })}
+              </Text>
+            )}
+          </div>
+        );
+      }
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <Tag color="red">{t("settings.messages.pegaStatusUnavailable")}</Tag>
+          {status.error && <Text type="secondary">{status.error}</Text>}
+        </div>
+      );
+    },
+    [t]
+  );
 
   const handleLocaleChange = async (value: SupportedLocale) => {
     if (value !== locale) {
@@ -346,6 +473,37 @@ const Settings = () => {
     } catch (error) {
       message.error(t("settings.messages.providerUpdateError"));
       console.error("Failed to update provider:", error);
+    }
+  };
+
+  const handlePegaModeChange = async (value: "ollama" | "openrouter") => {
+    const nextMode = value === "openrouter" ? "openrouter" : "ollama";
+    const previousMode = settings.pegaMode;
+    setSettings((prev) => ({
+      ...prev,
+      pegaMode: nextMode,
+    }));
+    try {
+      const appConfig = (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig | undefined;
+      const nextPegaConfig = {
+        ...(appConfig?.pega ?? {}),
+        pegaMode: nextMode,
+      };
+      await window.electronAPI.updateAppConfig({
+        pega: nextPegaConfig,
+        pegaMode: nextMode,
+      });
+      message.success(t("settings.messages.pegaModeUpdated"));
+      if (settings.llmProvider === "pega") {
+        void fetchPegaStatus();
+      }
+    } catch (error) {
+      console.error("Failed to update Pega mode:", error);
+      setSettings((prev) => ({
+        ...prev,
+        pegaMode: previousMode,
+      }));
+      message.error(t("settings.messages.pegaModeUpdateError"));
     }
   };
 
@@ -396,6 +554,9 @@ const Settings = () => {
     setSettings(nextState);
     setLocale(defaultLocale);
     apiService.setProvider(nextState.llmProvider);
+    setPegaStatus(null);
+    setPegaStatusError(null);
+    setPegaStatusLoading(false);
     message.success(t("settings.messages.resetSuccess"));
   };
 
@@ -420,6 +581,10 @@ const Settings = () => {
           setPegaUser(null);
           setPegaUserError(null);
           apiService.setPegaAuthToken(null);
+          apiService.setPegaApiKey(null);
+          setPegaStatus(null);
+          setPegaStatusError(null);
+          setPegaStatusLoading(false);
         } catch (error) {
           message.error(t("settings.messages.clearException"));
           console.error("Clear data error:", error);
@@ -653,6 +818,93 @@ const Settings = () => {
                     >
                       {t("settings.descriptions.pegaApiKey")}
                     </Text>
+                  </div>
+
+                  <div>
+                    <Text strong>{t("settings.labels.pegaMode")}</Text>
+                    <Select
+                      style={{ marginLeft: 16, minWidth: 200 }}
+                      value={settings.pegaMode}
+                      options={pegaModeOptions}
+                      onChange={(value) => handlePegaModeChange(value as "ollama" | "openrouter")}
+                    />
+                    <Text
+                      type="secondary"
+                      style={{ display: "block", marginTop: 8 }}
+                    >
+                      {t("settings.descriptions.pegaMode")}
+                    </Text>
+                  </div>
+
+                  <div>
+                    <Text strong>{t("settings.labels.pegaStatus")}</Text>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        flexWrap: "wrap",
+                        marginTop: 8,
+                      }}
+                    >
+                      <Button
+                        onClick={() => {
+                          void fetchPegaStatus();
+                        }}
+                        loading={pegaStatusLoading}
+                        disabled={!hasPegaCredential}
+                      >
+                        {t("settings.actions.refreshPegaStatus")}
+                      </Button>
+                    </div>
+                    {!hasPegaCredential && (
+                      <Text
+                        type="secondary"
+                        style={{ display: "block", marginTop: 8 }}
+                      >
+                        {t("settings.messages.pegaStatusCredentialHint")}
+                      </Text>
+                    )}
+                    {pegaStatusLoading && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginTop: 8,
+                        }}
+                      >
+                        <Spin size="small" />
+                        <Text type="secondary">
+                          {t("settings.messages.pegaStatusLoading")}
+                        </Text>
+                      </div>
+                    )}
+                    {pegaStatusError && (
+                      <Alert
+                        type="error"
+                        showIcon
+                        style={{ marginTop: 8 }}
+                        message={pegaStatusError}
+                      />
+                    )}
+                    {pegaStatus && !pegaStatusError && (
+                      <Descriptions
+                        size="small"
+                        column={1}
+                        style={{ marginTop: 8 }}
+                      >
+                        <Descriptions.Item
+                          label={t("settings.labels.pegaOllamaStatus")}
+                        >
+                          {renderPegaAvailability(pegaStatus.ollama ?? null)}
+                        </Descriptions.Item>
+                        <Descriptions.Item
+                          label={t("settings.labels.pegaOpenrouterStatus")}
+                        >
+                          {renderPegaAvailability(pegaStatus.openrouter ?? null)}
+                        </Descriptions.Item>
+                      </Descriptions>
+                    )}
                   </div>
 
                   <div>

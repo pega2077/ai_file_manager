@@ -16,7 +16,8 @@
     "pegaEmbedModel": "bge-m3",
     "pegaVisionModel": "qwen2.5vl:7b",
     "pegaApiKey": "",
-    "pegaAuthToken": ""
+    "pegaAuthToken": "",
+    "pegaMode": "ollama"
   },
   "openai": {
     "openaiEndpoint": "https://api.openai.com/v1",

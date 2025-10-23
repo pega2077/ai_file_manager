@@ -23,6 +23,7 @@ export interface AppConfig {
     pegaVisionModel?: string;
     pegaApiKey?: string;
     pegaAuthToken?: string;
+    pegaMode?: "ollama" | "openrouter";
     pegaPreviousProvider?: AppConfig['llmProvider'];
   };
   bailian?: {
@@ -46,6 +47,7 @@ export interface AppConfig {
     openaiApiKey?: string;
     /** Default chat/completion model for OpenAI */
     openaiModel?: string;
+    pegaMode?: "ollama" | "openrouter";
     /** Default embedding model for OpenAI */
     openaiEmbedModel?: string;
     /** Default vision-capable model for OpenAI (e.g., gpt-4o-mini) */
@@ -79,6 +81,7 @@ export interface AppConfig {
   pegaVisionModel?: string;
   pegaApiKey?: string;
   pegaAuthToken?: string;
+  pegaMode?: "ollama" | "openrouter";
   openaiEndpoint?: string;
   openaiApiKey?: string;
   openaiModel?: string;
@@ -149,8 +152,10 @@ const DEFAULT_CONFIG: AppConfig = {
     pegaVisionModel: "qwen2.5vl:7b",
     pegaApiKey: undefined,
     pegaAuthToken: undefined,
+    pegaMode: "ollama",
     pegaPreviousProvider: undefined,
   },
+  pegaMode: "ollama",
   openai: {
     openaiEndpoint: "https://api.openai.com/v1",
     openaiApiKey: undefined,
@@ -271,7 +276,8 @@ export class ConfigManager {
           userConfig.pegaEmbedModel ||
           userConfig.pegaVisionModel ||
           userConfig.pegaApiKey ||
-          userConfig.pegaAuthToken
+          userConfig.pegaAuthToken ||
+          userConfig.pegaMode
         ) {
           merged.pega = {
             ...(merged.pega || {}),
@@ -281,6 +287,7 @@ export class ConfigManager {
             pegaVisionModel: userConfig.pegaVisionModel ?? merged.pega?.pegaVisionModel,
             pegaApiKey: userConfig.pegaApiKey ?? merged.pega?.pegaApiKey,
             pegaAuthToken: userConfig.pegaAuthToken ?? merged.pega?.pegaAuthToken,
+            pegaMode: userConfig.pegaMode ?? merged.pega?.pegaMode,
           };
         }
         if (
@@ -356,6 +363,15 @@ export class ConfigManager {
             merged.pega = { ...(merged.pega || {}), pegaAuthToken: envToken };
           }
         }
+
+        const userPegaMode = (() => {
+          const direct = typeof userConfig.pegaMode === "string" ? userConfig.pegaMode : undefined;
+          const nested = typeof userConfig.pega?.pegaMode === "string" ? userConfig.pega.pegaMode : undefined;
+          return direct || nested || merged.pega?.pegaMode;
+        })();
+        const normalizedMode = userPegaMode === "openrouter" ? "openrouter" : "ollama";
+        merged.pega = { ...(merged.pega || {}), pegaMode: normalizedMode };
+        merged.pegaMode = normalizedMode;
 
         // Ensure pega endpoint always use default endpoint
         // if (!merged.pega) {
