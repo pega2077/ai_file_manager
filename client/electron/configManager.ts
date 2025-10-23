@@ -21,6 +21,8 @@ export interface AppConfig {
     pegaModel?: string;
     pegaEmbedModel?: string;
     pegaVisionModel?: string;
+    pegaOpenrouterModel?: string;
+    pegaOpenrouterVisionModel?: string;
     pegaApiKey?: string;
     pegaAuthToken?: string;
     pegaMode?: "ollama" | "openrouter";
@@ -68,6 +70,18 @@ export interface AppConfig {
     openrouterEmbedKey?: string;
     /** Default vision-capable model for OpenRouter */
     openrouterVisionModel?: string;
+    /** Optional request timeout override in milliseconds */
+    openrouterTimeoutMs?: number;
+    /** Optional generic timeout override */
+    timeoutMs?: number;
+    /** Optional generic request timeout override */
+    requestTimeoutMs?: number;
+    /** Custom Referer header for OpenRouter */
+    openrouterReferer?: string;
+    /** Custom X-Title header for OpenRouter */
+    openrouterTitle?: string;
+    /** Additional headers for OpenRouter requests */
+    openrouterHeaders?: Record<string, string>;
   };
   /** Legacy flat fields (deprecated; kept for backward compatibility) */
   ollamaEndpoint?: string;
@@ -79,6 +93,8 @@ export interface AppConfig {
   pegaModel?: string;
   pegaEmbedModel?: string;
   pegaVisionModel?: string;
+  pegaOpenrouterModel?: string;
+  pegaOpenrouterVisionModel?: string;
   pegaApiKey?: string;
   pegaAuthToken?: string;
   pegaMode?: "ollama" | "openrouter";
@@ -150,6 +166,8 @@ const DEFAULT_CONFIG: AppConfig = {
     pegaModel: "qwen3:8b",
     pegaEmbedModel: "bge-m3",
     pegaVisionModel: "qwen2.5vl:7b",
+    pegaOpenrouterModel: "openai/gpt-oss-20b:free",
+    pegaOpenrouterVisionModel: "qwen/qwen2.5-vl-32b-instruct:free",
     pegaApiKey: undefined,
     pegaAuthToken: undefined,
     pegaMode: "ollama",

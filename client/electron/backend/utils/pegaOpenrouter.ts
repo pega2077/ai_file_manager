@@ -35,9 +35,21 @@ function resolvePegaOpenRouterConfig(): PegaOpenRouterResolvedConfig {
   return {
     baseUrl,
     apiKey,
-    chatModel: section.pegaModel || cfg.pegaModel,
+    chatModel:
+      section.pegaOpenrouterModel ||
+      (section.pegaMode === "openrouter" ? section.pegaModel : undefined) ||
+      cfg.pegaOpenrouterModel ||
+      (cfg.pegaMode === "openrouter" ? cfg.pegaModel : undefined) ||
+      section.pegaModel ||
+      cfg.pegaModel,
     embedModel: section.pegaEmbedModel || cfg.pegaEmbedModel,
-    visionModel: section.pegaVisionModel || cfg.pegaVisionModel,
+    visionModel:
+      section.pegaOpenrouterVisionModel ||
+      (section.pegaMode === "openrouter" ? section.pegaVisionModel : undefined) ||
+      cfg.pegaOpenrouterVisionModel ||
+      (cfg.pegaMode === "openrouter" ? cfg.pegaVisionModel : undefined) ||
+      section.pegaVisionModel ||
+      cfg.pegaVisionModel,
   };
 }
 

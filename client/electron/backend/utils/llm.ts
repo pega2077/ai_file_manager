@@ -75,8 +75,35 @@ export function getActiveModelName(task: LlmTask, providerOverride?: ProviderNam
   }
   if (provider === "pega") {
     const pc = cfg.pega || {};
-    if (task === "embed") return pc.pegaEmbedModel || cfg.pegaEmbedModel || "";
-    if (task === "vision") return pc.pegaVisionModel || pc.pegaModel || cfg.pegaVisionModel || cfg.pegaModel || "";
+    const mode = getPegaMode();
+    if (task === "embed") {
+      return pc.pegaEmbedModel || cfg.pegaEmbedModel || "";
+    }
+    if (mode === "openrouter") {
+      if (task === "vision") {
+        return (
+          pc.pegaOpenrouterVisionModel ||
+          pc.pegaVisionModel ||
+          cfg.pegaOpenrouterVisionModel ||
+          cfg.pegaVisionModel ||
+          pc.pegaOpenrouterModel ||
+          pc.pegaModel ||
+          cfg.pegaOpenrouterModel ||
+          cfg.pegaModel ||
+          ""
+        );
+      }
+      return (
+        pc.pegaOpenrouterModel ||
+        cfg.pegaOpenrouterModel ||
+        pc.pegaModel ||
+        cfg.pegaModel ||
+        ""
+      );
+    }
+    if (task === "vision") {
+      return pc.pegaVisionModel || pc.pegaModel || cfg.pegaVisionModel || cfg.pegaModel || "";
+    }
     return pc.pegaModel || cfg.pegaModel || "";
   }
   // default to ollama
