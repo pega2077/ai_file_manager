@@ -559,7 +559,7 @@ function createBotWindow() {
   const isInitialized = Boolean(configManager.getConfig().isInitialized);
   const { width: screenWidth, height: screenHeight } =
     screen.getPrimaryDisplay().workAreaSize;
-  const windowWidth = 400;
+  const windowWidth = 350;
   const windowHeight = 400;
   const x = screenWidth - windowWidth;
   const y = screenHeight / 2 - windowHeight / 2;
