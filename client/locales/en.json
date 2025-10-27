@@ -728,6 +728,12 @@
       "okText": "Create",
       "cancelText": "Cancel"
     },
+    "urlInput": {
+      "modalTitle": "Import URLs",
+      "placeholder": "Enter URLs, one per line",
+      "okText": "Import",
+      "cancelText": "Cancel"
+    },
     "import": {
       "modalTitle": "Select Save Directory",
       "manualModalTitle": "Manually Select Save Directory",

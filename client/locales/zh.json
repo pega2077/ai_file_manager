@@ -734,6 +734,12 @@
       "okText": "创建",
       "cancelText": "取消"
     },
+    "urlInput": {
+      "modalTitle": "导入网址",
+      "placeholder": "输入网址，每行一个",
+      "okText": "导入",
+      "cancelText": "取消"
+    },
     "import": {
       "modalTitle": "选择保存目录",
       "manualModalTitle": "手动选择保存目录",

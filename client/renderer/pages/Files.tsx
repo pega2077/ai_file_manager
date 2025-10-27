@@ -961,6 +961,11 @@ const FilesPage: React.FC = () => {
   const importRef = useRef<FileImportRef>(null);
   const [webImporting, setWebImporting] = useState(false);
 
+  // URL input modal states
+  const [urlInputVisible, setUrlInputVisible] = useState(false);
+  const [urlInputValue, setUrlInputValue] = useState("");
+  const [batchImporting, setBatchImporting] = useState(false);
+
   // Work directory for creating folders under
   const [workDirectory, setWorkDirectory] = useState<string>("workdir");
   // Create folder modal state
@@ -1055,21 +1060,42 @@ const FilesPage: React.FC = () => {
     [importFileFromPath, t, webImporting]
   );
 
+  const handleBatchWebImport = useCallback(async (urls: string[]) => {
+    setBatchImporting(true);
+    try {
+      for (const url of urls) {
+        await handleWebImport(url);
+      }
+    } finally {
+      setBatchImporting(false);
+    }
+  }, [handleWebImport]);
+
   const handleImportClipboardUrl = useCallback(async () => {
     try {
-      const urlFromClipboard = await readClipboardText();
-      if (!urlFromClipboard) {
-        message.warning(t("bot.messages.clipboardEmpty"));
-        return;
+      const clipboardText = await readClipboardText();
+      if (clipboardText) {
+        const urls = clipboardText.split('\n').map(u => u.trim()).filter(u => u && isValidHttpUrl(u));
+        if (urls.length > 0) {
+          if (urls.length === 1) {
+            setUrlInputValue(urls[0]);
+            setUrlInputVisible(true);
+          } else {
+            await handleBatchWebImport(urls);
+          }
+          return;
+        }
       }
-      await handleWebImport(urlFromClipboard);
+      // No valid URLs in clipboard
+      setUrlInputValue("");
+      setUrlInputVisible(true);
     } catch (error) {
       window.electronAPI?.logError?.("files-import-clipboard-url-failed", {
         err: String(error),
       });
       message.error(t("bot.messages.webImportFailed"));
     }
-  }, [handleWebImport, readClipboardText, t]);
+  }, [readClipboardText, t, handleBatchWebImport]);
 
   const handleRefresh = () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -1175,6 +1201,18 @@ const FilesPage: React.FC = () => {
     }
   };
 
+  // Handle URL input modal OK
+  const handleUrlInputOk = async () => {
+    const urls = urlInputValue.split('\n').map(u => u.trim()).filter(u => u && isValidHttpUrl(u));
+    if (urls.length === 0) {
+      message.warning(t("bot.messages.invalidUrl"));
+      return;
+    }
+    setUrlInputVisible(false);
+    setUrlInputValue("");
+    await handleBatchWebImport(urls);
+  };
+
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Sidebar selectedMenu={selectedMenu} />
@@ -1218,8 +1256,8 @@ const FilesPage: React.FC = () => {
                 icon={<LinkOutlined />}
                 onClick={handleImportClipboardUrl}
                 size="large"
-                loading={webImporting}
-                disabled={webImporting}
+                loading={webImporting || batchImporting}
+                disabled={webImporting || batchImporting}
               >
                 {t("files.buttons.importUrl")}
               </Button>
@@ -1273,6 +1311,28 @@ const FilesPage: React.FC = () => {
                 {t("files.createFolder.help")}: {workDirectory}
               </div>
             </Form>
+          </Modal>
+
+          <Modal
+            open={urlInputVisible}
+            title={t("files.urlInput.modalTitle")}
+            okText={t("files.urlInput.okText")}
+            cancelText={t("files.urlInput.cancelText")}
+            onOk={handleUrlInputOk}
+            onCancel={() => {
+              setUrlInputVisible(false);
+              setUrlInputValue("");
+            }}
+            confirmLoading={batchImporting}
+            destroyOnHidden
+          >
+            <Input.TextArea
+              value={urlInputValue}
+              onChange={(e) => setUrlInputValue(e.target.value)}
+              placeholder={t("files.urlInput.placeholder")}
+              rows={6}
+              allowClear
+            />
           </Modal>
         </Content>
       </Layout>
