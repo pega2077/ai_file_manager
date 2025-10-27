@@ -1,25 +1,42 @@
-import OpenAI from "openai";
 import { configManager } from "../../configManager";
 import { logger } from "../../logger";
 import type {
   ChatCompletionMessageParam,
   ChatCompletionContentPart,
 } from "openai/resources/chat/completions";
+import { httpPostJson } from "./httpClient";
 import { normalizeJsonSchema } from "./openrouter";
+import type { OpenRouterEmbedResponse } from "./openrouter";
 
 interface PegaOpenRouterResolvedConfig {
   baseUrl: string;
-  apiKey: string;
+  apiKey?: string;
   chatModel?: string;
   embedModel?: string;
   visionModel?: string;
+  headers: Record<string, string>;
+  timeoutMs: number;
+  embedEndpoint: string;
+  embedKey?: string;
+}
+
+const DEFAULT_TIMEOUT_MS = 60000;
+const DEFAULT_REFERER = "https://github.com/pega2077/ai_file_manager";
+const DEFAULT_TITLE = "AI File Manager";
+const DEFAULT_EMBED_ENDPOINT = "https://embed.pegamob.com";
+
+type ChatCompletionTextContentPart = Extract<ChatCompletionContentPart, { type: "text" }>;
+
+function isTextContentPart(part: ChatCompletionContentPart): part is ChatCompletionTextContentPart {
+  return part.type === "text" && typeof (part as ChatCompletionTextContentPart).text === "string";
 }
 
 function resolvePegaOpenRouterConfig(): PegaOpenRouterResolvedConfig {
   const cfg = configManager.getConfig();
   const section = cfg.pega ?? {};
-  const baseUrl = (section.pegaEndpoint || cfg.pegaEndpoint || "").replace(/\/+$/, "");
-  if (!baseUrl) {
+  const rawEndpoint = (section.pegaEndpoint || cfg.pegaEndpoint || "").trim();
+  const normalizedEndpoint = rawEndpoint.replace(/\/+$/, "");
+  if (!normalizedEndpoint) {
     throw new Error("Pega endpoint not configured");
   }
   const apiKey = (
@@ -29,11 +46,33 @@ function resolvePegaOpenRouterConfig(): PegaOpenRouterResolvedConfig {
     cfg.pegaAuthToken ||
     ""
   ).trim();
-  if (!apiKey) {
-    throw new Error("Pega API key is not configured");
-  }
+
+  const headers: Record<string, string> = {
+    "HTTP-Referer": DEFAULT_REFERER,
+    "X-Title": DEFAULT_TITLE,
+  };
+
+  const embedEndpointRaw = (
+    section.pegaOpenrouterEmbedEndpoint ||
+    cfg.pega?.pegaOpenrouterEmbedEndpoint ||
+    cfg.pega?.openrouterEmbedEndpoint ||
+    cfg.openrouter?.openrouterEmbedEndpoint ||
+    DEFAULT_EMBED_ENDPOINT
+  ) as string;
+  const embedEndpoint = embedEndpointRaw.trim().replace(/\/+$/, "") || DEFAULT_EMBED_ENDPOINT;
+
+  const embedKey = (
+    section.pegaOpenrouterEmbedKey ||
+    section.openrouterEmbedKey ||
+    cfg.pegaOpenrouterEmbedKey ||
+    cfg.pega?.pegaOpenrouterEmbedKey ||
+    cfg.pega?.openrouterEmbedKey ||
+    cfg.openrouter?.openrouterEmbedKey ||
+    ""
+  ).trim();
+
   return {
-    baseUrl,
+    baseUrl: `${normalizedEndpoint}/openrouter/api`,
     apiKey,
     chatModel:
       section.pegaOpenrouterModel ||
@@ -42,7 +81,6 @@ function resolvePegaOpenRouterConfig(): PegaOpenRouterResolvedConfig {
       (cfg.pega?.pegaMode === "openrouter" ? cfg.pegaModel : undefined) ||
       section.pegaModel ||
       cfg.pegaModel,
-    embedModel: section.pegaEmbedModel || cfg.pegaEmbedModel,
     visionModel:
       section.pegaOpenrouterVisionModel ||
       (section.pegaMode === "openrouter" ? section.pegaVisionModel : undefined) ||
@@ -50,18 +88,102 @@ function resolvePegaOpenRouterConfig(): PegaOpenRouterResolvedConfig {
       (cfg.pega?.pegaMode === "openrouter" ? cfg.pegaVisionModel : undefined) ||
       section.pegaVisionModel ||
       cfg.pegaVisionModel,
+    embedModel:
+      section.pegaOpenrouterEmbedModel ||
+      (section.pegaMode === "openrouter" ? section.pegaEmbedModel : undefined) ||
+      cfg.pegaOpenrouterEmbedModel ||
+      cfg.pega?.pegaOpenrouterEmbedModel ||
+      (cfg.pega?.pegaMode === "openrouter" ? cfg.pegaEmbedModel : undefined) ||
+      cfg.pegaEmbedModel,
+    headers,
+    timeoutMs: DEFAULT_TIMEOUT_MS,
+    embedEndpoint,
+    embedKey: embedKey ? embedKey : undefined,
   };
 }
 
-function createClient(resolved: PegaOpenRouterResolvedConfig): OpenAI {
-  return new OpenAI({
-    apiKey: resolved.apiKey,
-    baseURL: `${resolved.baseUrl}/openrouter`,
-    defaultHeaders: {
-      "HTTP-Referer": "https://github.com/pega2077/ai_file_manager",
-      "X-Title": "AI File Manager",
-    },
-  });
+interface PegaOpenRouterChatCompletionChoice {
+  message?: {
+    role?: string;
+    content?: string | ChatCompletionContentPart[];
+  };
+}
+
+interface PegaOpenRouterChatCompletionResponse {
+  choices?: PegaOpenRouterChatCompletionChoice[];
+  error?: {
+    message?: string;
+  };
+}
+
+async function postPegaOpenRouterJson<T>(
+  resolved: PegaOpenRouterResolvedConfig,
+  path: string,
+  body: unknown,
+  overrideTimeoutMs?: number
+): Promise<T> {
+  const url = path.startsWith("http") ? path : `${resolved.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+  const controller = new AbortController();
+  const effectiveTimeout = typeof overrideTimeoutMs === "number" && overrideTimeoutMs > 0
+    ? overrideTimeoutMs
+    : resolved.timeoutMs;
+  const timer = setTimeout(() => controller.abort(), effectiveTimeout);
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...resolved.headers,
+    };
+    if (resolved.apiKey) {
+      headers.Authorization = `Bearer ${resolved.apiKey}`;
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    const rawText = await response.text();
+    if (!response.ok) {
+      let errorMessage = `Pega OpenRouter request failed with status ${response.status}`;
+      try {
+        const parsed = rawText ? JSON.parse(rawText) as { error?: { message?: string } } : undefined;
+        if (parsed?.error?.message) {
+          errorMessage = parsed.error.message;
+        }
+      } catch {
+        // Ignore JSON parse error for error payload.
+      }
+      logger.error("Pega OpenRouter request failed", { url, status: response.status, message: errorMessage });
+      throw new Error(errorMessage);
+    }
+
+    if (!rawText) {
+      return {} as T;
+    }
+
+    try {
+      return JSON.parse(rawText) as T;
+    } catch (parseError) {
+      logger.error("Pega OpenRouter response parsing failed", {
+        url,
+        message: (parseError as Error).message,
+      });
+      throw new Error("Invalid JSON response from Pega OpenRouter");
+    }
+  } catch (error) {
+    const err = error as Error;
+    if (err.name === "AbortError") {
+      logger.error("Pega OpenRouter request timed out", { url, timeoutMs: effectiveTimeout });
+      throw new Error("Pega OpenRouter request timed out");
+    }
+    logger.error("Pega OpenRouter request error", { url, message: err.message });
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function embedWithPegaOpenRouter(
@@ -73,17 +195,33 @@ export async function embedWithPegaOpenRouter(
     return [];
   }
   const resolved = resolvePegaOpenRouterConfig();
-  const client = createClient(resolved);
   const model = overrideModel || resolved.embedModel || resolved.chatModel;
   if (!model) {
     throw new Error("Pega embedding model not configured");
   }
+  const endpoint = resolved.embedEndpoint.replace(/\/+$/, "");
+  if (!endpoint) {
+    throw new Error("Pega OpenRouter embed endpoint not configured");
+  }
   try {
-    const response = await client.embeddings.create({
-      model,
-      input: payload,
-    });
-    return response.data.map((item) => item.embedding);
+    const url = `${endpoint}/api/embed`;
+    const response = await httpPostJson<OpenRouterEmbedResponse>(
+      url,
+      { model, input: payload },
+      { Accept: "application/json", ...resolved.headers },
+      resolved.timeoutMs,
+      resolved.embedKey || resolved.apiKey || undefined
+    );
+    if (!response.ok || !response.data) {
+      const msg = response.error?.message || `Failed embedding via Pega OpenRouter embed endpoint: HTTP ${response.status}`;
+      logger.error("embedWithPegaOpenRouter failed", msg);
+      throw new Error(msg);
+    }
+    const embeddings = response.data.embeddings;
+    if (!embeddings || !Array.isArray(embeddings)) {
+      throw new Error("Invalid embedding response from Pega OpenRouter");
+    }
+    return embeddings;
   } catch (error) {
     logger.error("Pega OpenRouter embeddings failed", error as unknown);
     throw error;
@@ -101,7 +239,6 @@ export async function generateStructuredJsonWithPegaOpenRouter(
     throw new Error("messages are required");
   }
   const resolved = resolvePegaOpenRouterConfig();
-  const client = createClient(resolved);
   const model = overrideModel || resolved.chatModel;
   if (!model) {
     throw new Error("Pega chat model not configured");
@@ -110,16 +247,26 @@ export async function generateStructuredJsonWithPegaOpenRouter(
     const normalizedSchema = schema
       ? (normalizeJsonSchema(schema) as Record<string, unknown>)
       : undefined;
-    const response = await client.chat.completions.create({
-      model,
-      temperature,
-      max_tokens: maxTokens,
-      messages,
-      response_format: normalizedSchema
-        ? { type: "json_schema", json_schema: { name: "schema", schema: normalizedSchema, strict: true } }
-        : { type: "json_object" },
-    });
-    const text = response.choices?.[0]?.message?.content || "";
+    const response = await postPegaOpenRouterJson<PegaOpenRouterChatCompletionResponse>(
+      resolved,
+      "/chat/completions",
+      {
+        model,
+        temperature,
+        max_tokens: maxTokens,
+        messages,
+        response_format: normalizedSchema
+          ? { type: "json_schema", json_schema: { name: "schema", schema: normalizedSchema, strict: true } }
+          : { type: "json_object" },
+      }
+    );
+    const choice = response.choices?.[0]?.message;
+    const content = choice?.content;
+    const text = Array.isArray(content)
+      ? content.filter(isTextContentPart).map((part) => part.text).join("\n")
+      : typeof content === "string"
+        ? content
+        : "";
     try {
       return JSON.parse(text);
     } catch {
@@ -145,7 +292,6 @@ export async function describeImageWithPegaOpenRouter(
     return "";
   }
   const resolved = resolvePegaOpenRouterConfig();
-  const client = createClient(resolved);
   const model = overrideModel || resolved.visionModel || resolved.chatModel;
   if (!model) {
     throw new Error("Pega vision model not configured");
@@ -155,13 +301,27 @@ export async function describeImageWithPegaOpenRouter(
       { type: "text", text: prompt },
       { type: "image_url", image_url: { url: `data:image/png;base64,${imageBase64}` } },
     ];
-    const response = await client.chat.completions.create({
-      model,
-      messages: [{ role: "user", content }],
-      temperature: 0.2,
-      max_tokens: typeof maxTokens === "number" && maxTokens > 0 ? maxTokens : 800,
-    });
-    return response.choices?.[0]?.message?.content || "";
+    const response = await postPegaOpenRouterJson<PegaOpenRouterChatCompletionResponse>(
+      resolved,
+      "/chat/completions",
+      {
+        model,
+        messages: [{ role: "user", content }],
+        temperature: 0.2,
+        max_tokens: typeof maxTokens === "number" && maxTokens > 0 ? maxTokens : 800,
+      }
+    );
+    const message = response.choices?.[0]?.message;
+    const value = message?.content;
+    if (Array.isArray(value)) {
+      const parts = value.filter(isTextContentPart).map((part) => part.text);
+      if (parts.length > 0) {
+        return parts.join("\n");
+      }
+    } else if (typeof value === "string") {
+      return value;
+    }
+    throw new Error("Pega OpenRouter vision model returned empty content");
   } catch (error) {
     logger.error("Pega OpenRouter vision request failed", error as unknown);
     throw error;

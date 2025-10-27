@@ -23,6 +23,12 @@ export interface AppConfig {
     pegaVisionModel?: string;
     pegaOpenrouterModel?: string;
     pegaOpenrouterVisionModel?: string;
+    pegaOpenrouterEmbedModel?: string;
+    pegaOpenrouterEmbedEndpoint?: string;
+    pegaOpenrouterEmbedKey?: string;
+    openrouterEmbedModel?: string;
+    openrouterEmbedEndpoint?: string;
+    openrouterEmbedKey?: string;
     pegaApiKey?: string;
     pegaAuthToken?: string;
     pegaMode?: "ollama" | "openrouter";
@@ -48,7 +54,7 @@ export interface AppConfig {
     /** OpenAI API key (read from env OPENAI_API_KEY if not set in config) */
     openaiApiKey?: string;
     /** Default chat/completion model for OpenAI */
-    openaiModel?: string;
+  openaiModel?: string;
     pegaMode?: "ollama" | "openrouter";
     /** Default embedding model for OpenAI */
     openaiEmbedModel?: string;
@@ -95,6 +101,9 @@ export interface AppConfig {
   pegaVisionModel?: string;
   pegaOpenrouterModel?: string;
   pegaOpenrouterVisionModel?: string;
+  pegaOpenrouterEmbedModel?: string;
+  pegaOpenrouterEmbedEndpoint?: string;
+  pegaOpenrouterEmbedKey?: string;
   pegaApiKey?: string;
   pegaAuthToken?: string;
   openaiEndpoint?: string;
@@ -169,6 +178,12 @@ const DEFAULT_CONFIG: AppConfig = {
     pegaVisionModel: "qwen2.5vl:7b",
     pegaOpenrouterModel: "openai/gpt-oss-20b:free",
     pegaOpenrouterVisionModel: "qwen/qwen2.5-vl-32b-instruct:free",
+    pegaOpenrouterEmbedModel: "all-MiniLM-L6-v2",
+    pegaOpenrouterEmbedEndpoint: "https://embed.pegamob.com",
+    pegaOpenrouterEmbedKey: undefined,
+    openrouterEmbedModel: "all-MiniLM-L6-v2",
+    openrouterEmbedEndpoint: "https://embed.pegamob.com",
+    openrouterEmbedKey: undefined,
     pegaApiKey: undefined,
     pegaAuthToken: undefined,
     pegaMode: "openrouter",
@@ -294,6 +309,9 @@ export class ConfigManager {
           userConfig.pegaModel ||
           userConfig.pegaEmbedModel ||
           userConfig.pegaVisionModel ||
+          userConfig.pegaOpenrouterEmbedModel ||
+          userConfig.pegaOpenrouterEmbedEndpoint ||
+          userConfig.pegaOpenrouterEmbedKey ||
           userConfig.pegaApiKey ||
           userConfig.pegaAuthToken
         ) {
@@ -303,6 +321,9 @@ export class ConfigManager {
             pegaModel: userConfig.pegaModel ?? merged.pega?.pegaModel,
             pegaEmbedModel: userConfig.pegaEmbedModel ?? merged.pega?.pegaEmbedModel,
             pegaVisionModel: userConfig.pegaVisionModel ?? merged.pega?.pegaVisionModel,
+            pegaOpenrouterEmbedModel: userConfig.pegaOpenrouterEmbedModel ?? merged.pega?.pegaOpenrouterEmbedModel,
+            pegaOpenrouterEmbedEndpoint: userConfig.pegaOpenrouterEmbedEndpoint ?? merged.pega?.pegaOpenrouterEmbedEndpoint,
+            pegaOpenrouterEmbedKey: userConfig.pegaOpenrouterEmbedKey ?? merged.pega?.pegaOpenrouterEmbedKey,
             pegaApiKey: userConfig.pegaApiKey ?? merged.pega?.pegaApiKey,
             pegaAuthToken: userConfig.pegaAuthToken ?? merged.pega?.pegaAuthToken,
           };

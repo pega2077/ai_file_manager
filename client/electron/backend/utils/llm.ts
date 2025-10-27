@@ -141,6 +141,8 @@ export async function generateStructuredJson(
   providerOverride?: ProviderName
 ): Promise<unknown> {
   const provider = providerOverride || getActiveProvider();
+  console.log(`generateStructuredJson called with provider: ${provider}`);
+
   if (provider === "openai" || provider === "azure-openai") {
     // Map to OpenAI message format (string content only)
     const oaMessages = messages.map((m) => ({ role: m.role, content: m.content }));
