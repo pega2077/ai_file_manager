@@ -198,6 +198,7 @@ export interface AppConfig {
   sqliteDbPath: string;
   language?: string;
   theme?: 'light' | 'dark';
+  themeFollowSystem?: boolean;
   autoSave?: boolean;
   showHiddenFiles?: boolean;
   enablePreview?: boolean;

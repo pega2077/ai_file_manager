@@ -197,6 +197,7 @@
       "actions": "Actions"
     },
     "labels": {
+      "themeFollowSystem": "Follow system appearance",
       "theme": "Theme",
       "language": "Language",
       "autoSave": "Auto-save",
@@ -227,6 +228,7 @@
       "providerConfigPages": "LLM configuration pages"
     },
     "descriptions": {
+      "themeFollowSystem": "Automatically switch between light and dark to match the operating system.",
       "enablePreview": "Double-click files to preview them before opening the default app.",
       "autoSaveRAG": "Automatically add imported files to the RAG knowledge base.",
       "autoTagEnabled": "Automatically extract tags for files during import or processing.",
@@ -290,6 +292,7 @@
       "unknownError": "Unknown error",
       "providerUpdated": "LLM provider updated",
       "providerUpdateError": "Failed to update LLM provider",
+  "themeUpdateFailed": "Failed to switch theme. Please try again.",
       "pegaKeyMissing": "No API key saved",
       "pegaLoginRestriction": "未登录用户大语言模型调用频率有限制",
       "pegaLoadingUser": "Loading account information...",
@@ -312,7 +315,9 @@
       "pegaStatusModels": "Models: {models}",
       "pegaStatusNoData": "No status data yet.",
       "pegaModeUpdated": "Pega mode updated",
-      "pegaModeUpdateError": "Failed to update Pega mode"
+      "pegaModeUpdateError": "Failed to update Pega mode",
+      "themeControlledBySystem": "Theme follows your system appearance. Disable following to change it manually.",
+      "themeFollowSystemUpdateFailed": "Failed to update the follow-system preference. Please try again."
     }
   },
   "providerConfig": {

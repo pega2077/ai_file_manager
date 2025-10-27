@@ -196,6 +196,7 @@
       "actions": "操作"
     },
     "labels": {
+      "themeFollowSystem": "跟随系统外观",
       "theme": "主题",
       "language": "语言",
       "autoSave": "自动保存",
@@ -226,6 +227,7 @@
       "providerConfigPages": "LLM 配置页面"
     },
     "descriptions": {
+      "themeFollowSystem": "根据操作系统的明暗模式自动切换。",
       "enablePreview": "双击文件以在打开默认应用前预览。",
       "autoSaveRAG": "自动将导入的文件添加到 RAG 知识库。",
       "autoTagEnabled": "在导入或处理文件时自动提取标签。",
@@ -293,6 +295,7 @@
       "unknownError": "未知错误",
       "providerUpdated": "已更新大模型提供商",
       "providerUpdateError": "更新大模型提供商失败",
+  "themeUpdateFailed": "切换主题失败，请重试。",
       "pegaKeyMissing": "尚未保存 API Key",
       "pegaLoginRestriction": "未登录用户大语言模型调用频率有限制",
       "pegaLoadingUser": "正在加载账号信息...",
@@ -315,7 +318,9 @@
       "pegaStatusModels": "模型：{models}",
       "pegaStatusNoData": "暂无状态数据。",
       "pegaModeUpdated": "Pega 模式已更新",
-      "pegaModeUpdateError": "更新 Pega 模式失败"
+      "pegaModeUpdateError": "更新 Pega 模式失败",
+      "themeControlledBySystem": "当前主题跟随系统，关闭后可手动切换。",
+      "themeFollowSystemUpdateFailed": "更新跟随系统设置失败，请重试。"
     }
   },
   "providerConfig": {

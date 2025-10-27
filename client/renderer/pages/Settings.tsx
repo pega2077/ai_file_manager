@@ -13,6 +13,7 @@
   Spin,
   Descriptions,
   Tag,
+  theme,
 } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -23,6 +24,8 @@ import {
   normalizeLocale,
   type SupportedLocale,
 } from "../shared/i18n";
+import { useTheme } from "../shared/theme";
+import type { ThemeMode } from "../shared/theme";
 import type { ApiError, PegaStatusResponse, PegaUser } from "../services/api";
 
 const { Content } = Layout;
@@ -38,7 +41,6 @@ type LlmProvider =
   | "pega";
 
 interface SettingsState {
-  theme: "light" | "dark";
   language: SupportedLocale;
   autoSave: boolean;
   showHiddenFiles: boolean;
@@ -55,7 +57,6 @@ interface SettingsState {
 }
 
 const DEFAULT_SETTINGS: SettingsState = {
-  theme: "light",
   language: defaultLocale,
   autoSave: true,
   showHiddenFiles: false,
@@ -75,10 +76,14 @@ const Settings = () => {
   const navigate = useNavigate();
   const { t, locale, setLocale, availableLocales, localeLabels } =
     useTranslation();
+  const { token } = theme.useToken();
+  const { mode, setMode, followSystem, setFollowSystem } = useTheme();
   const [settings, setSettings] = useState<SettingsState>(() => ({
     ...DEFAULT_SETTINGS,
     language: locale,
   }));
+  const [themePending, setThemePending] = useState(false);
+  const [followSystemPending, setFollowSystemPending] = useState(false);
   const [apiBaseUrl, setApiBaseUrl] = useState("http://localhost:8000");
   const [pegaAuthToken, setPegaAuthTokenState] = useState("");
   const [pegaUser, setPegaUser] = useState<PegaUser | null>(null);
@@ -87,6 +92,24 @@ const Settings = () => {
   const [pegaStatus, setPegaStatus] = useState<PegaStatusResponse | null>(null);
   const [pegaStatusLoading, setPegaStatusLoading] = useState(false);
   const [pegaStatusError, setPegaStatusError] = useState<string | null>(null);
+
+  const layoutStyle = useMemo(
+    () => ({
+      minHeight: "100vh",
+      background: token.colorBgLayout,
+      transition: "background-color 0.3s ease",
+    }),
+    [token.colorBgLayout]
+  );
+
+  const contentStyle = useMemo(
+    () => ({
+      padding: 24,
+      background: token.colorBgContainer,
+      transition: "background-color 0.3s ease",
+    }),
+    [token.colorBgContainer]
+  );
 
   const languageOptions = useMemo(
     () =>
@@ -196,7 +219,6 @@ const Settings = () => {
           const pegaMode = rawPegaMode === "openrouter" ? "openrouter" : "ollama";
           nextState = {
             ...nextState,
-            theme: appConfig.theme ?? DEFAULT_SETTINGS.theme,
             language: normalizedLanguage,
             autoSave: Boolean(appConfig.autoSave ?? DEFAULT_SETTINGS.autoSave),
             showHiddenFiles: Boolean(
@@ -231,6 +253,21 @@ const Settings = () => {
             pegaMode,
           };
 
+          try {
+            if (appConfig.themeFollowSystem) {
+              await setFollowSystem(true, { persist: false });
+            } else if (appConfig.theme === "dark" || appConfig.theme === "light") {
+              await setMode(appConfig.theme, {
+                persist: false,
+                followSystem: false,
+              });
+            } else {
+              await setFollowSystem(true, { persist: false });
+            }
+          } catch (error) {
+            console.error("Failed to sync theme from config:", error);
+          }
+
           if (normalizedLanguage !== locale) {
             setLocale(normalizedLanguage);
           }
@@ -255,7 +292,7 @@ const Settings = () => {
     };
 
     void loadSettings();
-  }, [locale, setLocale]);
+  }, [locale, setFollowSystem, setLocale, setMode]);
 
   useEffect(() => {
     setSettings((prev) =>
@@ -393,6 +430,46 @@ const Settings = () => {
     }));
   };
 
+  const handleThemeSwitch = useCallback(
+    async (checked: boolean) => {
+      if (followSystem) {
+        return;
+      }
+      const nextMode: ThemeMode = checked ? "dark" : "light";
+      if (nextMode === mode) {
+        return;
+      }
+      setThemePending(true);
+      try {
+        await setMode(nextMode, { persist: true, followSystem: false });
+      } catch (error) {
+        console.error("Failed to update theme mode:", error);
+        message.error(t("settings.messages.themeUpdateFailed"));
+      } finally {
+        setThemePending(false);
+      }
+    },
+    [followSystem, mode, setMode, t]
+  );
+
+  const handleFollowSystemSwitch = useCallback(
+    async (checked: boolean) => {
+      if (checked === followSystem) {
+        return;
+      }
+      setFollowSystemPending(true);
+      try {
+        await setFollowSystem(checked, { persist: true });
+      } catch (error) {
+        console.error("Failed to update follow system preference:", error);
+        message.error(t("settings.messages.themeFollowSystemUpdateFailed"));
+      } finally {
+        setFollowSystemPending(false);
+      }
+    },
+    [followSystem, setFollowSystem, t]
+  );
+
   const fetchPegaStatus = useCallback(async () => {
     if (!hasPegaCredential) {
       setPegaStatus(null);
@@ -509,7 +586,8 @@ const Settings = () => {
   const handleSaveSettings = async () => {
     try {
       await window.electronAPI.updateAppConfig({
-        theme: settings.theme,
+        theme: followSystem ? undefined : mode,
+        themeFollowSystem: followSystem,
         language: settings.language,
         autoSave: settings.autoSave,
         showHiddenFiles: settings.showHiddenFiles,
@@ -544,7 +622,7 @@ const Settings = () => {
   //   }
   // };
 
-  const handleResetSettings = () => {
+  const handleResetSettings = async () => {
     const nextState: SettingsState = {
       ...DEFAULT_SETTINGS,
       language: defaultLocale,
@@ -556,6 +634,12 @@ const Settings = () => {
     setPegaStatus(null);
     setPegaStatusError(null);
     setPegaStatusLoading(false);
+    try {
+  await setMode("light", { persist: true, followSystem: false });
+    } catch (error) {
+      console.error("Failed to reset theme during reset:", error);
+      message.error(t("settings.messages.themeUpdateFailed"));
+    }
     message.success(t("settings.messages.resetSuccess"));
   };
 
@@ -574,7 +658,10 @@ const Settings = () => {
           await window.electronAPI.updateAppConfig({
             isInitialized: false,
             workDirectory: "",
+            theme: "light",
+            themeFollowSystem: false,
           });
+          await setMode("light", { persist: false, followSystem: false });
           setSettings((prev) => ({ ...prev, workDirectory: "" }));
           setPegaAuthTokenState("");
           setPegaUser(null);
@@ -593,8 +680,8 @@ const Settings = () => {
   };
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Content style={{ padding: "24px", background: "#fff" }}>
+    <Layout style={layoutStyle}>
+      <Content style={contentStyle}>
         <div style={{ maxWidth: 800, margin: "0 auto" }}>
           <Title level={2}>{t("settings.pageTitle")}</Title>
 
@@ -606,16 +693,40 @@ const Settings = () => {
               style={{ display: "flex", flexDirection: "column", gap: "16px" }}
             >
               <div>
+                <Text strong>{t("settings.labels.themeFollowSystem")}</Text>
+                <Switch
+                  checkedChildren={t("settings.common.enabled")}
+                  unCheckedChildren={t("settings.common.disabled")}
+                  checked={followSystem}
+                  loading={followSystemPending}
+                  onChange={(checked) => {
+                    void handleFollowSystemSwitch(checked);
+                  }}
+                  style={{ marginLeft: 16 }}
+                />
+                <Text type="secondary" style={{ marginLeft: 8 }}>
+                  {t("settings.descriptions.themeFollowSystem")}
+                </Text>
+              </div>
+
+              <div>
                 <Text strong>{t("settings.labels.theme")}</Text>
                 <Switch
                   checkedChildren={t("settings.themeOptions.dark")}
                   unCheckedChildren={t("settings.themeOptions.light")}
-                  checked={settings.theme === "dark"}
-                  onChange={(checked) =>
-                    handleSettingChange("theme", checked ? "dark" : "light")
-                  }
+                  checked={mode === "dark"}
+                  loading={themePending}
+                  disabled={followSystem}
+                  onChange={(checked) => {
+                    void handleThemeSwitch(checked);
+                  }}
                   style={{ marginLeft: 16 }}
                 />
+                {followSystem && (
+                  <Text type="secondary" style={{ display: "block", marginTop: 8 }}>
+                    {t("settings.messages.themeControlledBySystem")}
+                  </Text>
+                )}
               </div>
 
               <div>

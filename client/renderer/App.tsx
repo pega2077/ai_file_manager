@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { IpcRenderer, IpcRendererEvent } from 'electron';
 import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { ThemeProvider } from './shared/theme';
 import Landing from './pages/Landing';
 import Directories from './pages/Directories';
 import Files from './pages/Files';
@@ -51,24 +52,26 @@ const NavigationBridge = () => {
 
 function App() {
   return (
-    <HashRouter>
-      <NavigationBridge />
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/home" element={<Directories />} />
-        <Route path="/files" element={<Files />} />
-        <Route path="/search" element={<Search />} />
-        <Route path="/setup" element={<Setup />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/settings/pega-auth" element={<PegaAuth />} />
-        <Route path="/settings/providers/ollama" element={<OllamaConfig />} />
-        <Route path="/settings/providers/openai" element={<OpenAIConfig />} />
-        <Route path="/settings/providers/openrouter" element={<OpenRouterConfig />} />
-        <Route path="/settings/providers/bailian" element={<BailianConfig />} />
-        <Route path="/bot" element={<Bot />} />
-        <Route path="/convert" element={<Convert />} />
-      </Routes>
-    </HashRouter>
+    <ThemeProvider>
+      <HashRouter>
+        <NavigationBridge />
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/home" element={<Directories />} />
+          <Route path="/files" element={<Files />} />
+          <Route path="/search" element={<Search />} />
+          <Route path="/setup" element={<Setup />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/settings/pega-auth" element={<PegaAuth />} />
+          <Route path="/settings/providers/ollama" element={<OllamaConfig />} />
+          <Route path="/settings/providers/openai" element={<OpenAIConfig />} />
+          <Route path="/settings/providers/openrouter" element={<OpenRouterConfig />} />
+          <Route path="/settings/providers/bailian" element={<BailianConfig />} />
+          <Route path="/bot" element={<Bot />} />
+          <Route path="/convert" element={<Convert />} />
+        </Routes>
+      </HashRouter>
+    </ThemeProvider>
   );
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Layout,
   Button,
@@ -12,6 +12,7 @@ import {
   Modal,
   Form,
   Checkbox,
+  theme,
 } from "antd";
 import type { TableProps } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -960,6 +961,37 @@ const FilesPage: React.FC = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const importRef = useRef<FileImportRef>(null);
   const [webImporting, setWebImporting] = useState(false);
+  const { token } = theme.useToken();
+
+  const outerLayoutStyle = useMemo(
+    () => ({
+      minHeight: "100vh",
+      background: token.colorBgLayout,
+      transition: "background-color 0.3s ease",
+    }),
+    [token.colorBgLayout]
+  );
+
+  const innerLayoutStyle = useMemo(
+    () => ({
+      padding: "0 24px 24px",
+      background: token.colorBgLayout,
+      transition: "background-color 0.3s ease",
+    }),
+    [token.colorBgLayout]
+  );
+
+  const contentStyle = useMemo(
+    () => ({
+      padding: 24,
+      margin: 0,
+      minHeight: 280,
+      background: token.colorBgContainer,
+      transition: "background-color 0.3s ease",
+    }),
+    [token.colorBgContainer]
+  );
+  const secondaryTextColor = token.colorTextTertiary;
 
   // URL input modal states
   const [urlInputVisible, setUrlInputVisible] = useState(false);
@@ -1214,17 +1246,10 @@ const FilesPage: React.FC = () => {
   };
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <Layout style={outerLayoutStyle}>
       <Sidebar selectedMenu={selectedMenu} />
-      <Layout style={{ padding: "0 24px 24px" }}>
-        <Content
-          style={{
-            padding: 24,
-            margin: 0,
-            minHeight: 280,
-            background: "#fff",
-          }}
-        >
+      <Layout style={innerLayoutStyle}>
+        <Content style={contentStyle}>
           <div
             style={{
               marginBottom: 16,
@@ -1272,7 +1297,10 @@ const FilesPage: React.FC = () => {
             </div>
           </div>
 
-      <FileList refreshTrigger={refreshTrigger} onRetryImport={handleRetryImport} />
+          <FileList
+            refreshTrigger={refreshTrigger}
+            onRetryImport={handleRetryImport}
+          />
           <FileImport
             ref={importRef}
             onImported={() => setRefreshTrigger((prev) => prev + 1)}
@@ -1307,7 +1335,7 @@ const FilesPage: React.FC = () => {
                   allowClear
                 />
               </Form.Item>
-              <div style={{ color: "#888", fontSize: 12 }}>
+              <div style={{ color: secondaryTextColor, fontSize: 12 }}>
                 {t("files.createFolder.help")}: {workDirectory}
               </div>
             </Form>

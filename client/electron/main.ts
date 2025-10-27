@@ -9,6 +9,7 @@
   screen,
   Tray,
   nativeImage,
+  nativeTheme,
 } from "electron";
 
 import { fileURLToPath } from "node:url";
@@ -65,6 +66,25 @@ let isQuitting = false; // Track whether the app is in an explicit quit flow
 interface ShowMainWindowOptions {
   route?: string;
   refreshFiles?: boolean;
+}
+
+function applyNativeThemePreference(themePreference: AppConfig["theme"] | undefined): void {
+  try {
+    const nextThemeSource: "dark" | "light" | "system" =
+      themePreference === "dark" || themePreference === "light"
+        ? themePreference
+        : "system";
+    if (nativeTheme.themeSource !== nextThemeSource) {
+      nativeTheme.themeSource = nextThemeSource;
+      logger.info("Applied native theme preference", {
+        themeSource: nextThemeSource,
+      });
+    }
+  } catch (error) {
+    logger.error("Failed to apply native theme preference", {
+      error: String(error),
+    });
+  }
 }
 
 /**
@@ -376,9 +396,16 @@ function setupIpcHandlers() {
   // IPC handler for updating app config
   ipcMain.handle("update-app-config", (_event, updates: Partial<AppConfig>) => {
     configManager.updateConfig(updates);
+    const nextConfig = configManager.getConfig();
+    if (
+      Object.prototype.hasOwnProperty.call(updates, "theme") ||
+      Object.prototype.hasOwnProperty.call(updates, "themeFollowSystem")
+    ) {
+      applyNativeThemePreference(nextConfig.theme);
+    }
     // Reinitialize import service with potentially new base URL
   // importService = new ImportService(win ?? null, apiBaseUrl);
-    return configManager.getConfig();
+    return nextConfig;
   });
 
   // IPC handler for setting API base URL
@@ -890,6 +917,7 @@ app.whenReady().then(async () => {
   // 读取配置文件
   const appConfig = configManager.loadConfig();
   logger.info('Loaded configuration:', appConfig);
+  applyNativeThemePreference(appConfig.theme);
 
   // Load i18n dictionaries for main process
   await i18n.load(appConfig.language);

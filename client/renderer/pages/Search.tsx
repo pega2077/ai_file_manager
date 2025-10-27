@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Layout,
   Input,
@@ -12,6 +12,7 @@ import {
   Modal,
   Space,
   Tooltip,
+  theme,
 } from "antd";
 import { CopyOutlined, EyeOutlined, QuestionCircleOutlined } from "@ant-design/icons";
 import { useSearchParams } from "react-router-dom";
@@ -46,6 +47,34 @@ const SearchPage = () => {
   const { t, locale } = useTranslation();
   const [searchParams] = useSearchParams();
   const selectedMenu = "search";
+  const { token } = theme.useToken();
+  const layoutStyle = useMemo(
+    () => ({
+      minHeight: "100vh",
+      background: token.colorBgLayout,
+      transition: "background-color 0.3s ease",
+    }),
+    [token.colorBgLayout]
+  );
+  const contentStyle = useMemo(
+    () => ({
+      padding: 24,
+      background: token.colorBgContainer,
+      transition: "background-color 0.3s ease",
+    }),
+    [token.colorBgContainer]
+  );
+  const referencedCardStyle = useMemo(
+    () => ({
+      marginBottom: 16,
+      background: token.colorSuccessBg,
+      border: `1px solid ${token.colorSuccessBorder || token.colorSuccess}`,
+    }),
+    [token.colorSuccessBg, token.colorSuccessBorder, token.colorSuccess]
+  );
+  const secondaryTextColor = token.colorTextTertiary;
+  const placeholderTextColor = token.colorTextQuaternary;
+  const snippetTextColor = token.colorText;
 
   const [questionQuery, setQuestionQuery] = useState("");
   const [answerResult, setAnswerResult] = useState<AnswerResult | null>(null);
@@ -327,19 +356,15 @@ const SearchPage = () => {
 
   return (
     <>
-      <Layout style={{ minHeight: "100vh" }}>
-      <Sidebar selectedMenu={selectedMenu} />
-      <Layout>
-        <Content style={{ padding: "24px", background: "#fff" }}>
-          <div style={{ marginBottom: "24px" }}>
+      <Layout style={layoutStyle}>
+        <Sidebar selectedMenu={selectedMenu} />
+        <Layout>
+          <Content style={contentStyle}>
+            <div style={{ marginBottom: "24px" }}>
             {referencedFiles.length > 0 && (
               <Card
                 size="small"
-                style={{
-                  marginBottom: "16px",
-                  background: "#f6ffed",
-                  border: "1px solid #b7eb8f",
-                }}
+                style={referencedCardStyle}
                 title={
                   <div
                     style={{
@@ -358,7 +383,7 @@ const SearchPage = () => {
                     <div style={{ fontWeight: "bold", fontSize: "14px" }}>
                       {file.file_name}
                     </div>
-                    <div style={{ color: "#666", fontSize: "12px" }}>
+                    <div style={{ color: secondaryTextColor, fontSize: "12px" }}>
                       {file.file_path}
                     </div>
                   </div>
@@ -481,13 +506,13 @@ const SearchPage = () => {
                     fontSize: "16px",
                     lineHeight: 1.7,
                     whiteSpace: "pre-wrap",
-                    color: "#222",
+                    color: snippetTextColor,
                   }}
                 >
                   {answerResult.payload.answer}
                 </div>
               ) : (
-                <div style={{ color: "#222" }}>
+                <div style={{ color: snippetTextColor }}>
                   <div
                     style={{
                       fontSize: "16px",
@@ -527,7 +552,7 @@ const SearchPage = () => {
                           <li key={doc.file_id} style={{ marginBottom: "6px" }}>
                             <div style={{ fontWeight: 500 }}>{doc.file_name || doc.file_path}</div>
                             {doc.file_path && (
-                              <div style={{ fontSize: "12px", color: "#666" }}>
+                              <div style={{ fontSize: "12px", color: secondaryTextColor }}>
                                 {doc.file_path}
                               </div>
                             )}
@@ -539,7 +564,7 @@ const SearchPage = () => {
                 </div>
               )
             ) : (
-              <div style={{ color: "#999", textAlign: "center" }}>
+              <div style={{ color: placeholderTextColor, textAlign: "center" }}>
                 {t("search.qa.answerPlaceholder")}
               </div>
             )}
@@ -594,7 +619,7 @@ const SearchPage = () => {
                       </div>
                       <div
                         style={{
-                          color: "#666",
+                          color: secondaryTextColor,
                           fontSize: "12px",
                           marginBottom: "4px",
                         }}
@@ -603,7 +628,7 @@ const SearchPage = () => {
                       </div>
                       <div
                         style={{
-                          color: "#333",
+                          color: snippetTextColor,
                           fontSize: "13px",
                           lineHeight: 1.6,
                         }}
@@ -635,7 +660,7 @@ const SearchPage = () => {
                   );
                 })
               ) : (
-                <div style={{ color: "#999", textAlign: "center" }}>
+                <div style={{ color: placeholderTextColor, textAlign: "center" }}>
                   {t("search.qa.noResultsPlaceholder")}
                 </div>
               )}
@@ -660,7 +685,7 @@ const SearchPage = () => {
             whiteSpace: "pre-wrap",
             fontSize: "14px",
             lineHeight: 1.6,
-            color: "#333",
+            color: snippetTextColor,
           }}
         >
           {previewContent}

@@ -116,6 +116,8 @@ export interface AppConfig {
   language?: string;
   /** UI theme preference */
   theme?: 'light' | 'dark';
+  /** Whether UI theme should follow the operating system appearance */
+  themeFollowSystem?: boolean;
   /** Whether to auto save general edits */
   autoSave?: boolean;
   /** Whether to show hidden files in UI */
@@ -201,6 +203,7 @@ const DEFAULT_CONFIG: AppConfig = {
   // App defaults (override in config.json)
   language: 'zh',
   theme: 'light',
+  themeFollowSystem: false,
   autoSave: true,
   showHiddenFiles: false,
   enablePreview: true,
@@ -400,6 +403,10 @@ export class ConfigManager {
         }
         if (typeof merged.autoTagEnabled !== 'boolean') {
           merged.autoTagEnabled = DEFAULT_CONFIG.autoTagEnabled;
+        }
+
+        if (typeof merged.themeFollowSystem !== 'boolean') {
+          merged.themeFollowSystem = DEFAULT_CONFIG.themeFollowSystem;
         }
 
         this.config = merged;

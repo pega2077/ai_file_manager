@@ -1,7 +1,7 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import botLoadingImage from "../assets/mona-loading-default.gif";
 import botStaticImage from "../assets/mona-loading-default-static.png";
-import { message, Menu, Button, Tooltip } from "antd";
+import { message, Menu, Button, Tooltip, theme } from "antd";
 import { UploadOutlined, SearchOutlined } from "@ant-design/icons";
 import FileImport, { FileImportRef } from "../components/FileImport";
 import { useTranslation } from "../shared/i18n/I18nProvider";
@@ -31,6 +31,22 @@ const Bot: React.FC = () => {
   const [isHovered, setIsHovered] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [webImporting, setWebImporting] = useState(false);
+  const { token } = theme.useToken();
+  const statusTextColor = token.colorTextSecondary;
+  const contextMenuBaseStyle = useMemo(
+    () => ({
+      background: token.colorBgElevated,
+      border: `1px solid ${token.colorBorderSecondary || token.colorBorder}`,
+      borderRadius: 4,
+      boxShadow: token.boxShadowSecondary,
+    }),
+    [
+      token.colorBgElevated,
+      token.colorBorderSecondary,
+      token.colorBorder,
+      token.boxShadowSecondary,
+    ]
+  );
 
   // Work directory handling moved into FileImport component.
 
@@ -471,7 +487,7 @@ const Bot: React.FC = () => {
             marginTop: 12,
             maxWidth: 220,
             textAlign: "center",
-            color: "#555",
+            color: statusTextColor,
             fontSize: 14,
             lineHeight: 1.4,
           }}
@@ -496,10 +512,7 @@ const Bot: React.FC = () => {
             top: menuPosition.y,
             left: menuPosition.x,
             zIndex: 1000,
-            background: "white",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            ...contextMenuBaseStyle,
           }}
           onClick={() => setMenuVisible(false)}
         >
