@@ -15,6 +15,7 @@
     "@ant-design/icons": "^6.0.2",
     "@mozilla/readability": "^0.6.0",
     "antd": "^5.27.3",
+    "chokidar": "^3.6.0",
     "electron-store": "^10.1.0",
     "express": "^5.1.0",
     "faiss-node": "^0.5.1",

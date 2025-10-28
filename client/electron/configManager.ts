@@ -141,6 +141,8 @@ export interface AppConfig {
   tagSummaryMaxLength?: number;
   /** Auto classify without confirmation */
   autoClassifyWithoutConfirmation?: boolean;
+  /** Enable background directory watcher for automatic imports */
+  enableDirectoryWatcher?: boolean;
   /** Current workspace directory path */
   workDirectory?: string;
   /** App initialization flag */
@@ -226,6 +228,7 @@ const DEFAULT_CONFIG: AppConfig = {
   autoTagEnabled: true,
   tagSummaryMaxLength: 1000,
   autoClassifyWithoutConfirmation: true,
+  enableDirectoryWatcher: false,
   workDirectory: '',
   isInitialized: false,
   apiBaseUrl: 'http://localhost:8000',
@@ -428,6 +431,10 @@ export class ConfigManager {
 
         if (typeof merged.themeFollowSystem !== 'boolean') {
           merged.themeFollowSystem = DEFAULT_CONFIG.themeFollowSystem;
+        }
+
+        if (typeof merged.enableDirectoryWatcher !== 'boolean') {
+          merged.enableDirectoryWatcher = DEFAULT_CONFIG.enableDirectoryWatcher;
         }
 
         this.config = merged;

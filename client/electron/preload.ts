@@ -2,6 +2,10 @@ import { ipcRenderer, contextBridge } from 'electron'
 import { webUtils } from 'electron'
 import { pathToFileURL } from 'url'
 import type { FileImportNotification } from '../renderer/shared/events/fileImportEvents'
+import type {
+  DirectoryWatchImportRequest,
+  DirectoryWatchStatusMessage,
+} from '../shared/directoryWatcher'
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
@@ -68,6 +72,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => {
       ipcRenderer.removeListener('file-import:notification', listener);
     };
+  },
+  registerDirectoryWatcherImporter: () => {
+    ipcRenderer.send('directory-watcher:register-importer')
+  },
+  unregisterDirectoryWatcherImporter: () => {
+    ipcRenderer.send('directory-watcher:unregister-importer')
+  },
+  notifyDirectoryWatcherStatus: (payload: DirectoryWatchStatusMessage) => {
+    ipcRenderer.send('directory-watcher:status', payload)
+  },
+  onDirectoryWatcherImportRequest: (
+    callback: (payload: DirectoryWatchImportRequest) => void,
+  ) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      detail: DirectoryWatchImportRequest,
+    ) => {
+      callback(detail)
+    }
+    ipcRenderer.on('directory-watcher:import-request', listener)
+    return () => {
+      ipcRenderer.removeListener('directory-watcher:import-request', listener)
+    }
   },
 })
 

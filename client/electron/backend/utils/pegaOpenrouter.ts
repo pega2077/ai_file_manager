@@ -260,6 +260,7 @@ export async function generateStructuredJsonWithPegaOpenRouter(
           : { type: "json_object" },
       }
     );
+    //console.log("Pega OpenRouter response:", response);
     const choice = response.choices?.[0]?.message;
     const content = choice?.content;
     const text = Array.isArray(content)

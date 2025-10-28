@@ -10,6 +10,7 @@
   Tray,
   nativeImage,
   nativeTheme,
+  Notification,
 } from "electron";
 
 import { fileURLToPath } from "node:url";
@@ -22,6 +23,8 @@ import { ensureTempDir, getBaseDir, resolveProjectRoot } from "./backend/utils/p
 import { closeDB } from "./backend/db";
 import { i18n } from "./languageHelper";
 import type { FileImportNotification } from '../renderer/shared/events/fileImportEvents';
+import { DirectoryWatcher } from "./directoryWatcher";
+import type { DirectoryWatchImportRequest, DirectoryWatchStatusMessage } from "../shared/directoryWatcher";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Config is managed via ConfigManager (JSON file), electron-store removed
@@ -62,6 +65,70 @@ let win: BrowserWindow | null;
 let botWin: BrowserWindow | null;
 let tray: Tray | null;
 let isQuitting = false; // Track whether the app is in an explicit quit flow
+let directoryWatcher: DirectoryWatcher | null = null;
+let directoryWatcherImporterCount = 0;
+
+const sendToRendererWindows = (channel: string, payload: unknown): void => {
+  if (botWin && !botWin.isDestroyed()) {
+    botWin.webContents.send(channel, payload);
+  }
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(channel, payload);
+  }
+};
+
+const sendDirectoryWatcherImportRequest = (payload: DirectoryWatchImportRequest): void => {
+  const filePath = payload.filePath;
+  const fileName = path.basename(filePath);
+  let delivered = false;
+  if (botWin && !botWin.isDestroyed()) {
+    botWin.webContents.send("directory-watcher:import-request", payload);
+    delivered = true;
+  }
+  if (!delivered && win && !win.isDestroyed()) {
+    win.webContents.send("directory-watcher:import-request", payload);
+  }
+  if (!delivered && Notification.isSupported()) {
+    try {
+      const notification = new Notification({
+        title: i18n.t("directoryWatcher.notificationTitle", "New file detected"),
+        body: `${i18n.t("directoryWatcher.notificationBody", "A new file is ready to import")}: ${fileName}`,
+      });
+      notification.show();
+    } catch (error) {
+      logger.warn("Failed to show directory watcher notification", {
+        filePath,
+        error: String(error),
+      });
+    }
+  }
+};
+
+const broadcastDirectoryWatcherStatus = (payload: DirectoryWatchStatusMessage): void => {
+  sendToRendererWindows("directory-watcher:status", payload);
+};
+
+const ensureDirectoryWatcher = (): DirectoryWatcher => {
+  if (!directoryWatcher) {
+    directoryWatcher = new DirectoryWatcher({
+      emitImportRequest: sendDirectoryWatcherImportRequest,
+      emitStatus: broadcastDirectoryWatcherStatus,
+    });
+  }
+  return directoryWatcher;
+};
+
+const refreshDirectoryWatcher = (config?: AppConfig): void => {
+  const cfg = config ?? configManager.getConfig();
+  const watcher = ensureDirectoryWatcher();
+  watcher.updateConfig({
+    enabled: Boolean(cfg.enableDirectoryWatcher),
+    workDirectory: cfg.workDirectory,
+  });
+  if (directoryWatcherImporterCount > 0) {
+    watcher.notifyRendererAvailable();
+  }
+};
 
 interface ShowMainWindowOptions {
   route?: string;
@@ -403,6 +470,7 @@ function setupIpcHandlers() {
     ) {
       applyNativeThemePreference(nextConfig.theme);
     }
+    refreshDirectoryWatcher(nextConfig);
     // Reinitialize import service with potentially new base URL
   // importService = new ImportService(win ?? null, apiBaseUrl);
     return nextConfig;
@@ -435,6 +503,26 @@ function setupIpcHandlers() {
         err: String(error),
       });
     }
+  });
+
+  ipcMain.on("directory-watcher:status", (_event, payload: DirectoryWatchStatusMessage) => {
+    try {
+      ensureDirectoryWatcher().handleRendererStatus(payload);
+    } catch (error) {
+      logger.error("Failed to handle directory watcher status", {
+        error: String(error),
+      });
+    }
+  });
+
+  ipcMain.on("directory-watcher:register-importer", () => {
+    directoryWatcherImporterCount += 1;
+    ensureDirectoryWatcher().notifyRendererAvailable();
+  });
+
+  ipcMain.on("directory-watcher:unregister-importer", () => {
+    directoryWatcherImporterCount = Math.max(0, directoryWatcherImporterCount - 1);
+    ensureDirectoryWatcher().notifyRendererUnavailable();
   });
 
   // IPC handler for clearing all data and relaunching the app
@@ -899,6 +987,7 @@ app.on("before-quit", () => {
   isQuitting = true;
   void stopLocalExpressServer();
   void closeDB();
+  void directoryWatcher?.stop();
 });
 
 app.on("activate", () => {
@@ -933,6 +1022,7 @@ app.whenReady().then(async () => {
   createTray();
   // Start internal lightweight Express server
   await startLocalExpressServer();
+  refreshDirectoryWatcher(appConfig);
   logger.info('Application startup complete');
 });
 

@@ -207,6 +207,7 @@
       "autoTagEnabled": "Auto tagging",
       "tagSummaryMaxLength": "Tag summary max length",
       "autoClassify": "Auto classify without confirmation",
+  "enableDirectoryWatcher": "Monitor workspace directory",
       "useLocalService": "Use local service",
       "workDirectory": "Current workspace",
       "apiBaseUrl": "API base URL",
@@ -234,6 +235,7 @@
       "autoTagEnabled": "Automatically extract tags for files during import or processing.",
       "tagSummaryMaxLength": "Maximum characters used when generating tag summaries (affects auto-tagging).",
       "autoClassify": "Skip confirmation dialogs when saving files to recommended directories.",
+  "enableDirectoryWatcher": "Watch the workspace folder for new files and queue them for automatic import.",
       "useLocalService": "When enabled, use the local Python service (typically http://localhost:8000). When disabled, you can configure a remote API URL.",
       "workDirectory": "The workspace folder is defined during setup. Re-run the setup wizard to change it.",
       "apiBaseUrl": "Base URL of this program's web service.",
@@ -523,9 +525,11 @@
       "webImportFailed": "Failed to import webpage content",
       "invalidUrl": "Please provide a valid URL",
       "clipboardEmpty": "Clipboard does not contain a URL",
-      "webImportInProgress": "Webpage import already in progress"
-    }
-    ,
+      "webImportInProgress": "Webpage import already in progress",
+      "directoryWatcherTaskQueued": "Queued new file for import: {name}",
+      "directoryWatcherTaskFailed": "Automatic import failed for {name}",
+      "directoryWatcherImporterUnavailable": "Assistant unavailable. File queued for later import."
+    },
     "menu": {
       "importFile": "Import File",
       "openWorkdir": "Open Workdir",
@@ -536,6 +540,10 @@
       "search": "Search",
       "pasteUrl": "Paste URL"
     }
+  },
+  "directoryWatcher": {
+    "notificationTitle": "New file detected",
+    "notificationBody": "Automatic import queued"
   },
   "convert": {
     "pageTitle": "File Format Conversion",

@@ -206,6 +206,7 @@
       "autoTagEnabled": "自动打标签",
       "tagSummaryMaxLength": "标签摘要最大长度",
       "autoClassify": "自动分类无需确认",
+  "enableDirectoryWatcher": "启用目录监听",
       "useLocalService": "使用本地服务",
       "workDirectory": "当前工作空间",
       "apiBaseUrl": "API 基础地址",
@@ -233,6 +234,7 @@
       "autoTagEnabled": "在导入或处理文件时自动提取标签。",
       "tagSummaryMaxLength": "生成标签摘要时使用的最大字符数（影响自动打标签）。",
       "autoClassify": "保存文件到推荐目录时跳过确认步骤。",
+  "enableDirectoryWatcher": "监听工作目录中的新文件并自动加入导入队列。",
       "useLocalService": "启用后使用本地 Python 服务（通常为 http://localhost:8000），关闭后可配置远程 API 地址。",
       "workDirectory": "工作空间在初始化流程中设置，可通过重新运行向导进行修改。",
       "apiBaseUrl": "本程序web服务的基础地址",
@@ -504,31 +506,33 @@
   },
   "bot": {
     "messages": {
-      "importingToRag": "正在导入RAG库...",
-      "importedToRagSuccess": "文件已成功导入RAG库",
-      "saveSuccessRagFailed": "文件保存成功，但导入RAG库失败",
+      "importingToRag": "正在导入 RAG 库...",
+      "importedToRagSuccess": "文件已导入 RAG 库",
+      "saveSuccessRagFailed": "文件保存成功，但导入 RAG 库失败",
       "selectSaveDirectory": "请选择保存目录",
-      "fileSavedTo": "文件已保存到: {path}",
+      "fileSavedTo": "文件已保存到：{path}",
       "fileSaveFailed": "文件保存失败",
       "getDirectoryStructureFailed": "获取目录结构失败",
       "analyzingFile": "正在分析文件并推荐保存目录...",
       "getRecommendationFailed": "获取推荐目录失败",
-      "fileAutoSavedTo": "文件已自动保存到: {path}",
+      "fileAutoSavedTo": "文件已自动保存到：{path}",
       "fileImportFailed": "文件导入失败",
       "errorProcessingFiles": "处理文件时出错",
-      "workdirNotSet": "工作目录未设置",
+      "workdirNotSet": "尚未配置工作目录",
       "openWorkdirFailed": "打开工作目录失败",
       "openFolderNotSupported": "当前环境不支持打开目录",
-      "droppedFilePath": "文件路径: {path}",
+      "droppedFilePath": "文件路径：{path}",
       "filesDroppedCount": "已放置 {count} 个文件",
       "fetchingWebpage": "正在获取网页内容...",
       "webImportSuccess": "网页内容已导入",
       "webImportFailed": "网页内容导入失败",
       "invalidUrl": "请输入有效的网址",
       "clipboardEmpty": "剪贴板中没有可用的网址",
-      "webImportInProgress": "正在处理网页导入，请稍候"
-    }
-    ,
+      "webImportInProgress": "正在处理网页导入，请稍候",
+      "directoryWatcherTaskQueued": "已加入自动导入队列：{name}",
+      "directoryWatcherTaskFailed": "自动导入失败：{name}",
+      "directoryWatcherImporterUnavailable": "助手暂不可用，文件已加入稍后导入"
+    },
     "menu": {
       "importFile": "导入文件",
       "openWorkdir": "打开工作目录",
@@ -539,6 +543,10 @@
       "search": "搜索",
       "pasteUrl": "粘贴网址"
     }
+  },
+  "directoryWatcher": {
+    "notificationTitle": "检测到新文件",
+    "notificationBody": "已加入自动导入队列"
   },
   "convert": {
     "pageTitle": "文件格式转换",

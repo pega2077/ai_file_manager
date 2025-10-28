@@ -21,6 +21,7 @@ import {
   FileImportStep,
   FileImportStepState,
 } from "../shared/events/fileImportEvents";
+import type { DirectoryWatchStatusMessage } from "../../shared/directoryWatcher";
 
 type FileImportProps = {
   onImported?: () => void;
@@ -30,11 +31,15 @@ type ProcessFileResult = "complete" | "pending-user-action";
 
 type ImportMode = "new" | "retry";
 
+type TaskSource = "manual" | "directory-watcher" | "retry";
+
 type EnqueueTaskPayload = {
   path: string;
   mode: ImportMode;
   existingFileId?: string;
   displayName?: string;
+  taskIdOverride?: string;
+  source: TaskSource;
 };
 
 type QueuedImportTask = EnqueueTaskPayload & {
@@ -42,6 +47,11 @@ type QueuedImportTask = EnqueueTaskPayload & {
     resolve: () => void;
     reject: (error: unknown) => void;
   };
+};
+
+export type FileImportOptions = {
+  taskId?: string;
+  source?: "directory-watcher" | "manual";
 };
 
 const CONVERSION_ERROR_CODES = new Set([
@@ -65,7 +75,7 @@ const CONVERSION_KEYWORDS = [
 
 export type FileImportRef = {
   startImport: () => Promise<void> | void;
-  importFile: (filePath: string) => Promise<void>;
+  importFile: (filePath: string, options?: FileImportOptions) => Promise<void>;
   retryImport: (file: ImportedFileItem) => Promise<void>;
 };
 
@@ -152,9 +162,10 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
     const [directoryOptions, setDirectoryOptions] = useState<TreeNode[]>([]);
     const [directoryTreeData, setDirectoryTreeData] = useState<TreeNode[]>([]);
     const taskIdRef = useRef<string | null>(null);
-  const importQueueRef = useRef<QueuedImportTask[]>([]);
-  const currentImportRef = useRef<QueuedImportTask | null>(null);
-  const isProcessingRef = useRef(false);
+    const importQueueRef = useRef<QueuedImportTask[]>([]);
+    const currentImportRef = useRef<QueuedImportTask | null>(null);
+    const isProcessingRef = useRef(false);
+    const currentTaskMetaRef = useRef<{ source: TaskSource; taskId?: string; filePath?: string } | null>(null);
 
     const createTaskId = useCallback(
       () =>
@@ -164,9 +175,58 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       [],
     );
 
+    const emitDirectoryWatcherProgress = useCallback(
+      (step: string, state: FileImportStepState, message?: string) => {
+        const meta = currentTaskMetaRef.current;
+        if (!meta || meta.source !== "directory-watcher" || !meta.taskId) {
+          return;
+        }
+        try {
+          const payload: DirectoryWatchStatusMessage = {
+            status: "progress",
+            taskId: meta.taskId,
+            step,
+            state,
+            message,
+            filePath: meta.filePath,
+          };
+          window.electronAPI?.notifyDirectoryWatcherStatus?.(payload);
+        } catch (error) {
+          console.error("Failed to notify directory watcher progress:", error);
+        }
+      },
+      [],
+    );
+
+    const emitDirectoryWatcherIdle = useCallback(
+      (result: "success" | "error" | "cancelled", message?: string, errorMessage?: string) => {
+        const meta = currentTaskMetaRef.current;
+        if (!meta || meta.source !== "directory-watcher" || !meta.taskId) {
+          return;
+        }
+        try {
+          const payload: DirectoryWatchStatusMessage = {
+            status: "idle",
+            taskId: meta.taskId,
+            filePath: meta.filePath,
+            result,
+            message,
+            error: errorMessage,
+          };
+          window.electronAPI?.notifyDirectoryWatcherStatus?.(payload);
+        } catch (error) {
+          console.error("Failed to notify directory watcher idle status:", error);
+        } finally {
+          currentTaskMetaRef.current = null;
+        }
+      },
+      [],
+    );
+
     const notifyStart = useCallback(
-      (filePath: string) => {
-        const taskId = createTaskId();
+      (filePath: string, overrideTaskId?: string) => {
+        const providedId = typeof overrideTaskId === "string" ? overrideTaskId.trim() : "";
+        const taskId = providedId.length > 0 ? providedId : createTaskId();
         taskIdRef.current = taskId;
         const filename = filePath.split(/[/\\]/).pop();
         dispatchFileImportNotification({
@@ -175,8 +235,9 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           filePath,
           filename,
         });
+        emitDirectoryWatcherProgress("start", "start", filename ?? filePath);
       },
-      [createTaskId],
+      [createTaskId, emitDirectoryWatcherProgress],
     );
 
     const notifyProgress = useCallback(
@@ -194,8 +255,9 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           state,
           message,
         });
+        emitDirectoryWatcherProgress(String(step), state, message);
       },
-      [],
+      [emitDirectoryWatcherProgress],
     );
 
     const notifySuccess = useCallback(
@@ -207,9 +269,10 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           taskId,
           message,
         });
+        emitDirectoryWatcherIdle("success", message);
         taskIdRef.current = null;
       },
-      [],
+      [emitDirectoryWatcherIdle],
     );
 
     const notifyError = useCallback(
@@ -224,9 +287,12 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           error: errorMessage,
           message: fallbackMessage,
         });
+        const messageToShow = fallbackMessage ?? errorMessage;
+        emitDirectoryWatcherProgress("error", "error", messageToShow);
+        emitDirectoryWatcherIdle("error", messageToShow, errorMessage);
         taskIdRef.current = null;
       },
-      [],
+      [emitDirectoryWatcherIdle, emitDirectoryWatcherProgress],
     );
 
     const notifyCancelled = useCallback(
@@ -238,9 +304,10 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           taskId,
           message,
         });
+        emitDirectoryWatcherIdle("cancelled", message);
         taskIdRef.current = null;
       },
-      [],
+      [emitDirectoryWatcherIdle],
     );
 
     useEffect(() => {
@@ -592,7 +659,17 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           return "complete";
         }
 
-        notifyStart(normalizedPath);
+        if (currentTaskMetaRef.current) {
+          currentTaskMetaRef.current.filePath = normalizedPath;
+        } else {
+          currentTaskMetaRef.current = {
+            source: task.source,
+            taskId: task.taskIdOverride,
+            filePath: normalizedPath,
+          };
+        }
+
+        notifyStart(normalizedPath, task.taskIdOverride);
 
         let cfg: import("../shared/types").AppConfig | undefined;
         let latestWorkDir = workDirectory;
@@ -976,25 +1053,39 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       }
       currentImportRef.current = nextTask;
       isProcessingRef.current = true;
+      currentTaskMetaRef.current = {
+        source: nextTask.source,
+        taskId: nextTask.taskIdOverride,
+        filePath: nextTask.path,
+      };
       try {
         const status = await processFile(nextTask);
         if (status === "complete") {
           nextTask.deferred.resolve();
           currentImportRef.current = null;
           isProcessingRef.current = false;
+          if (nextTask.source !== "directory-watcher") {
+            currentTaskMetaRef.current = null;
+          }
           void runNextImport();
         }
       } catch (error) {
         nextTask.deferred.reject(error);
         currentImportRef.current = null;
         isProcessingRef.current = false;
+        emitDirectoryWatcherIdle(
+          "error",
+          t("files.messages.fileImportFailed"),
+          error instanceof Error ? error.message : String(error ?? "unknown error"),
+        );
+        currentTaskMetaRef.current = null;
         window.electronAPI?.logError?.("processFile queue failed", {
           err: String(error),
           path: nextTask.path,
         });
         void runNextImport();
       }
-    }, [processFile]);
+    }, [emitDirectoryWatcherIdle, processFile, t]);
 
     const resolveCurrentImport = useCallback(() => {
       const currentTask = currentImportRef.current;
@@ -1004,6 +1095,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       currentTask.deferred.resolve();
       currentImportRef.current = null;
       isProcessingRef.current = false;
+      currentTaskMetaRef.current = null;
       void runNextImport();
     }, [runNextImport]);
 
@@ -1015,9 +1107,15 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             resolve();
             return;
           }
+          const trimmedTaskId =
+            typeof task.taskIdOverride === "string"
+              ? task.taskIdOverride.trim()
+              : undefined;
           importQueueRef.current.push({
             ...task,
             path: normalizedPath,
+            taskIdOverride:
+              trimmedTaskId && trimmedTaskId.length > 0 ? trimmedTaskId : undefined,
             deferred: { resolve, reject },
           });
           void runNextImport();
@@ -1052,7 +1150,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         }
 
         normalizedPaths.forEach((path) => {
-          void enqueueTask({ path, mode: "new" });
+          void enqueueTask({ path, mode: "new", source: "manual" });
         });
       } catch (error) {
         message.error(t("files.messages.fileImportFailed"));
@@ -1081,6 +1179,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           mode: "retry",
           existingFileId: fileId,
           displayName: file.name,
+          source: "retry",
         }).catch((error) => {
           message.error(
             t("files.messages.retryImportFailed", {
@@ -1098,7 +1197,13 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       ref,
       () => ({
         startImport: handleStartImport,
-        importFile: (filePath: string) => enqueueTask({ path: filePath, mode: "new" }),
+        importFile: (filePath: string, options?: FileImportOptions) =>
+          enqueueTask({
+            path: filePath,
+            mode: "new",
+            source: options?.source === "directory-watcher" ? "directory-watcher" : "manual",
+            taskIdOverride: options?.taskId,
+          }),
         retryImport,
       }),
       [handleStartImport, enqueueTask, retryImport]

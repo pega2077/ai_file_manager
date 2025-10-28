@@ -10,6 +10,7 @@ import {
   subscribeFileImportNotifications,
 } from "../shared/events/fileImportEvents";
 import { apiService } from "../services/api";
+import type { DirectoryWatchImportRequest } from "../../shared/directoryWatcher";
 
 const isValidHttpUrl = (value: string): boolean => {
   try {
@@ -307,6 +308,69 @@ const Bot: React.FC = () => {
     }
   };
 
+  const handleDirectoryWatcherTask = useCallback(
+    (payload: DirectoryWatchImportRequest) => {
+      if (!payload || typeof payload.filePath !== "string") {
+        return;
+      }
+      const taskId = payload.taskId;
+      const filePath = payload.filePath.trim();
+      if (!filePath) {
+        return;
+      }
+
+      try {
+        window.electronAPI?.notifyDirectoryWatcherStatus?.({
+          status: "accepted",
+          taskId,
+          filePath,
+        });
+      } catch (error) {
+        console.error("Failed to acknowledge directory watcher task:", error);
+      }
+
+      const fileName = filePath.split(/[/\\]/).pop() ?? filePath;
+      if (document.hidden) {
+        message.info(
+          t("bot.messages.directoryWatcherTaskQueued", { name: fileName })
+        );
+      }
+      setStatusMessage(t("bot.messages.directoryWatcherTaskQueued", { name: fileName }));
+
+      const importer = importRef.current;
+      if (!importer || typeof importer.importFile !== "function") {
+        window.electronAPI?.notifyDirectoryWatcherStatus?.({
+          status: "busy",
+          taskId,
+          filePath,
+        });
+        message.warning(t("bot.messages.directoryWatcherImporterUnavailable"));
+        return;
+      }
+
+      const runImport = async () => {
+        try {
+          await importer.importFile(filePath, {
+            taskId,
+            source: "directory-watcher",
+          });
+        } catch (error) {
+          const errMsg = error instanceof Error ? error.message : String(error ?? "unknown error");
+          window.electronAPI?.notifyDirectoryWatcherStatus?.({
+            status: "error",
+            taskId,
+            filePath,
+            error: errMsg,
+          });
+          message.error(t("bot.messages.directoryWatcherTaskFailed", { name: fileName }));
+        }
+      };
+
+      void runImport();
+    },
+    [t]
+  );
+
   useEffect(() => {
     const unsubscribe = subscribeFileImportNotifications(
       (detail: FileImportNotification) => {
@@ -412,6 +476,27 @@ const Bot: React.FC = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [menuVisible]);
+
+  useEffect(() => {
+    try {
+      window.electronAPI?.registerDirectoryWatcherImporter?.();
+    } catch (error) {
+      console.error("Failed to register directory watcher importer:", error);
+    }
+
+    const unsubscribe = window.electronAPI?.onDirectoryWatcherImportRequest?.(
+      handleDirectoryWatcherTask
+    );
+
+    return () => {
+      unsubscribe?.();
+      try {
+        window.electronAPI?.unregisterDirectoryWatcherImporter?.();
+      } catch (error) {
+        console.error("Failed to unregister directory watcher importer:", error);
+      }
+    };
+  }, [handleDirectoryWatcherTask]);
 
   return (
     <div

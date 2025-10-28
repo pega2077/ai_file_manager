@@ -29,6 +29,14 @@ declare global {
       onFileImportNotification: (
         callback: (payload: import('./shared/events/fileImportEvents').FileImportNotification) => void,
       ) => () => void
+      registerDirectoryWatcherImporter: () => void
+      unregisterDirectoryWatcherImporter: () => void
+      notifyDirectoryWatcherStatus: (
+        payload: import('../shared/directoryWatcher').DirectoryWatchStatusMessage,
+      ) => void
+      onDirectoryWatcherImportRequest: (
+        callback: (payload: import('../shared/directoryWatcher').DirectoryWatchImportRequest) => void,
+      ) => () => void
     }
     webUtils: typeof import('electron').webUtils
   }

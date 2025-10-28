@@ -1752,46 +1752,58 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
     let destFileName = preferredName;
     let destPath = path.join(absTargetDir, destFileName);
     let overwritten = false;
-
-    const exists = await fsp
-      .access(destPath, fs.constants.F_OK)
-      .then(() => true)
-      .catch(() => false);
-
-    if (exists) {
-      if (overwrite) {
-        overwritten = true;
-      } else {
-        const ext = path.extname(destFileName);
-        const nameOnly = path.basename(destFileName, ext);
-        const now = new Date();
-        const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
-        destFileName = `${nameOnly}_${ts}${ext}`;
-        destPath = path.join(absTargetDir, destFileName);
-      }
-    }
-
-    await fsp.copyFile(sourcePath, destPath);
-
     let destStat: fs.Stats | null = null;
-    try {
-      destStat = await fsp.stat(destPath);
-    } catch (e) {
-      logger.error("Stat on saved file failed", e as unknown);
-      try {
-        await fsp.unlink(destPath);
-      } catch {
-        // ignore cleanup failure
+
+    const normalizedSourcePath = path.normalize(sourcePath);
+    let normalizedDestPath = path.normalize(destPath);
+    const sameLocation = normalizedSourcePath === normalizedDestPath;
+
+    if (!sameLocation) {
+      const exists = await fsp
+        .access(destPath, fs.constants.F_OK)
+        .then(() => true)
+        .catch(() => false);
+
+      if (exists) {
+        if (overwrite) {
+          overwritten = true;
+        } else {
+          const ext = path.extname(destFileName);
+          const nameOnly = path.basename(destFileName, ext);
+          const now = new Date();
+          const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+          destFileName = `${nameOnly}_${ts}${ext}`;
+          destPath = path.join(absTargetDir, destFileName);
+          normalizedDestPath = path.normalize(destPath);
+        }
       }
-      res.status(500).json({
-        success: false,
-        message: "internal_error",
-        data: null,
-        error: { code: "SAVE_FILE_ERROR", message: "Saved file but failed to validate", details: null },
-        timestamp: new Date().toISOString(),
-        request_id: "",
-      });
-      return;
+
+      await fsp.copyFile(sourcePath, destPath);
+
+      try {
+        destStat = await fsp.stat(destPath);
+      } catch (e) {
+        logger.error("Stat on saved file failed", e as unknown);
+        try {
+          await fsp.unlink(destPath);
+        } catch {
+          // ignore cleanup failure
+        }
+        res.status(500).json({
+          success: false,
+          message: "internal_error",
+          data: null,
+          error: { code: "SAVE_FILE_ERROR", message: "Saved file but failed to validate", details: null },
+          timestamp: new Date().toISOString(),
+          request_id: "",
+        });
+        return;
+      }
+    } else {
+      destPath = normalizedSourcePath;
+      destFileName = path.basename(destPath);
+      destStat = srcStat;
+      overwritten = true;
     }
 
     const finalExt = path.extname(destFileName).replace(/^\./, "").toLowerCase();

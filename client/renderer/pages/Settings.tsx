@@ -49,6 +49,7 @@ interface SettingsState {
   autoTagEnabled: boolean;
   tagSummaryMaxLength: number;
   autoClassifyWithoutConfirmation: boolean;
+  enableDirectoryWatcher: boolean;
   workDirectory: string;
   useLocalService: boolean;
   llmProvider: LlmProvider;
@@ -65,6 +66,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   autoTagEnabled: false,
   tagSummaryMaxLength: 1000,
   autoClassifyWithoutConfirmation: false,
+  enableDirectoryWatcher: false,
   workDirectory: "",
   useLocalService: true,
   llmProvider: "ollama",
@@ -241,6 +243,10 @@ const Settings = () => {
             autoClassifyWithoutConfirmation: Boolean(
               appConfig.autoClassifyWithoutConfirmation ??
                 DEFAULT_SETTINGS.autoClassifyWithoutConfirmation
+            ),
+            enableDirectoryWatcher: Boolean(
+              appConfig.enableDirectoryWatcher ??
+                DEFAULT_SETTINGS.enableDirectoryWatcher
             ),
             workDirectory: String(
               appConfig.workDirectory ?? DEFAULT_SETTINGS.workDirectory
@@ -597,6 +603,7 @@ const Settings = () => {
         tagSummaryMaxLength: settings.tagSummaryMaxLength,
         autoClassifyWithoutConfirmation:
           settings.autoClassifyWithoutConfirmation,
+        enableDirectoryWatcher: settings.enableDirectoryWatcher,
         useLocalService: settings.useLocalService,
       });
       message.success(t("settings.messages.saveSuccess"));
@@ -851,6 +858,22 @@ const Settings = () => {
                 />
                 <Text type="secondary" style={{ marginLeft: 8 }}>
                   {t("settings.descriptions.autoClassify")}
+                </Text>
+              </div>
+
+              <div>
+                <Text strong>{t("settings.labels.enableDirectoryWatcher")}</Text>
+                <Switch
+                  checkedChildren={t("settings.common.enabled")}
+                  unCheckedChildren={t("settings.common.disabled")}
+                  checked={settings.enableDirectoryWatcher}
+                  onChange={(checked) =>
+                    handleSettingChange("enableDirectoryWatcher", checked)
+                  }
+                  style={{ marginLeft: 16 }}
+                />
+                <Text type="secondary" style={{ marginLeft: 8 }}>
+                  {t("settings.descriptions.enableDirectoryWatcher")}
                 </Text>
               </div>
             </div>

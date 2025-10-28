@@ -32,6 +32,7 @@ export interface Settings {
   autoSaveRAG: boolean;
   autoTagEnabled?: boolean;
   tagSummaryMaxLength?: number;
+  enableDirectoryWatcher?: boolean;
   workDirectory: string;
 }
 
@@ -206,6 +207,7 @@ export interface AppConfig {
   autoTagEnabled?: boolean;
   tagSummaryMaxLength?: number;
   autoClassifyWithoutConfirmation?: boolean;
+  enableDirectoryWatcher?: boolean;
   workDirectory?: string;
   isInitialized?: boolean;
   apiBaseUrl?: string;
