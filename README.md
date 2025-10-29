@@ -1,6 +1,6 @@
 # AiFileManager
 
-A desktop document organization and intelligent search program based on RAG (Retrieval-Augmented Generation) technology.
+A smart file manager powered by AI. It automatically classifies your imported files into the most suitable folders and tags them intelligently based on their content, making future search and retrieval easy. You can also import files into a local knowledge base and use large language models for intelligent Q&A.
 
 ## Features
 
