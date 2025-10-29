@@ -4,6 +4,11 @@ A smart file manager powered by AI. It automatically classifies your imported fi
 
 ## Features
 
+ ![Features1](intro/page.001.jpeg)
+ ![Features2](intro/page.002.jpeg)
+ ![Features3](intro/page.003.jpeg)
+ ![Features4](intro/page.004.jpeg)
+
 - 📁 **Document Import and Management** - Supports multiple document formats, automatically converts to Markdown format
 - 🏷️ **Intelligent Classification** - Automatically classifies and tags documents
 - 🔍 **Semantic Search** - Intelligent document retrieval based on vector database
