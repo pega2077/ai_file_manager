@@ -1,12 +1,11 @@
-// OpenRouter utility wrapper (OpenAI-compatible for chat; external endpoint for embeddings)
+// OpenRouter utility wrapper (OpenAI-compatible for chat and embeddings)
 // Configuration:
 // - Set `openrouter.openrouterApiKey` and optional `openrouter.openrouterEndpoint` in config.json,
 //   or provide env `OPENROUTER_API_KEY`.
-// - Default chat base endpoint: https://openrouter.ai/api/v1
-// - Embeddings use a separate endpoint with Ollama-compatible format: see `openrouter.openrouterEmbedEndpoint`.
+// - Default base endpoint: https://openrouter.ai/api/v1
+// - Embeddings default to the OpenRouter /embeddings API with model qwen/qwen3-embedding-0.6b.
 import { configManager } from "../../configManager";
 import { logger } from "../../logger";
-import { httpPostJson } from "./httpClient";
 import type {
   ChatCompletionMessageParam,
   ChatCompletionContentPart,
@@ -151,23 +150,34 @@ interface OpenRouterChatCompletionResponseChoice {
   };
 }
 
+interface OpenRouterErrorPayload {
+  message?: string;
+  code?: number | string;
+  metadata?: Record<string, unknown>;
+}
+
 interface OpenRouterChatCompletionResponse {
   choices?: OpenRouterChatCompletionResponseChoice[];
-  error?: {
-    message?: string;
-  };
+  error?: OpenRouterErrorPayload;
 }
 
 async function postOpenRouterJson<T>(
   path: string,
   body: unknown,
-  overrideTimeoutMs?: number
+  options?: {
+    timeoutMs?: number;
+    apiKeyOverride?: string;
+    headers?: Record<string, string>;
+  }
 ): Promise<T> {
   const { apiKey, baseUrl, timeoutMs, headers } = resolveOpenRouterConfig();
   const url = path.startsWith("http") ? path : `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
   const controller = new AbortController();
-  const effectiveTimeout = typeof overrideTimeoutMs === "number" && overrideTimeoutMs > 0
-    ? overrideTimeoutMs
+  const effectiveApiKey = options?.apiKeyOverride && options.apiKeyOverride.trim()
+    ? options.apiKeyOverride.trim()
+    : apiKey;
+  const effectiveTimeout = typeof options?.timeoutMs === "number" && options.timeoutMs > 0
+    ? options.timeoutMs
     : timeoutMs;
   const timer = setTimeout(() => controller.abort(), effectiveTimeout);
 
@@ -176,8 +186,9 @@ async function postOpenRouterJson<T>(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${effectiveApiKey}`,
         ...headers,
+        ...(options?.headers ?? {}),
       },
       body: JSON.stringify(body),
       signal: controller.signal,
@@ -186,15 +197,23 @@ async function postOpenRouterJson<T>(
     const rawText = await response.text();
     if (!response.ok) {
       let errorMessage = `OpenRouter request failed with status ${response.status}`;
+      let parsed: { error?: OpenRouterErrorPayload } | undefined;
       try {
-        const parsed = rawText ? JSON.parse(rawText) as { error?: { message?: string } } : undefined;
+        parsed = rawText ? JSON.parse(rawText) as { error?: OpenRouterErrorPayload } : undefined;
         if (parsed?.error?.message) {
           errorMessage = parsed.error.message;
         }
       } catch {
         // Ignore JSON parse errors for error payload
       }
-      logger.error("OpenRouter request failed", { url, status: response.status, message: errorMessage });
+      logger.error("OpenRouter request failed", {
+        url,
+        status: response.status,
+        message: errorMessage,
+        providerErrorCode: parsed?.error?.code,
+        providerMetadata: parsed?.error?.metadata,
+        rawResponse: rawText,
+      });
       throw new Error(errorMessage);
     }
 
@@ -224,35 +243,56 @@ async function postOpenRouterJson<T>(
   }
 }
 
-// Embedding request/response types aligned with Ollama /api/embed
-export interface OpenRouterEmbedRequest { input: string | string[]; model?: string }
-export interface OpenRouterEmbedResponse { model?: string; embeddings: number[][] }
+// Embedding request/response types aligned with OpenRouter /embeddings endpoint
+export interface OpenRouterEmbedRequest { input: string | string[]; model: string }
+interface OpenRouterEmbedResponseData { embedding: number[] }
+interface OpenRouterEmbedResponse { data?: OpenRouterEmbedResponseData[]; model?: string; error?: OpenRouterErrorPayload }
 
 export async function embedWithOpenRouter(inputs: string[] | string, overrideModel?: string): Promise<number[][]> {
   const arr = Array.isArray(inputs) ? inputs : [inputs];
   if (arr.length === 0) return [];
   const cfg = configManager.getConfig();
   const oc = cfg.openrouter || {};
-  const endpoint = (oc.openrouterEmbedEndpoint || "https://embed.pegamob.com").replace(/\/$/, "");
-  const url = `${endpoint}/api/embed`;
-  const model = overrideModel || oc.openrouterEmbedModel || "all-MiniLM-L6-v2";
-  const payload: OpenRouterEmbedRequest = { model, input: Array.isArray(inputs) ? inputs : inputs };
-  const token = (oc.openrouterEmbedKey || "").trim() || undefined;
-  const resp = await httpPostJson<OpenRouterEmbedResponse>(
-    url,
-    payload,
-    { Accept: "application/json" },
-    60000,
-    token
-  );
-  if (!resp.ok || !resp.data) {
-    const msg = resp.error?.message || `Failed embedding via OpenRouter embed endpoint: HTTP ${resp.status}`;
-    logger.error("embedWithOpenRouter failed", msg);
-    throw new Error(msg);
+  const model = overrideModel || oc.openrouterEmbedModel || "qwen/qwen3-embedding-0.6b";
+  const timeoutCandidate = [oc.openrouterTimeoutMs, oc.requestTimeoutMs, oc.timeoutMs]
+    .map((value) => {
+      if (typeof value === "string") {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      }
+      return value;
+    })
+    .find((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0);
+  const payload: OpenRouterEmbedRequest = {
+    model,
+    input: arr.length === 1 ? arr[0] : arr,
+  };
+  const response = await postOpenRouterJson<OpenRouterEmbedResponse>("/embeddings", payload, {
+    timeoutMs: timeoutCandidate,
+  });
+  if (response?.error) {
+    logger.error("OpenRouter embedding error", {
+      message: response.error.message,
+      code: response.error.code,
+      metadata: response.error.metadata,
+    });
+    throw new Error(response.error.message || "OpenRouter embeddings request failed");
   }
-  const embeddings = resp.data.embeddings;
-  if (!embeddings || !Array.isArray(embeddings)) {
-    throw new Error("Invalid embedding response from OpenRouter embed endpoint");
+  if (!response?.data || !Array.isArray(response.data) || response.data.length === 0) {
+    throw new Error("OpenRouter embeddings response is empty");
+  }
+  const embeddings = response.data.map((entry) => {
+    if (!entry || !Array.isArray(entry.embedding)) {
+      throw new Error("Invalid embedding entry returned from OpenRouter");
+    }
+    return entry.embedding;
+  });
+  if (embeddings.length !== arr.length) {
+    logger.warn("Embedding count mismatch", {
+      requested: arr.length,
+      received: embeddings.length,
+      model,
+    });
   }
   return embeddings;
 }
@@ -281,8 +321,17 @@ export async function generateStructuredJsonWithOpenRouter(
         ? { type: "json_schema", json_schema: { name: "schema", schema: normalizedSchema, strict: true } }
         : { type: "json_object" },
     };
+    logger.info("OpenRouter payload:", payload);
     const resp = await postOpenRouterJson<OpenRouterChatCompletionResponse>("/chat/completions", payload);
-
+    logger.info("OpenRouter response:", resp);
+    if (resp.error) {
+      logger.error("OpenRouter provider error", {
+        message: resp.error.message,
+        code: resp.error.code,
+        metadata: resp.error.metadata,
+      });
+      throw new Error(resp.error.message || "OpenRouter provider returned error");
+    }
     const choice = resp.choices?.[0]?.message;
     const content = choice?.content;
     const text = Array.isArray(content)
@@ -331,6 +380,14 @@ export async function describeImageWithOpenRouter(
     };
 
     const resp = await postOpenRouterJson<OpenRouterChatCompletionResponse>("/chat/completions", payload);
+    if (resp.error) {
+      logger.error("OpenRouter provider error", {
+        message: resp.error.message,
+        code: resp.error.code,
+        metadata: resp.error.metadata,
+      });
+      throw new Error(resp.error.message || "OpenRouter provider returned error");
+    }
     const message = resp.choices?.[0]?.message;
     const contentValue = message?.content;
     if (Array.isArray(contentValue)) {

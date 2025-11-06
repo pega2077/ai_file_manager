@@ -158,8 +158,6 @@ export interface OpenRouterConfig {
   openrouterApiKey?: string;
   openrouterModel?: string;
   openrouterEmbedModel?: string;
-  openrouterEmbedEndpoint?: string;
-  openrouterEmbedKey?: string;
   openrouterVisionModel?: string;
 }
 

@@ -6,7 +6,8 @@ import type {
 } from "openai/resources/chat/completions";
 import { httpPostJson } from "./httpClient";
 import { normalizeJsonSchema } from "./openrouter";
-import type { OpenRouterEmbedResponse } from "./openrouter";
+
+interface PegaOpenRouterEmbedResponse { embeddings: number[][] }
 
 interface PegaOpenRouterResolvedConfig {
   baseUrl: string;
@@ -55,19 +56,14 @@ function resolvePegaOpenRouterConfig(): PegaOpenRouterResolvedConfig {
   const embedEndpointRaw = (
     section.pegaOpenrouterEmbedEndpoint ||
     cfg.pega?.pegaOpenrouterEmbedEndpoint ||
-    cfg.pega?.openrouterEmbedEndpoint ||
-    cfg.openrouter?.openrouterEmbedEndpoint ||
     DEFAULT_EMBED_ENDPOINT
   ) as string;
   const embedEndpoint = embedEndpointRaw.trim().replace(/\/+$/, "") || DEFAULT_EMBED_ENDPOINT;
 
   const embedKey = (
     section.pegaOpenrouterEmbedKey ||
-    section.openrouterEmbedKey ||
     cfg.pegaOpenrouterEmbedKey ||
     cfg.pega?.pegaOpenrouterEmbedKey ||
-    cfg.pega?.openrouterEmbedKey ||
-    cfg.openrouter?.openrouterEmbedKey ||
     ""
   ).trim();
 
@@ -205,7 +201,7 @@ export async function embedWithPegaOpenRouter(
   }
   try {
     const url = `${endpoint}/api/embed`;
-    const response = await httpPostJson<OpenRouterEmbedResponse>(
+  const response = await httpPostJson<PegaOpenRouterEmbedResponse>(
       url,
       { model, input: payload },
       { Accept: "application/json", ...resolved.headers },

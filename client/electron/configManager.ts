@@ -27,8 +27,6 @@ export interface AppConfig {
     pegaOpenrouterEmbedEndpoint?: string;
     pegaOpenrouterEmbedKey?: string;
     openrouterEmbedModel?: string;
-    openrouterEmbedEndpoint?: string;
-    openrouterEmbedKey?: string;
     pegaApiKey?: string;
     pegaAuthToken?: string;
     pegaMode?: "ollama" | "openrouter";
@@ -70,10 +68,6 @@ export interface AppConfig {
     openrouterModel?: string;
     /** Default embedding model name for external embed endpoint */
     openrouterEmbedModel?: string;
-    /** Embedding service endpoint (Ollama-compatible /api/embed) */
-    openrouterEmbedEndpoint?: string;
-    /** Embedding service API key (if required by gateway) */
-    openrouterEmbedKey?: string;
     /** Default vision-capable model for OpenRouter */
     openrouterVisionModel?: string;
     /** Optional request timeout override in milliseconds */
@@ -184,8 +178,6 @@ const DEFAULT_CONFIG: AppConfig = {
     pegaOpenrouterEmbedEndpoint: "https://embed.pegamob.com",
     pegaOpenrouterEmbedKey: undefined,
     openrouterEmbedModel: "all-MiniLM-L6-v2",
-    openrouterEmbedEndpoint: "https://embed.pegamob.com",
-    openrouterEmbedKey: undefined,
     pegaApiKey: undefined,
     pegaAuthToken: undefined,
     pegaMode: "openrouter",
@@ -202,9 +194,7 @@ const DEFAULT_CONFIG: AppConfig = {
     openrouterEndpoint: "https://openrouter.ai/api/v1",
     openrouterApiKey: undefined,
     openrouterModel: "openai/gpt-oss-20b:free",
-    openrouterEmbedModel: "all-MiniLM-L6-v2",
-    openrouterEmbedEndpoint: "https://embed.pegamob.com",
-    openrouterEmbedKey: undefined,
+    openrouterEmbedModel: "qwen/qwen3-embedding-0.6b",
     openrouterVisionModel: "google/gemma-3-12b-it:free",
   },
   bailian: {

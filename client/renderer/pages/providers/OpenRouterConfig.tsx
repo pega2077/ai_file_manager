@@ -8,10 +8,8 @@ const OPENROUTER_DEFAULTS = {
   openrouterEndpoint: 'https://openrouter.ai/api/v1',
   openrouterModel: 'openai/gpt-oss-20b:free',
   openrouterEmbedModel: 'all-MiniLM-L6-v2',
-  openrouterEmbedEndpoint: 'https://embed.pegamob.com',
   openrouterVisionModel: 'google/gemma-3-12b-it:free',
   openrouterApiKey: undefined,
-  openrouterEmbedKey: undefined,
 };
 
 const OPENROUTER_FIELDS: FieldDefinition[] = [
@@ -37,18 +35,6 @@ const OPENROUTER_FIELDS: FieldDefinition[] = [
     labelKey: 'providerConfig.openrouter.fields.embedModel.label',
     placeholderKey: 'providerConfig.openrouter.fields.embedModel.placeholder',
     extraKey: 'providerConfig.openrouter.fields.embedModel.extra',
-  },
-  {
-    name: 'openrouterEmbedEndpoint',
-    labelKey: 'providerConfig.openrouter.fields.embedEndpoint.label',
-    placeholderKey: 'providerConfig.openrouter.fields.embedEndpoint.placeholder',
-    extraKey: 'providerConfig.openrouter.fields.embedEndpoint.extra',
-  },
-  {
-    name: 'openrouterEmbedKey',
-    labelKey: 'providerConfig.openrouter.fields.embedKey.label',
-    placeholderKey: 'providerConfig.openrouter.fields.embedKey.placeholder',
-    inputType: 'password',
   },
   {
     name: 'openrouterVisionModel',
