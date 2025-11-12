@@ -638,7 +638,11 @@
       "modalTitle": "Edit File",
       "nameLabel": "Name",
       "categoryLabel": "Category",
-      "tagsLabel": "Tags"
+      "tagsLabel": "Tags",
+      "suggestNameButton": "Check name",
+      "assessmentConfidence": "Confidence: {confidence}%",
+      "assessmentRenamed": "Renamed to: {name}",
+      "assessmentNotes": "Notes: {notes}"
     },
     "delete": {
       "confirmTitle": "Delete \"{name}\"?",
@@ -731,7 +735,16 @@
       "generateTagsFailed": "Failed to generate tags for \"{name}\".",
       "generateTagsNoContent": "Cannot generate tags because no analyzable content is available.",
       "generateTagsAlreadyExists": "\"{name}\" already has tags. Enable overwrite to regenerate them.",
-      "generateTagsNoChange": "Tags for \"{name}\" remain unchanged."
+      "generateTagsNoChange": "Tags for \"{name}\" remain unchanged.",
+      "fileNameAssessmentChecking": "Checking file name...",
+      "fileNameAssessmentPositive": "Current file name already looks good.",
+      "fileNameAssessmentPositiveWithConfidence": "Current file name already looks good (confidence {confidence}%).",
+      "fileNameAssessmentNoContent": "Unable to access file content for evaluation.",
+      "fileNameAssessmentNoSuggestion": "No better file name suggestions were returned.",
+      "fileNameAssessmentSuggestionInvalid": "Suggested file name is invalid.",
+      "fileNameAssessmentSuggestionSame": "Suggested file name matches the current name.",
+      "fileNameAssessmentRenamed": "File renamed to {name}.",
+      "fileNameAssessmentFailed": "Failed to validate file name."
     },
     "createFolder": {
       "modalTitle": "Create Folder",

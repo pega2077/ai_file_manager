@@ -641,7 +641,11 @@
       "modalTitle": "编辑文件",
       "nameLabel": "名称",
       "categoryLabel": "分类",
-      "tagsLabel": "标签"
+      "tagsLabel": "标签",
+      "suggestNameButton": "检查名称",
+      "assessmentConfidence": "置信度：{confidence}%",
+      "assessmentRenamed": "已重命名为：{name}",
+      "assessmentNotes": "提示：{notes}"
     },
     "delete": {
       "confirmTitle": "删除“{name}”？",
@@ -737,7 +741,16 @@
       "generateTagsFailed": "生成文件“{name}”的标签失败",
       "generateTagsNoContent": "无法生成标签：缺少可分析的内容",
       "generateTagsAlreadyExists": "文件“{name}”已有标签，如需重新生成请允许覆盖",
-      "generateTagsNoChange": "文件“{name}”的标签保持不变"
+      "generateTagsNoChange": "文件“{name}”的标签保持不变",
+      "fileNameAssessmentChecking": "正在检查文件名...",
+      "fileNameAssessmentPositive": "当前文件名已较为合适。",
+      "fileNameAssessmentPositiveWithConfidence": "当前文件名已较为合适（置信度 {confidence}%）。",
+      "fileNameAssessmentNoContent": "无法获取文件内容，无法评估。",
+      "fileNameAssessmentNoSuggestion": "未获取到更好的文件名建议。",
+      "fileNameAssessmentSuggestionInvalid": "建议的文件名无效。",
+      "fileNameAssessmentSuggestionSame": "建议的文件名与当前名称相同。",
+      "fileNameAssessmentRenamed": "文件已重命名为 {name}。",
+      "fileNameAssessmentFailed": "文件名校验失败。"
     },
     "createFolder": {
       "modalTitle": "创建文件夹",

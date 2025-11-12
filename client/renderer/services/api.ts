@@ -42,6 +42,8 @@ interface ApiResponse<T = unknown> {
   request_id: string;
 }
 
+const MAX_FILE_NAME_ASSESSMENT_LENGTH = 6000;
+
 export interface ApiError extends Error {
   status: number;
   code?: string;
@@ -95,6 +97,25 @@ interface UpdateFileTagsResponse {
   model_used: string | null;
   language: string;
   source: string;
+}
+
+export interface FileNameAssessmentMetadata {
+  model_used?: string;
+  truncated_input?: boolean;
+  analyzed_content_length?: number;
+  response_time_ms?: number;
+  temperature?: number;
+  max_tokens?: number;
+}
+
+export interface FileNameAssessmentResult {
+  file_name: string;
+  is_reasonable: boolean;
+  confidence: number;
+  reasoning: string;
+  suggested_names: string[];
+  quality_notes: string[];
+  metadata?: FileNameAssessmentMetadata | null;
 }
 
 export interface DirectoryListItem {
@@ -858,6 +879,54 @@ class ApiService {
         available_directories: availableDirectories,
         ...(content && content.trim() ? { content } : {}),
       }),
+    });
+  }
+
+  async validateFileName(payload: {
+    fileName: string;
+    fileContent: string;
+    language?: string;
+    providerOverride?: ProviderName;
+    temperature?: number;
+    maxTokens?: number;
+  }): Promise<ApiResponse<FileNameAssessmentResult>> {
+    const trimmedName = (payload.fileName ?? '').trim();
+    const normalizedContent = (payload.fileContent ?? '').slice(0, MAX_FILE_NAME_ASSESSMENT_LENGTH);
+
+    if (!trimmedName || !normalizedContent.trim()) {
+      return Promise.reject(
+        Object.assign(new Error('fileName and fileContent are required'), {
+          code: 'INVALID_INPUT',
+        })
+      );
+    }
+
+    const provider = payload.providerOverride ?? (await this.ensureProvider());
+    const body: Record<string, unknown> = {
+      file_name: trimmedName,
+      file_content: normalizedContent,
+    };
+
+    if (provider) {
+      body.provider = provider;
+    }
+
+    if (typeof payload.language === 'string' && payload.language.trim().length > 0) {
+      body.language = payload.language.trim();
+    }
+
+    if (typeof payload.temperature === 'number' && Number.isFinite(payload.temperature)) {
+      body.temperature = Math.max(0, Math.min(1.5, payload.temperature));
+    }
+
+    if (typeof payload.maxTokens === 'number' && Number.isFinite(payload.maxTokens)) {
+      const bounded = Math.max(64, Math.min(800, Math.floor(payload.maxTokens)));
+      body.max_tokens = bounded;
+    }
+
+    return this.request<FileNameAssessmentResult>('/chat/validate-file-name', {
+      method: 'POST',
+      body: JSON.stringify(body),
     });
   }
 

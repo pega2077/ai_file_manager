@@ -81,6 +81,49 @@ export function buildRecommendDirectoryMessages(params: {
   ];
 }
 
+export function buildFileNameAssessmentMessages(params: {
+  language: SupportedLang;
+  fileName: string;
+  fileContent: string;
+  truncated: boolean;
+  maxLength: number;
+}): Message[] {
+  const { language, fileName, fileContent, truncated, maxLength } = params;
+  if (language === "zh") {
+    const notice = truncated
+      ? `注意：以下文件内容已截断至 ${maxLength} 个字符用于分析。\n`
+      : "";
+    return [
+      {
+        role: "system",
+        content:
+          "你是一名文件命名规范审核专家。请判断当前文件名是否准确反映内容并符合命名最佳实践。务必严格输出 JSON。",
+      },
+      {
+        role: "user",
+        content:
+          `${notice}当前文件名：${fileName}\n文件内容摘录：\n${fileContent}\n\n返回 JSON：{\n  "is_reasonable": boolean,\n  "confidence": number,\n  "reasoning": string,\n  "suggested_names": string[],\n  "quality_notes": string[]\n}\n要求：\n- 判断文件名是否清晰描述文档目的、主题、范围。\n- confidence 取值 0-1。\n- 若需要改进，请给出 1-3 个更好的命名；若已合适，可返回空数组或包含当前名称。\n- quality_notes 可列出命名建议或问题，可为空。`,
+      },
+    ];
+  }
+
+  const notice = truncated
+    ? `Note: file content truncated to ${maxLength} characters for analysis.\n`
+    : "";
+  return [
+    {
+      role: "system",
+      content:
+        "You are a file naming reviewer. Determine whether the current file name aligns with the content and follows naming best practices. Always output strict JSON only.",
+    },
+    {
+      role: "user",
+      content:
+        `${notice}Current file name: ${fileName}\nFile content excerpt:\n${fileContent}\n\nReturn JSON: {\n  "is_reasonable": boolean,\n  "confidence": number,\n  "reasoning": string,\n  "suggested_names": string[],\n  "quality_notes": string[]\n}\nGuidelines:\n- Decide if the name communicates the document purpose, topic, and scope.\n- confidence must be between 0 and 1.\n- Provide 1-3 improved suggestions when naming needs work; leave empty or include the existing name when it is already strong.\n- quality_notes may contain concise observations or tips (can be empty).`,
+    },
+  ];
+}
+
 export function buildDirectoryStructureMessages(params: {
   language: SupportedLang;
   profession: string;

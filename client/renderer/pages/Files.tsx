@@ -37,12 +37,108 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import FilePreview from "../components/FilePreview";
 import FileImport, { FileImportRef } from "../components/FileImport";
-import { apiService } from "../services/api";
+import { apiService, type FileNameAssessmentResult } from "../services/api";
 import { ImportedFileItem } from "../shared/types";
 import { useTranslation } from "../shared/i18n/I18nProvider";
 
 const { Content } = Layout;
 const { Option } = Select;
+
+const MAX_NAME_ASSESSMENT_TEXT = 6000;
+const INVALID_FILENAME_PATTERN = /[<>:"/\\|?*]/;
+const INVALID_FILENAME_SANITIZE_PATTERN = /[<>:"/\\|?*]+/g;
+
+type ValidateStatus = "success" | "warning" | "error" | "validating" | undefined;
+
+interface PreviewResponseData {
+  file_path: string;
+  file_type: "text" | "image" | "html" | "pdf" | "video";
+  mime_type: string;
+  content: string;
+  size: number;
+  truncated?: boolean;
+  encoding?: string;
+}
+
+interface NameAssessmentSummary {
+  isReasonable: boolean;
+  confidence: number;
+  reasoning: string;
+  qualityNotes: string[];
+  suggestedNames: string[];
+  appliedName?: string;
+}
+
+interface EditFileDetailLite {
+  summary?: string;
+  path?: string;
+  category?: string;
+  tags?: string[];
+}
+
+const extractExtension = (fileName: string): string => {
+  const trimmed = fileName.trim();
+  const lastDot = trimmed.lastIndexOf(".");
+  if (lastDot <= 0) return "";
+  return trimmed.slice(lastDot);
+};
+
+const htmlToPlainText = (html: string): string => {
+  if (!html) return "";
+  try {
+    if (typeof window !== "undefined" && typeof window.DOMParser !== "undefined") {
+      const parser = new window.DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      return (doc.body?.textContent ?? "").trim();
+    }
+  } catch {
+    // fall through to regex-based strip
+  }
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+};
+
+const extractTextFromPreview = (preview: PreviewResponseData | null | undefined): string => {
+  if (!preview) return "";
+  if (preview.file_type === "text") {
+    return preview.content ?? "";
+  }
+  if (preview.file_type === "html") {
+    return htmlToPlainText(preview.content ?? "");
+  }
+  return "";
+};
+
+const normalizeSuggestedName = (suggestion: string, referenceName: string): string => {
+  const trimmed = suggestion.trim();
+  if (!trimmed) return "";
+  let sanitized = trimmed.replace(INVALID_FILENAME_SANITIZE_PATTERN, "_");
+  sanitized = sanitized.replace(/\s+/g, " ").trim();
+  sanitized = sanitized.replace(/^[.]+/, "");
+  sanitized = sanitized.replace(/[. ]+$/, "");
+  if (!sanitized) return "";
+
+  const referenceExt = extractExtension(referenceName);
+  let finalName = sanitized;
+  const suggestionExt = extractExtension(sanitized);
+
+  if (referenceExt) {
+    if (!suggestionExt) {
+      finalName = `${sanitized}${referenceExt}`;
+    } else if (suggestionExt.toLowerCase() !== referenceExt.toLowerCase()) {
+      const base = sanitized.slice(0, sanitized.length - suggestionExt.length);
+      finalName = `${base}${referenceExt}`;
+    }
+  }
+
+  if (finalName.length > 180) {
+    const ext = extractExtension(finalName);
+    const baseLength = ext ? 180 - ext.length : 180;
+    const base = ext ? finalName.slice(0, finalName.length - ext.length) : finalName;
+    finalName = `${base.slice(0, Math.max(1, baseLength))}${ext}`;
+  }
+
+  return finalName.replace(INVALID_FILENAME_SANITIZE_PATTERN, "_");
+};
 
 const isValidHttpUrl = (value: string): boolean => {
   try {
@@ -76,7 +172,7 @@ const FileList: React.FC<FileListProps> = ({
   refreshTrigger,
   onRetryImport,
 }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const navigate = useNavigate();
   const [files, setFiles] = useState<ImportedFileItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -118,6 +214,31 @@ const FileList: React.FC<FileListProps> = ({
     path?: string;
     type?: string;
   }>();
+  const [nameAssessing, setNameAssessing] = useState(false);
+  const [nameAssessment, setNameAssessment] = useState<NameAssessmentSummary | null>(null);
+  const [nameAssessmentStatus, setNameAssessmentStatus] = useState<ValidateStatus>(undefined);
+  const [editFileDetail, setEditFileDetail] = useState<EditFileDetailLite | null>(null);
+  const [editSourceContent, setEditSourceContent] = useState<string>("");
+
+  const translateOrFallback = useCallback(
+    (key: string, fallback: string, params?: Record<string, string | number>) => {
+      const translated = t(key, params);
+      return translated === key ? fallback : translated;
+    },
+    [t]
+  );
+
+  const closeEditModal = useCallback(() => {
+    setEditVisible(false);
+    setEditingFile(null);
+    setEditing(false);
+    setNameAssessment(null);
+    setNameAssessmentStatus(undefined);
+    setEditSourceContent("");
+    setEditFileDetail(null);
+    setNameAssessing(false);
+    editForm.resetFields();
+  }, [editForm]);
 
   // 获取文件列表
   const fetchFiles = useCallback(
@@ -286,6 +407,11 @@ const FileList: React.FC<FileListProps> = ({
   // Open edit modal
   const openEdit = async (file: ImportedFileItem) => {
     setEditingFile(file);
+    setNameAssessment(null);
+    setNameAssessmentStatus(undefined);
+    setEditSourceContent("");
+    setEditFileDetail(null);
+    setNameAssessing(false);
     // Prefill from row data immediately
     editForm.setFieldsValue({
       name: file.name,
@@ -308,11 +434,357 @@ const FileList: React.FC<FileListProps> = ({
           path: d.path,
           type: d.type,
         });
+        setEditFileDetail({
+          summary: d.summary,
+          path: d.path,
+          category: d.category,
+          tags: d.tags,
+        });
       }
     } catch {
       // ignore detail fetch error; keep row values
     }
   };
+
+  const handleValidateFileName = useCallback(async () => {
+    if (!editingFile) {
+      return;
+    }
+
+    const values = editForm.getFieldsValue();
+    const currentName = (values.name ?? "").trim();
+    if (!currentName) {
+      message.warning(
+        translateOrFallback(
+          "files.messages.editInvalidName",
+          "Please enter a valid file name"
+        )
+      );
+      return;
+    }
+
+    setNameAssessing(true);
+    setNameAssessmentStatus("validating");
+    setNameAssessment(null);
+
+    let hideLoading: (() => void) | undefined;
+
+    try {
+      hideLoading = message.loading(
+        translateOrFallback(
+          "files.messages.fileNameAssessmentChecking",
+          "Checking file name..."
+        ),
+        0
+      );
+
+      let sourceText = editSourceContent;
+      const formPath = typeof values.path === "string" ? values.path.trim() : "";
+      const targetPath = formPath || editingFile.path;
+
+      if (!sourceText && targetPath) {
+        try {
+          const previewResp = await apiService.previewFile(targetPath, { origin: true });
+          if (previewResp.success && previewResp.data) {
+            const previewData = previewResp.data as PreviewResponseData;
+            const extracted = extractTextFromPreview(previewData);
+            if (extracted) {
+              const truncated = extracted.slice(0, MAX_NAME_ASSESSMENT_TEXT);
+              const prepared = truncated.trim();
+              if (prepared) {
+                sourceText = prepared;
+                setEditSourceContent(prepared);
+              }
+            }
+          }
+        } catch (error) {
+          console.warn("Failed to load preview for file name assessment", error);
+        }
+      }
+
+      if (!sourceText) {
+        const fallbackSummary = (editFileDetail?.summary ?? editingFile.summary ?? "").trim();
+        if (fallbackSummary) {
+          const truncated = fallbackSummary.slice(0, MAX_NAME_ASSESSMENT_TEXT);
+          const prepared = truncated.trim();
+          if (prepared) {
+            sourceText = prepared;
+            setEditSourceContent(prepared);
+          }
+        }
+      }
+
+      if (!sourceText) {
+        setNameAssessmentStatus("warning");
+        message.warning(
+          translateOrFallback(
+            "files.messages.fileNameAssessmentNoContent",
+            "Unable to access file content for evaluation."
+          )
+        );
+        return;
+      }
+
+      const preparedContent = sourceText.trim();
+      if (!preparedContent) {
+        setNameAssessmentStatus("warning");
+        message.warning(
+          translateOrFallback(
+            "files.messages.fileNameAssessmentNoContent",
+            "Unable to access file content for evaluation."
+          )
+        );
+        return;
+      }
+
+      const assessmentResp = await apiService.validateFileName({
+        fileName: currentName,
+        fileContent: preparedContent,
+        language: locale,
+      });
+
+      if (!assessmentResp.success || !assessmentResp.data) {
+        throw new Error(assessmentResp.message || "File name assessment failed");
+      }
+
+      const assessment = assessmentResp.data as FileNameAssessmentResult;
+      const qualityNotes = Array.isArray(assessment.quality_notes)
+        ? (assessment.quality_notes as unknown[])
+            .map((note: unknown) => (typeof note === "string" ? note.trim() : ""))
+            .filter((note): note is string => note.length > 0)
+        : [];
+      const suggestedNames = Array.isArray(assessment.suggested_names)
+        ? (assessment.suggested_names as unknown[])
+            .map((candidate: unknown) =>
+              typeof candidate === "string" ? candidate.trim() : ""
+            )
+            .filter((candidate): candidate is string => candidate.length > 0)
+        : [];
+
+      const summary: NameAssessmentSummary = {
+        isReasonable: assessment.is_reasonable,
+        confidence:
+          typeof assessment.confidence === "number" && Number.isFinite(assessment.confidence)
+            ? assessment.confidence
+            : 0,
+        reasoning:
+          typeof assessment.reasoning === "string" ? assessment.reasoning.trim() : "",
+        qualityNotes,
+        suggestedNames,
+      };
+
+      if (summary.isReasonable) {
+        setNameAssessment(summary);
+        setNameAssessmentStatus("success");
+        const confidencePercent = Math.round(summary.confidence * 100);
+        if (confidencePercent > 0) {
+          message.success(
+            translateOrFallback(
+              "files.messages.fileNameAssessmentPositiveWithConfidence",
+              `Current file name already looks good (confidence ${confidencePercent}%).`,
+              { confidence: confidencePercent }
+            )
+          );
+        } else {
+          message.success(
+            translateOrFallback(
+              "files.messages.fileNameAssessmentPositive",
+              "Current file name already looks good."
+            )
+          );
+        }
+        return;
+      }
+
+      const suggestion = summary.suggestedNames[0];
+      if (!suggestion) {
+        setNameAssessment(summary);
+        setNameAssessmentStatus("warning");
+        message.warning(
+          translateOrFallback(
+            "files.messages.fileNameAssessmentNoSuggestion",
+            "No better file name suggestions were returned."
+          )
+        );
+        return;
+      }
+
+      const normalizedSuggestion = normalizeSuggestedName(suggestion, currentName);
+      if (!normalizedSuggestion) {
+        setNameAssessment(summary);
+        setNameAssessmentStatus("warning");
+        message.warning(
+          translateOrFallback(
+            "files.messages.fileNameAssessmentSuggestionInvalid",
+            "Suggested file name is invalid."
+          )
+        );
+        return;
+      }
+
+      if (normalizedSuggestion.toLowerCase() === currentName.toLowerCase()) {
+        setNameAssessment(summary);
+        setNameAssessmentStatus("warning");
+        message.info(
+          translateOrFallback(
+            "files.messages.fileNameAssessmentSuggestionSame",
+            "Suggested file name matches the current name."
+          )
+        );
+        return;
+      }
+
+      if (INVALID_FILENAME_PATTERN.test(normalizedSuggestion)) {
+        setNameAssessment(summary);
+        setNameAssessmentStatus("warning");
+        message.warning(
+          translateOrFallback(
+            "files.messages.fileNameAssessmentSuggestionInvalid",
+            "Suggested file name is invalid."
+          )
+        );
+        return;
+      }
+
+      const updateResp = await apiService.updateFile({
+        file_id: editingFile.file_id,
+        name: normalizedSuggestion,
+      });
+
+      if (!updateResp.success || !updateResp.data) {
+        throw new Error(updateResp.message || "Failed to update file name");
+      }
+
+      const updateData = updateResp.data as {
+        name: string;
+        path: string;
+        category?: string;
+        tags?: string[];
+      };
+
+      editForm.setFieldsValue({
+        name: updateData.name,
+        path: updateData.path,
+        category: updateData.category ?? editForm.getFieldValue("category"),
+        tags: updateData.tags ?? editForm.getFieldValue("tags"),
+      });
+
+      setEditingFile((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: updateData.name,
+              path: updateData.path,
+              category: updateData.category ?? prev.category,
+              tags: Array.isArray(updateData.tags) ? updateData.tags : prev.tags,
+            }
+          : prev
+      );
+      setEditFileDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              path: updateData.path,
+              category: updateData.category ?? prev.category,
+              tags: Array.isArray(updateData.tags) ? updateData.tags : prev.tags,
+            }
+          : prev
+      );
+
+      summary.appliedName = updateData.name;
+      setNameAssessment(summary);
+      setNameAssessmentStatus("success");
+
+      message.success(
+        translateOrFallback(
+          "files.messages.fileNameAssessmentRenamed",
+          `File renamed to ${updateData.name}.`,
+          { name: updateData.name }
+        )
+      );
+
+      await fetchFiles(currentPageRef.current || 1);
+    } catch (error) {
+      console.error("File name assessment failed", error);
+      setNameAssessmentStatus("error");
+      const errMsg = (error as Error)?.message;
+      message.error(
+        errMsg && errMsg.trim().length > 0
+          ? errMsg
+          : translateOrFallback(
+              "files.messages.fileNameAssessmentFailed",
+              "Failed to validate file name."
+            )
+      );
+    } finally {
+      if (hideLoading) hideLoading();
+      setNameAssessing(false);
+    }
+  }, [
+    editFileDetail,
+    editForm,
+    editSourceContent,
+    editingFile,
+    fetchFiles,
+    locale,
+    translateOrFallback,
+  ]);
+
+  const nameAssessmentHelp = useMemo(() => {
+    if (!nameAssessment) {
+      return null;
+    }
+
+    const lines: string[] = [];
+
+    if (Number.isFinite(nameAssessment.confidence) && nameAssessment.confidence > 0) {
+      const confidencePercent = Math.round(nameAssessment.confidence * 100);
+      lines.push(
+        translateOrFallback(
+          "files.edit.assessmentConfidence",
+          `Confidence: ${confidencePercent}%`,
+          { confidence: confidencePercent }
+        )
+      );
+    }
+
+    if (nameAssessment.reasoning) {
+      lines.push(nameAssessment.reasoning);
+    }
+
+    if (nameAssessment.appliedName) {
+      lines.push(
+        translateOrFallback(
+          "files.edit.assessmentRenamed",
+          `Renamed to: ${nameAssessment.appliedName}`,
+          { name: nameAssessment.appliedName }
+        )
+      );
+    }
+
+    if (nameAssessment.qualityNotes.length > 0) {
+      const joinedNotes = nameAssessment.qualityNotes.join("; ");
+      lines.push(
+        translateOrFallback(
+          "files.edit.assessmentNotes",
+          `Notes: ${joinedNotes}`,
+          { notes: joinedNotes }
+        )
+      );
+    }
+
+    if (lines.length === 0) {
+      return null;
+    }
+
+    return (
+      <div>
+        {lines.map((line, index) => (
+          <div key={index}>{line}</div>
+        ))}
+      </div>
+    );
+  }, [nameAssessment, translateOrFallback]);
 
   // Submit edit
   const submitEdit = async () => {
@@ -343,11 +815,10 @@ const FileList: React.FC<FileListProps> = ({
         tags,
       });
       if (resp.success) {
-        message.success(t("files.messages.updateSuccess") || "Updated");
-        setEditVisible(false);
+  message.success(t("files.messages.updateSuccess") || "Updated");
         setEditing(false);
-        setEditingFile(null);
-        fetchFiles(pagination.current_page);
+  closeEditModal();
+  fetchFiles(pagination.current_page);
       } else {
         setEditing(false);
         message.error(
@@ -885,11 +1356,7 @@ const FileList: React.FC<FileListProps> = ({
         okText={t("common.confirm") || "Confirm"}
         cancelText={t("common.cancel") || "Cancel"}
         onOk={submitEdit}
-        onCancel={() => {
-          setEditVisible(false);
-          setEditingFile(null);
-          editForm.resetFields();
-        }}
+        onCancel={closeEditModal}
         confirmLoading={editing}
         destroyOnHidden
       >
@@ -898,7 +1365,21 @@ const FileList: React.FC<FileListProps> = ({
             <Input disabled />
           </Form.Item>
           <Form.Item
-            label={t("files.table.columns.name")}
+            label={
+              <Space size={8} align="center">
+                <span>{t("files.table.columns.name")}</span>
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={handleValidateFileName}
+                  loading={nameAssessing}
+                  disabled={!editingFile}
+                  onMouseDown={(event) => event.preventDefault()}
+                >
+                  {translateOrFallback("files.edit.suggestNameButton", "Check name")}
+                </Button>
+              </Space>
+            }
             name="name"
             rules={[
               {
@@ -907,6 +1388,9 @@ const FileList: React.FC<FileListProps> = ({
                   t("files.messages.editInvalidName") || "Please input name",
               },
             ]}
+            validateStatus={nameAssessmentStatus}
+            hasFeedback={Boolean(nameAssessmentStatus)}
+            help={nameAssessmentHelp}
           >
             <Input allowClear />
           </Form.Item>

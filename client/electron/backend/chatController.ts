@@ -6,6 +6,7 @@ import { logger } from "../logger";
 import { configManager } from "../configManager";
 import {
   buildRecommendDirectoryMessages,
+  buildFileNameAssessmentMessages,
   buildDirectoryStructureMessages,
   buildChatAskMessages,
   buildDocumentSummaryMessages,
@@ -28,6 +29,8 @@ import faiss from "faiss-node";
 export function registerChatRoutes(app: Express) {
   // POST /api/chat/recommend-directory
   app.post("/api/chat/recommend-directory", chatRecommendDirectoryHandler);
+  // POST /api/chat/validate-file-name
+  app.post("/api/chat/validate-file-name", chatValidateFileNameHandler);
   // POST /api/chat/directory-structure
   app.post("/api/chat/directory-structure", chatDirectoryStructureHandler);
   // POST /api/chat/query-purpose
@@ -54,6 +57,15 @@ type ChatRecommendBody = {
   temperature?: unknown;
   max_tokens?: unknown;
   provider?: unknown;
+};
+
+type ChatValidateFileNameBody = {
+  file_name?: unknown;
+  file_content?: unknown;
+  language?: unknown;
+  provider?: unknown;
+  temperature?: unknown;
+  max_tokens?: unknown;
 };
 
 export async function chatRecommendDirectoryHandler(
@@ -215,6 +227,168 @@ export async function chatRecommendDirectoryHandler(
       error: {
         code: "INTERNAL_ERROR",
         message: "Recommend directory failed",
+        details: null,
+      },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+export async function chatValidateFileNameHandler(
+  req: Request,
+  res: Response
+): Promise<void> {
+  const startTs = Date.now();
+  try {
+    const body = req.body as ChatValidateFileNameBody | undefined;
+    const fileNameRaw = typeof body?.file_name === "string" ? body.file_name : "";
+    const fileContentRaw =
+      typeof body?.file_content === "string" ? body.file_content : "";
+
+    const fileName = fileNameRaw.trim();
+    const fileContent = fileContentRaw.trim();
+
+    if (!fileName || !fileContent) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "file_name and file_content are required",
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const truncated = fileContent.length > MAX_FILENAME_ANALYSIS_CONTENT_LENGTH;
+    const contentForPrompt = truncated
+      ? `${fileContent.slice(0, MAX_FILENAME_ANALYSIS_CONTENT_LENGTH)}\n\n[Content truncated for analysis]`
+      : fileContent;
+
+    const language: SupportedLang = normalizeLanguage(body?.language);
+    const provider = normalizeProviderName(body?.provider);
+
+    const temperatureRaw =
+      typeof body?.temperature === "number" && Number.isFinite(body.temperature)
+        ? body.temperature
+        : undefined;
+    const maxTokensRaw =
+      typeof body?.max_tokens === "number" && Number.isFinite(body.max_tokens)
+        ? body.max_tokens
+        : undefined;
+
+    const temperature = Math.max(0, Math.min(1.5, temperatureRaw ?? 0.25));
+    const maxTokens = Math.max(
+      128,
+      Math.min(800, Math.floor(maxTokensRaw ?? 320))
+    );
+
+    const messages = buildFileNameAssessmentMessages({
+      language,
+      fileName,
+      fileContent: contentForPrompt,
+      truncated,
+      maxLength: MAX_FILENAME_ANALYSIS_CONTENT_LENGTH,
+    });
+
+    let result: unknown;
+    try {
+      result = await generateStructuredJson(
+        messages,
+        FILE_NAME_ASSESSMENT_RESPONSE_FORMAT,
+        temperature,
+        maxTokens,
+        undefined,
+        language,
+        provider
+      );
+    } catch (err) {
+      logger.error(
+        "/api/chat/validate-file-name LLM failed",
+        err as unknown
+      );
+      res.status(500).json({
+        success: false,
+        message: "llm_error",
+        data: null,
+        error: {
+          code: "LLM_ERROR",
+          message: (err as Error).message,
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const obj = (result as Record<string, unknown>) ?? {};
+    const isReasonable = obj.is_reasonable === true;
+    const confidenceRaw =
+      typeof obj.confidence === "number"
+        ? obj.confidence
+        : typeof obj.confidence === "string"
+        ? Number(obj.confidence)
+        : 0;
+    const confidence = Number.isFinite(confidenceRaw)
+      ? Math.max(0, Math.min(1, confidenceRaw))
+      : 0;
+    const reasoning =
+      typeof obj.reasoning === "string" ? obj.reasoning.trim() : "";
+
+    const suggestedRaw = Array.isArray(obj.suggested_names)
+      ? (obj.suggested_names as unknown[])
+      : [];
+    const suggestedNames = suggestedRaw
+      .map((value) => (typeof value === "string" ? value.trim() : ""))
+      .filter((value) => value.length > 0)
+      .slice(0, 5);
+
+    const notesRaw = Array.isArray(obj.quality_notes)
+      ? (obj.quality_notes as unknown[])
+      : [];
+    const qualityNotes = notesRaw
+      .map((value) => (typeof value === "string" ? value.trim() : ""))
+      .filter((value) => value.length > 0)
+      .slice(0, 5);
+
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        file_name: fileName,
+        is_reasonable: isReasonable,
+        confidence,
+        reasoning,
+        suggested_names: suggestedNames,
+        quality_notes: qualityNotes,
+        metadata: {
+          model_used: getActiveModelName("chat", provider),
+          truncated_input: truncated,
+          analyzed_content_length: contentForPrompt.length,
+          response_time_ms: Date.now() - startTs,
+          temperature,
+          max_tokens: maxTokens,
+        },
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/chat/validate-file-name failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "File name assessment failed",
         details: null,
       },
       timestamp: new Date().toISOString(),
@@ -904,6 +1078,32 @@ interface HydratedChunkRow {
   match_reason: MatchReason;
   snippet: string;
 }
+
+const MAX_FILENAME_ANALYSIS_CONTENT_LENGTH = 6000;
+
+const FILE_NAME_ASSESSMENT_RESPONSE_FORMAT = {
+  json_schema: {
+    name: "file_name_assessment_schema",
+    schema: {
+      type: "object",
+      properties: {
+        is_reasonable: { type: "boolean" },
+        confidence: { type: "number" },
+        reasoning: { type: "string" },
+        suggested_names: {
+          type: "array",
+          items: { type: "string" },
+        },
+        quality_notes: {
+          type: "array",
+          items: { type: "string" },
+        },
+      },
+      required: ["is_reasonable", "confidence", "reasoning", "suggested_names"],
+    },
+    strict: true,
+  },
+} as const;
 
 const QA_RESPONSE_FORMAT = {
   json_schema: {
