@@ -39,6 +39,7 @@ declare global {
       onDirectoryWatcherImportRequest: (
         callback: (payload: import('../shared/directoryWatcher').DirectoryWatchImportRequest) => void,
       ) => () => void
+      getLogArchive?: () => Promise<{ filename: string; data: string; contentType?: string } | null>
     }
     webUtils: typeof import('electron').webUtils
   }

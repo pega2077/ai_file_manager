@@ -32,6 +32,7 @@
     "zoomOut": "Zoom Out",
     "help": "Help",
     "viewLogs": "View Logs",
+    "feedback": "Send Feedback",
     "about": "About"
   },
   "tray": {
@@ -278,7 +279,8 @@
       "configureOpenai": "Configure OpenAI",
       "configureOpenrouter": "Configure OpenRouter",
       "configureBailian": "Configure Bailian",
-      "refreshPegaStatus": "Check status"
+      "refreshPegaStatus": "Check status",
+      "feedback": "Send feedback"
     },
     "messages": {
       "saveSuccess": "Settings saved",
@@ -322,6 +324,51 @@
       "pegaModeUpdateError": "Failed to update Pega mode",
       "themeControlledBySystem": "Theme follows your system appearance. Disable following to change it manually.",
       "themeFollowSystemUpdateFailed": "Failed to update the follow-system preference. Please try again."
+    },
+    "feedback": {
+      "title": "Share Feedback",
+      "type": {
+        "bug": "Bug",
+        "feature": "Feature request",
+        "general": "General feedback"
+      },
+      "fields": {
+        "name": "Name",
+        "contact": "Contact",
+        "type": "Issue type",
+        "description": "Description",
+        "screenshot": "Screenshot",
+        "includeLogs": "Include recent logs"
+      },
+      "placeholders": {
+        "name": "How should we address you?",
+        "contact": "Email or phone (optional)",
+        "type": "Select issue type",
+        "description": "Describe what happened or what you expect"
+      },
+      "descriptions": {
+        "screenshotHint": "Attach up to 3 images (PNG or JPG), each under 5 MB.",
+        "logsHint": "Logs help us troubleshoot issues and do not include personal content."
+      },
+      "actions": {
+        "uploadScreenshot": "Upload screenshot",
+        "submit": "Submit"
+      },
+      "messages": {
+        "logsAttached": "Logs attached.",
+        "logsPreparing": "Collecting logs…",
+        "logsReady": "Logs ready to upload.",
+        "submitted": "Feedback sent. Thank you!",
+        "notInitialized": "Feedback service is not ready yet."
+      },
+      "errors": {
+        "invalidImage": "Only image files are supported.",
+        "imageTooLarge": "Each screenshot must be smaller than 5 MB.",
+        "logsUnavailable": "Unable to attach logs right now. Please try again later.",
+        "nameRequired": "Name is required.",
+        "descriptionRequired": "Please describe your feedback.",
+        "submitFailed": "Failed to submit feedback. Please try again."
+      }
     }
   },
   "providerConfig": {

@@ -16,7 +16,8 @@
   theme,
 } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import FeedbackModal from "../components/feedback/FeedbackModal";
 import { apiService } from "../services/api";
 import { useTranslation } from "../shared/i18n/I18nProvider";
 import {
@@ -78,6 +79,7 @@ const DEFAULT_SETTINGS: SettingsState = {
 
 const Settings = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t, locale, setLocale, availableLocales, localeLabels } =
     useTranslation();
   const { token } = theme.useToken();
@@ -96,6 +98,8 @@ const Settings = () => {
   const [pegaStatus, setPegaStatus] = useState<PegaStatusResponse | null>(null);
   const [pegaStatusLoading, setPegaStatusLoading] = useState(false);
   const [pegaStatusError, setPegaStatusError] = useState<string | null>(null);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackIncludeLogsDefault, setFeedbackIncludeLogsDefault] = useState(false);
 
   const layoutStyle = useMemo(
     () => ({
@@ -205,6 +209,7 @@ const Settings = () => {
       try {
         const appConfig =
           (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
+        setFeedbackIncludeLogsDefault(Boolean(appConfig?.sentry?.sendLogsByDefault));
         if (appConfig) {
           const normalizedLanguage = normalizeLocale(
             appConfig.language ?? defaultLocale
@@ -287,6 +292,7 @@ const Settings = () => {
         }
       } catch (error) {
         console.error("Failed to load app config:", error);
+        setFeedbackIncludeLogsDefault(false);
       }
 
       try {
@@ -301,6 +307,14 @@ const Settings = () => {
 
     void loadSettings();
   }, [locale, setFollowSystem, setLocale, setMode]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const feedbackRequested = params.get("feedback");
+    if (feedbackRequested && feedbackRequested !== "0" && feedbackRequested !== "false") {
+      setFeedbackModalOpen(true);
+    }
+  }, [location.key, location.search]);
 
   useEffect(() => {
     setSettings((prev) =>
@@ -1214,8 +1228,17 @@ const Settings = () => {
               <Button onClick={() => navigate("/files")}>
                 {t("settings.actions.back")}
               </Button>
+              <Button onClick={() => setFeedbackModalOpen(true)}>
+                {t("settings.actions.feedback")}
+              </Button>
             </div>
           </Card>
+              <FeedbackModal
+                open={feedbackModalOpen}
+                onClose={() => setFeedbackModalOpen(false)}
+                t={t}
+                defaultIncludeLogs={feedbackIncludeLogsDefault}
+              />
         </div>
       </Content>
     </Layout>

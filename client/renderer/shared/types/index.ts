@@ -211,4 +211,9 @@ export interface AppConfig {
   workDirectory?: string;
   isInitialized?: boolean;
   apiBaseUrl?: string;
+  sentry?: {
+    dsn?: string;
+    environment?: string;
+    sendLogsByDefault?: boolean;
+  };
 }

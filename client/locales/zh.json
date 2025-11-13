@@ -32,6 +32,7 @@
     "zoomOut": "缩小",
     "help": "帮助",
     "viewLogs": "查看日志",
+    "feedback": "问题反馈",
     "about": "关于"
   },
   "tray": {
@@ -281,7 +282,8 @@
       "configureOpenai": "配置 OpenAI",
       "configureOpenrouter": "配置 OpenRouter",
       "configureBailian": "配置百炼",
-      "refreshPegaStatus": "检查状态"
+      "refreshPegaStatus": "检查状态",
+      "feedback": "反馈问题"
     },
     "messages": {
       "saveSuccess": "设置已保存",
@@ -325,6 +327,51 @@
       "pegaModeUpdateError": "更新 Pega 模式失败",
       "themeControlledBySystem": "当前主题跟随系统，关闭后可手动切换。",
       "themeFollowSystemUpdateFailed": "更新跟随系统设置失败，请重试。"
+    },
+    "feedback": {
+      "title": "问题反馈",
+      "type": {
+        "bug": "缺陷",
+        "feature": "功能建议",
+        "general": "其他反馈"
+      },
+      "fields": {
+        "name": "称呼",
+        "contact": "联系方式",
+        "type": "问题类型",
+        "description": "问题描述",
+        "screenshot": "截图",
+        "includeLogs": "附加最近日志"
+      },
+      "placeholders": {
+        "name": "请填写称呼",
+        "contact": "邮箱或手机号（可选）",
+        "type": "选择问题类型",
+        "description": "请描述遇到的问题或改进建议"
+      },
+      "descriptions": {
+        "screenshotHint": "最多上传 3 张 PNG/JPG 图片，每张不超过 5 MB。",
+        "logsHint": "日志有助于排查问题，不包含个人敏感信息。"
+      },
+      "actions": {
+        "uploadScreenshot": "上传截图",
+        "submit": "提交反馈"
+      },
+      "messages": {
+        "logsAttached": "已附加日志。",
+        "logsPreparing": "正在收集日志…",
+        "logsReady": "日志已准备好。",
+        "submitted": "反馈已提交，感谢支持！",
+        "notInitialized": "反馈服务尚未初始化，请稍后再试。"
+      },
+      "errors": {
+        "invalidImage": "仅支持图片文件。",
+        "imageTooLarge": "截图需小于 5 MB。",
+        "logsUnavailable": "无法附加日志，请稍后重试。",
+        "nameRequired": "请填写称呼。",
+        "descriptionRequired": "请填写问题描述。",
+        "submitFailed": "提交失败，请稍后再试。"
+      }
     }
   },
   "providerConfig": {

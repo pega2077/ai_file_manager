@@ -574,6 +574,22 @@ function setupIpcHandlers() {
     return true;
   });
 
+  ipcMain.handle("app:get-log-archive", async () => {
+    try {
+      const archivePath = await logger.createLatestArchive?.();
+      if (!archivePath) {
+        return null;
+      }
+      const buffer = await fs.readFile(archivePath);
+      const filename = path.basename(archivePath);
+      await fs.unlink(archivePath).catch(() => undefined);
+      return { filename, data: buffer.toString("base64"), contentType: "application/zip" };
+    } catch (error) {
+      logger.error("Failed to generate log archive", { error: String(error) });
+      return null;
+    }
+  });
+
   // IPC handler for clearing all data and relaunching the app
   ipcMain.handle("clear-all-data", async () => {
     await handleClearAllData();
@@ -942,6 +958,32 @@ function createMenu() {
           click: () => {
             const logFilePath = logger.getLogFilePath();
             shell.openPath(logFilePath);
+          },
+        },
+        {
+          label: i18n.t('menu.feedback', 'Send Feedback'),
+          click: () => {
+            if (!win || win.isDestroyed()) {
+              createWindow();
+            }
+
+            const targetRoute = '/settings?feedback=1';
+            const dispatchNavigation = () => {
+              if (!win || win.isDestroyed()) {
+                return;
+              }
+              win.webContents.send('renderer:navigate', { route: targetRoute });
+            };
+
+            if (win && !win.isDestroyed()) {
+              if (win.webContents.isLoading()) {
+                win.webContents.once('did-finish-load', dispatchNavigation);
+              } else {
+                dispatchNavigation();
+              }
+              win.show();
+              win.focus();
+            }
           },
         },
         {

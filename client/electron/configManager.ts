@@ -153,6 +153,12 @@ export interface AppConfig {
     targetHeight?: number;
     timeoutMs?: number;
   };
+  /** Optional Sentry configuration for telemetry and feedback */
+  sentry?: {
+    dsn?: string;
+    environment?: string;
+    sendLogsByDefault?: boolean;
+  };
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -230,7 +236,12 @@ const DEFAULT_CONFIG: AppConfig = {
     maxShots: 5,
     // targetWidth/targetHeight omitted => use video native resolution
     timeoutMs: 60000,
-  }
+  },
+  sentry: {
+    dsn: "https://235a9bae8ce69a567a7aa733d298613c@o4507153410293760.ingest.us.sentry.io/4510357919956992",
+    environment: "production",
+    sendLogsByDefault: false,
+  },
 };
 
 export class ConfigManager {

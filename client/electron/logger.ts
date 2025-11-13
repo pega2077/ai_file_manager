@@ -85,6 +85,51 @@ class Logger {
     }
     return this.logFilePath;
   }
+
+  async createLatestArchive(): Promise<string | null> {
+    if (!this.initialized) {
+      this.initialize();
+    }
+    if (!this.logFilePath) {
+      return null;
+    }
+    try {
+      const logsDir = path.dirname(this.logFilePath);
+      const files = await fs.promises.readdir(logsDir);
+      const logFiles = files
+        .filter((file) => file.startsWith('electron-') && file.endsWith('.log'))
+        .sort()
+        .slice(-5);
+      if (logFiles.length === 0) {
+        return null;
+      }
+
+      const archiveName = `logs-${Date.now()}.zip`;
+      const archivePath = path.join(logsDir, archiveName);
+      const archiver = (await import('archiver')).default;
+      await new Promise<void>((resolve, reject) => {
+        const output = fs.createWriteStream(archivePath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        output.on('close', () => resolve());
+        output.on('error', (error) => reject(error));
+        archive.on('error', (error) => reject(error));
+
+        archive.pipe(output);
+
+        for (const file of logFiles) {
+          archive.file(path.join(logsDir, file), { name: file });
+        }
+
+        archive.finalize().catch(reject);
+      });
+
+      return archivePath;
+    } catch (error) {
+      console.error('Failed to create log archive:', error);
+      return null;
+    }
+  }
 }
 
 // 创建全局日志实例
