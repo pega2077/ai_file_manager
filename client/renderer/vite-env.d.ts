@@ -31,6 +31,8 @@ declare global {
       ) => () => void
       registerDirectoryWatcherImporter: () => void
       unregisterDirectoryWatcherImporter: () => void
+      pauseDirectoryWatcher: () => Promise<boolean>
+      resumeDirectoryWatcher: () => Promise<boolean>
       notifyDirectoryWatcherStatus: (
         payload: import('../shared/directoryWatcher').DirectoryWatchStatusMessage,
       ) => void

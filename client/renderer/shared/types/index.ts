@@ -29,6 +29,7 @@ export interface Settings {
   showHiddenFiles: boolean;
   enablePreview: boolean;
   autoClassifyWithoutConfirmation: boolean;
+  checkFileNameOnImport: boolean;
   autoSaveRAG: boolean;
   autoTagEnabled?: boolean;
   tagSummaryMaxLength?: number;
@@ -205,6 +206,7 @@ export interface AppConfig {
   autoTagEnabled?: boolean;
   tagSummaryMaxLength?: number;
   autoClassifyWithoutConfirmation?: boolean;
+  checkFileNameOnImport?: boolean;
   enableDirectoryWatcher?: boolean;
   workDirectory?: string;
   isInitialized?: boolean;

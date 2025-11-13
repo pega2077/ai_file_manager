@@ -135,6 +135,8 @@ export interface AppConfig {
   tagSummaryMaxLength?: number;
   /** Auto classify without confirmation */
   autoClassifyWithoutConfirmation?: boolean;
+  /** Validate file name quality before completing import */
+  checkFileNameOnImport?: boolean;
   /** Enable background directory watcher for automatic imports */
   enableDirectoryWatcher?: boolean;
   /** Current workspace directory path */
@@ -218,6 +220,7 @@ const DEFAULT_CONFIG: AppConfig = {
   autoTagEnabled: true,
   tagSummaryMaxLength: 1000,
   autoClassifyWithoutConfirmation: true,
+  checkFileNameOnImport: true,
   enableDirectoryWatcher: false,
   workDirectory: '',
   isInitialized: false,
@@ -425,6 +428,10 @@ export class ConfigManager {
 
         if (typeof merged.enableDirectoryWatcher !== 'boolean') {
           merged.enableDirectoryWatcher = DEFAULT_CONFIG.enableDirectoryWatcher;
+        }
+
+        if (typeof merged.checkFileNameOnImport !== 'boolean') {
+          merged.checkFileNameOnImport = DEFAULT_CONFIG.checkFileNameOnImport;
         }
 
         this.config = merged;

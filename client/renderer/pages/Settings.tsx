@@ -49,6 +49,7 @@ interface SettingsState {
   autoTagEnabled: boolean;
   tagSummaryMaxLength: number;
   autoClassifyWithoutConfirmation: boolean;
+  checkFileNameOnImport: boolean;
   enableDirectoryWatcher: boolean;
   workDirectory: string;
   useLocalService: boolean;
@@ -66,6 +67,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   autoTagEnabled: false,
   tagSummaryMaxLength: 1000,
   autoClassifyWithoutConfirmation: false,
+  checkFileNameOnImport: true,
   enableDirectoryWatcher: false,
   workDirectory: "",
   useLocalService: true,
@@ -603,6 +605,7 @@ const Settings = () => {
         tagSummaryMaxLength: settings.tagSummaryMaxLength,
         autoClassifyWithoutConfirmation:
           settings.autoClassifyWithoutConfirmation,
+        checkFileNameOnImport: settings.checkFileNameOnImport,
         enableDirectoryWatcher: settings.enableDirectoryWatcher,
         useLocalService: settings.useLocalService,
       });
@@ -858,6 +861,22 @@ const Settings = () => {
                 />
                 <Text type="secondary" style={{ marginLeft: 8 }}>
                   {t("settings.descriptions.autoClassify")}
+                </Text>
+              </div>
+
+              <div>
+                <Text strong>{t("settings.labels.checkFileNameOnImport")}</Text>
+                <Switch
+                  checkedChildren={t("settings.common.enabled")}
+                  unCheckedChildren={t("settings.common.disabled")}
+                  checked={settings.checkFileNameOnImport}
+                  onChange={(checked) =>
+                    handleSettingChange("checkFileNameOnImport", checked)
+                  }
+                  style={{ marginLeft: 16 }}
+                />
+                <Text type="secondary" style={{ marginLeft: 8 }}>
+                  {t("settings.descriptions.checkFileNameOnImport")}
                 </Text>
               </div>
 

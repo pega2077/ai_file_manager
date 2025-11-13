@@ -79,6 +79,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   unregisterDirectoryWatcherImporter: () => {
     ipcRenderer.send('directory-watcher:unregister-importer')
   },
+  pauseDirectoryWatcher: () => ipcRenderer.invoke('directory-watcher:pause'),
+  resumeDirectoryWatcher: () => ipcRenderer.invoke('directory-watcher:resume'),
   notifyDirectoryWatcherStatus: (payload: DirectoryWatchStatusMessage) => {
     ipcRenderer.send('directory-watcher:status', payload)
   },

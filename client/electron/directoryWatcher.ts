@@ -45,6 +45,7 @@ export class DirectoryWatcher {
   private busy = false;
   private idleTimer: NodeJS.Timeout | null = null;
   private lastActivityAt = 0;
+  private suspended = false;
 
   constructor(private readonly callbacks: DirectoryWatcherCallbacks) {}
 
@@ -93,6 +94,7 @@ export class DirectoryWatcher {
 
     this.workDirectory = normalizedDir;
     this.enabled = true;
+    this.suspended = false;
 
     await this.seedExistingRecords();
     await this.createWatcher();
@@ -119,6 +121,7 @@ export class DirectoryWatcher {
     this.queue.length = 0;
     this.tasksByPath.clear();
     this.lastActivityAt = 0;
+    this.suspended = false;
 
     if (this.idleTimer) {
       clearInterval(this.idleTimer);
@@ -230,6 +233,36 @@ export class DirectoryWatcher {
       });
       return null;
     }
+  }
+
+  async suspendMonitoring(): Promise<void> {
+    if (this.suspended) {
+      return;
+    }
+    this.suspended = true;
+    if (this.watcher) {
+      try {
+        await this.watcher.close();
+      } catch (error) {
+        logger.warn("DirectoryWatcher.suspendMonitoring: failed to close watcher", {
+          error: String(error),
+        });
+      }
+      this.watcher = null;
+    }
+  }
+
+  async resumeMonitoring(): Promise<void> {
+    if (!this.suspended) {
+      return;
+    }
+    this.suspended = false;
+    if (!this.enabled || !this.workDirectory) {
+      return;
+    }
+    await this.createWatcher();
+    this.startIdleTimer();
+    this.maybeProcessNext();
   }
 
   private normalizeFilePath(input: string): string | null {

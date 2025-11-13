@@ -4,6 +4,7 @@ export type FileImportStep =
   | 'stage-file'
   | 'list-directory'
   | 'describe-image'
+  | 'validate-file-name'
   | 'recommend-directory'
   | 'await-confirmation'
   | 'save-file'

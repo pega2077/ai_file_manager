@@ -207,6 +207,7 @@
       "autoTagEnabled": "Auto tagging",
       "tagSummaryMaxLength": "Tag summary max length",
       "autoClassify": "Auto classify without confirmation",
+    "checkFileNameOnImport": "Validate filename on import",
   "enableDirectoryWatcher": "Monitor workspace directory",
       "useLocalService": "Use local service",
       "workDirectory": "Current workspace",
@@ -235,6 +236,7 @@
       "autoTagEnabled": "Automatically extract tags for files during import or processing.",
       "tagSummaryMaxLength": "Maximum characters used when generating tag summaries (affects auto-tagging).",
       "autoClassify": "Skip confirmation dialogs when saving files to recommended directories.",
+    "checkFileNameOnImport": "Validate file names during import and block the process when they contain invalid patterns or unclear naming.",
   "enableDirectoryWatcher": "Watch the workspace folder for new files and queue them for automatic import.",
       "useLocalService": "When enabled, use the local Python service (typically http://localhost:8000). When disabled, you can configure a remote API URL.",
       "workDirectory": "The workspace folder is defined during setup. Re-run the setup wizard to change it.",
@@ -743,8 +745,12 @@
       "fileNameAssessmentNoSuggestion": "No better file name suggestions were returned.",
       "fileNameAssessmentSuggestionInvalid": "Suggested file name is invalid.",
       "fileNameAssessmentSuggestionSame": "Suggested file name matches the current name.",
-      "fileNameAssessmentRenamed": "File renamed to {name}.",
-      "fileNameAssessmentFailed": "Failed to validate file name."
+  "fileNameAssessmentRenamed": "File renamed to {name}.",
+  "fileNameAssessmentFailed": "Failed to validate file name.",
+  "fileNameValidationInvalidChars": "Filename contains invalid characters (<>:\"/\\|?*). Please rename the file before importing.",
+  "fileNameValidationReserved": "Filename matches a reserved system name. Please rename the file before importing.",
+  "fileNameValidationTooLong": "Filename exceeds the maximum length of {limit} characters. Please shorten it before importing.",
+  "fileNameValidationSuggestion": "Suggested filename: {name}"
     },
     "createFolder": {
       "modalTitle": "Create Folder",

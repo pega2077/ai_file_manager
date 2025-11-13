@@ -9,7 +9,7 @@ import React, {
 import { Button, Modal, Select, TreeSelect, message } from "antd";
 import { useTranslation } from "../shared/i18n/I18nProvider";
 import { apiService } from "../services/api";
-import type { ApiError } from "../services/api";
+import type { ApiError, FileNameAssessmentResult } from "../services/api";
 import type {
   DirectoryStructureResponse,
   RecommendDirectoryResponse,
@@ -47,6 +47,119 @@ type QueuedImportTask = EnqueueTaskPayload & {
     resolve: () => void;
     reject: (error: unknown) => void;
   };
+};
+
+const MAX_NAME_VALIDATION_TEXT = 6000;
+const MAX_FILENAME_LENGTH = 180;
+const INVALID_FILENAME_PATTERN = /[<>:"/\\|?*]/;
+const INVALID_FILENAME_SANITIZE_PATTERN = /[<>:"/\\|?*]+/g;
+const WINDOWS_RESERVED_NAMES = new Set(
+  [
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    "COM1",
+    "COM2",
+    "COM3",
+    "COM4",
+    "COM5",
+    "COM6",
+    "COM7",
+    "COM8",
+    "COM9",
+    "LPT1",
+    "LPT2",
+    "LPT3",
+    "LPT4",
+    "LPT5",
+    "LPT6",
+    "LPT7",
+    "LPT8",
+    "LPT9",
+  ].map((name) => name.toLowerCase())
+);
+
+interface PreviewResponseData {
+  file_path: string;
+  file_type: "text" | "image" | "html" | "pdf" | "video";
+  mime_type: string;
+  content: string;
+  size: number;
+  truncated?: boolean;
+  encoding?: string;
+}
+
+const htmlToPlainText = (html: string): string => {
+  if (!html) return "";
+  try {
+    if (typeof window !== "undefined" && typeof window.DOMParser !== "undefined") {
+      const parser = new window.DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      return (doc.body?.textContent ?? "").trim();
+    }
+  } catch {
+    // fallback handled below
+  }
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+};
+
+const extractTextFromPreview = (preview: PreviewResponseData | null | undefined): string => {
+  if (!preview) return "";
+  if (preview.file_type === "text") {
+    return preview.content ?? "";
+  }
+  if (preview.file_type === "html") {
+    return htmlToPlainText(preview.content ?? "");
+  }
+  return "";
+};
+
+const extractExtension = (fileName: string): string => {
+  const trimmed = fileName.trim();
+  const lastDot = trimmed.lastIndexOf(".");
+  if (lastDot <= 0) return "";
+  return trimmed.slice(lastDot);
+};
+
+const normalizeSuggestedName = (suggestion: string, referenceName: string): string => {
+  const trimmed = suggestion.trim();
+  if (!trimmed) return "";
+  let sanitized = trimmed.replace(INVALID_FILENAME_SANITIZE_PATTERN, "_");
+  sanitized = sanitized.replace(/\s+/g, " ").trim();
+  sanitized = sanitized.replace(/^[.]+/, "");
+  sanitized = sanitized.replace(/[. ]+$/, "");
+  if (!sanitized) return "";
+
+  const referenceExt = extractExtension(referenceName);
+  let finalName = sanitized;
+  const suggestionExt = extractExtension(sanitized);
+
+  if (referenceExt) {
+    if (!suggestionExt) {
+      finalName = `${sanitized}${referenceExt}`;
+    } else if (suggestionExt.toLowerCase() !== referenceExt.toLowerCase()) {
+      const base = sanitized.slice(0, sanitized.length - suggestionExt.length);
+      finalName = `${base}${referenceExt}`;
+    }
+  }
+
+  if (finalName.length > MAX_FILENAME_LENGTH) {
+    const ext = extractExtension(finalName);
+    const baseLength = ext ? MAX_FILENAME_LENGTH - ext.length : MAX_FILENAME_LENGTH;
+    const base = ext ? finalName.slice(0, finalName.length - ext.length) : finalName;
+    finalName = `${base.slice(0, Math.max(1, baseLength))}${ext}`;
+  }
+
+  if (INVALID_FILENAME_PATTERN.test(finalName)) {
+    return "";
+  }
+  const bare = finalName.replace(/\.[^.]+$/, "").toLowerCase();
+  if (WINDOWS_RESERVED_NAMES.has(bare)) {
+    return "";
+  }
+
+  return finalName;
 };
 
 export type FileImportOptions = {
@@ -461,67 +574,6 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       []
     );
 
-    const handleRagImport = useCallback(
-      async (fileId: string, noSaveDb: boolean = false) => {
-        try {
-          const cfg =
-            (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
-          let hideLoading: undefined | (() => void);
-          try {
-            if (cfg?.autoSaveRAG) {
-              notifyProgress("import-rag", "start", t("files.messages.importingRag"));
-              hideLoading = message.loading(
-                t("files.messages.importingRag"),
-                0
-              );
-              const ragResponse = await apiService.importToRag(
-                fileId,
-                noSaveDb
-              );
-              if (ragResponse.success) {
-                notifyProgress("import-rag", "success", t("files.messages.importedRagSuccess"));
-                message.success(t("files.messages.importedRagSuccess"));
-              } else {
-                const failureMessage = getConversionMessage({
-                  message: ragResponse.error?.message ?? ragResponse.message,
-                  code: ragResponse.error?.code,
-                  details: ragResponse.error?.details,
-                  payload: ragResponse,
-                });
-                const displayMessage = failureMessage ?? t("files.messages.saveSuccessRagFailed");
-                notifyProgress("import-rag", failureMessage ? "error" : "success", displayMessage);
-                if (failureMessage) {
-                  message.error(displayMessage);
-                } else {
-                  message.warning(displayMessage);
-                }
-              }
-            }
-          } finally {
-            if (hideLoading) hideLoading();
-          }
-        } catch (error) {
-          const conversionMessage = getConversionMessage(error);
-          const fallback = t("files.messages.saveSuccessRagFailed");
-          const messageToShow = conversionMessage ?? fallback;
-          notifyProgress("import-rag", "error", messageToShow);
-          if (conversionMessage) {
-            message.error(messageToShow);
-          } else {
-            message.warning(messageToShow);
-          }
-          window.electronAPI?.logError?.(
-            "importToRag (handleRagImport) failed",
-            {
-              err: String(error),
-              conversionMessage: conversionMessage ?? undefined,
-            }
-          );
-        }
-      },
-      [t, notifyProgress, getConversionMessage]
-    );
-
     const showImportConfirmationDialog = useCallback(
       async (
         filePath: string,
@@ -597,6 +649,37 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       [t]
     );
 
+    const withDirectoryWatcherPaused = useCallback(
+      async <T,>(operation: () => Promise<T>): Promise<T> => {
+        let paused = false;
+        try {
+          if (window.electronAPI?.pauseDirectoryWatcher) {
+            await window.electronAPI.pauseDirectoryWatcher();
+            paused = true;
+          }
+        } catch (error) {
+          window.electronAPI?.logError?.("pauseDirectoryWatcher failed", {
+            err: String(error),
+          });
+        }
+
+        try {
+          return await operation();
+        } finally {
+          if (paused) {
+            try {
+              await window.electronAPI?.resumeDirectoryWatcher?.();
+            } catch (error) {
+              window.electronAPI?.logError?.("resumeDirectoryWatcher failed", {
+                err: String(error),
+              });
+            }
+          }
+        }
+      },
+      []
+    );
+
     const fileToBase64 = useCallback(async (path: string): Promise<string> => {
       // Use backend preview with downscaling to avoid large payloads.
       try {
@@ -649,6 +732,129 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         return description;
       },
       [fileToBase64],
+    );
+
+    const assessFileNameAfterImport = useCallback(
+      async ({
+        fileId,
+        filePath,
+        currentName,
+        language,
+        existingContent,
+      }: {
+        fileId: string;
+        filePath: string;
+        currentName: string;
+        language: "zh" | "en";
+        existingContent?: string;
+      }): Promise<{
+        renamed: boolean;
+        updatedName?: string;
+        updatedPath?: string;
+        content?: string;
+      }> => {
+        const effectiveName = (currentName || "").trim() || filePath.split(/[\\/]/).pop() || "";
+        if (!effectiveName || !filePath) {
+          return { renamed: false };
+        }
+
+        let contentForAssessment = (existingContent ?? "").trim();
+        notifyProgress("validate-file-name", "start", t("files.messages.fileNameAssessmentChecking"));
+
+        if (!contentForAssessment) {
+          try {
+            const previewResp = await apiService.previewFile(filePath, { origin: true });
+            if (previewResp.success && previewResp.data) {
+              const previewData = previewResp.data as PreviewResponseData;
+              const extracted = extractTextFromPreview(previewData);
+              if (extracted) {
+                contentForAssessment = extracted.slice(0, MAX_NAME_VALIDATION_TEXT).trim();
+              }
+            }
+          } catch (error) {
+            window.electronAPI?.logError?.("previewFile for assessFileNameAfterImport failed", {
+              err: String(error),
+              path: filePath,
+            });
+          }
+        }
+
+        if (!contentForAssessment) {
+          notifyProgress("validate-file-name", "success", t("files.messages.fileNameAssessmentNoContent"));
+          return { renamed: false };
+        }
+
+        try {
+          const response = await apiService.validateFileName({
+            fileName: effectiveName,
+            fileContent: contentForAssessment.slice(0, MAX_NAME_VALIDATION_TEXT),
+            language,
+          });
+
+          if (!response.success || !response.data) {
+            const msg = response.message || t("files.messages.fileNameAssessmentFailed");
+            message.error(msg);
+            notifyProgress("validate-file-name", "error", msg);
+            return { renamed: false };
+          }
+
+          const result = response.data as FileNameAssessmentResult;
+          if (result.is_reasonable) {
+            notifyProgress("validate-file-name", "success", t("files.messages.fileNameAssessmentPositive"));
+            return { renamed: false, content: contentForAssessment };
+          }
+
+          const suggestion = Array.isArray(result.suggested_names)
+            ? result.suggested_names
+                .map((candidate) =>
+                  typeof candidate === "string" ? normalizeSuggestedName(candidate, effectiveName) : ""
+                )
+                .find((candidate) => candidate && candidate.toLowerCase() !== effectiveName.toLowerCase())
+            : undefined;
+
+          if (!suggestion) {
+            const messageToShow =
+              (typeof result.reasoning === "string" && result.reasoning.trim()) ||
+              t("files.messages.fileNameAssessmentNoSuggestion");
+            notifyProgress("validate-file-name", "success", messageToShow);
+            return { renamed: false, content: contentForAssessment };
+          }
+
+          const updateResp = await withDirectoryWatcherPaused(() =>
+            apiService.updateFile({ file_id: fileId, name: suggestion })
+          );
+          if (!updateResp.success || !updateResp.data) {
+            const msg = updateResp.message || t("files.messages.updateFailed");
+            message.error(msg);
+            notifyProgress("validate-file-name", "error", msg);
+            return { renamed: false, content: contentForAssessment };
+          }
+
+          const updatedData = updateResp.data as { path?: string; name?: string } | undefined;
+          const successMessage = t("files.messages.fileNameAssessmentRenamed", { name: suggestion });
+          message.success(successMessage);
+          notifyProgress("validate-file-name", "success", successMessage);
+
+          return {
+            renamed: true,
+            updatedName: suggestion,
+            updatedPath: typeof updatedData?.path === "string" ? updatedData.path : undefined,
+            content: contentForAssessment,
+          };
+        } catch (error) {
+          const conversionMessage = getConversionMessage(error);
+          const msg = conversionMessage ?? t("files.messages.fileNameAssessmentFailed");
+          message.error(msg);
+          notifyProgress("validate-file-name", "error", msg);
+          window.electronAPI?.logError?.("assessFileNameAfterImport failed", {
+            err: String(error),
+            fileId,
+            filePath,
+          });
+          return { renamed: false };
+        }
+      },
+      [getConversionMessage, notifyProgress, t, withDirectoryWatcherPaused]
     );
 
     const processFile = useCallback(
@@ -705,7 +911,9 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           notifyProgress("save-file", "start");
           let saveResponse;
           try {
-            saveResponse = await apiService.saveFile(normalizedPath, parentDirectory, true);
+            saveResponse = await withDirectoryWatcherPaused(() =>
+              apiService.saveFile(normalizedPath, parentDirectory, true)
+            );
           } catch (err) {
             message.error(t("files.messages.fileSaveFailed"));
             window.electronAPI?.logError?.("saveFile (workspace direct) failed", {
@@ -724,7 +932,30 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           }
 
           notifyProgress("save-file", "success");
-          const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
+          const saveData = saveResponse.data as { file_id?: string; saved_path?: string; filename?: string; summary?: string } | undefined;
+          const fileId = saveData?.file_id;
+          let savedPath = (saveData?.saved_path || normalizedPath).trim();
+          let savedName = (saveData?.filename || savedPath.split(/[\\/]/).pop() || normalizedPath.split(/[\\/]/).pop() || "").trim();
+          let ragContent = typeof saveData?.summary === "string" ? saveData.summary : undefined;
+
+          if (fileId && cfg?.checkFileNameOnImport) {
+            const assessment = await assessFileNameAfterImport({
+              fileId,
+              filePath: savedPath,
+              currentName: savedName,
+              language: lang,
+            });
+            if (assessment.updatedPath) {
+              savedPath = assessment.updatedPath;
+            }
+            if (assessment.updatedName) {
+              savedName = assessment.updatedName;
+            }
+            if (!ragContent && assessment.content) {
+              ragContent = assessment.content;
+            }
+          }
+
           onImported?.();
 
           if (fileId && cfg?.autoSaveRAG) {
@@ -732,7 +963,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             let hideLoadingRag: undefined | (() => void);
             try {
               hideLoadingRag = message.loading(t("files.messages.importingRag"), 0);
-              const ragResponse = await apiService.importToRag(fileId, true);
+              const ragResponse = await apiService.importToRag(fileId, true, ragContent);
               if (ragResponse.success) {
                 notifyProgress("import-rag", "success", t("files.messages.importedRagSuccess"));
                 message.success(t("files.messages.importedRagSuccess"));
@@ -925,12 +1156,25 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             : `${latestWorkDir}${separator}${recommendedDirectory.replace(/\//g, separator)}`;
 
           notifyProgress("save-file", "start");
-          const saveResponse = await apiService.saveFile(
-            stagedPath,
-            fullTargetDirectory,
-            false,
-            stagedId
-          );
+          let saveResponse;
+          try {
+            saveResponse = await withDirectoryWatcherPaused(() =>
+              apiService.saveFile(
+                stagedPath,
+                fullTargetDirectory,
+                false,
+                stagedId
+              )
+            );
+          } catch (error) {
+            message.error(t("files.messages.fileSaveFailed"));
+            window.electronAPI?.logError?.("saveFile (auto classify) failed", {
+              err: String(error),
+              path: stagedPath,
+            });
+            notifyError(error, t("files.messages.fileSaveFailed"));
+            return "complete";
+          }
           if (!saveResponse.success) {
             const errMsg = saveResponse.message || t("files.messages.fileSaveFailed");
             message.error(errMsg);
@@ -938,13 +1182,33 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             return "complete";
           }
           notifyProgress("save-file", "success");
+          const saveData = saveResponse.data as { file_id?: string; saved_path?: string; filename?: string; summary?: string } | undefined;
+          const fileId = saveData?.file_id;
+          const savedPath = (saveData?.saved_path || stagedPath).trim();
+          const savedName = (saveData?.filename || savedPath.split(/[\\/]/).pop() || stagedPath.split(/[\\/]/).pop() || "").trim();
+          if (!contentForAnalysis && typeof saveData?.summary === "string") {
+            contentForAnalysis = saveData.summary;
+          }
+
+          if (fileId && cfg?.checkFileNameOnImport) {
+            const assessment = await assessFileNameAfterImport({
+              fileId,
+              filePath: savedPath,
+              currentName: savedName,
+              language: lang,
+              existingContent: contentForAnalysis,
+            });
+            if (!contentForAnalysis && assessment.content) {
+              contentForAnalysis = assessment.content;
+            }
+          }
+
           message.success(
             t("files.messages.fileAutoSavedTo", {
               path: recommendedDirectory,
             })
           );
           onImported?.();
-          const fileId = (saveResponse.data as { file_id?: string } | undefined)?.file_id;
           if (fileId) {
             const descForRag =
               contentForAnalysis && contentForAnalysis.trim()
@@ -1033,6 +1297,8 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         onImported,
         showSegmentedInfo,
         describeImageContent,
+        withDirectoryWatcherPaused,
+        assessFileNameAfterImport,
         notifyStart,
         notifyProgress,
         notifySuccess,
@@ -1229,14 +1495,67 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
               separator
             )}`;
 
-        const saveResponse = await apiService.saveFile(
-          importFilePath,
-          fullTargetDirectory,
-          false,
-          stagedFileId
-        );
+        let saveResponse;
+        try {
+          saveResponse = await withDirectoryWatcherPaused(() =>
+            apiService.saveFile(
+              importFilePath,
+              fullTargetDirectory,
+              false,
+              stagedFileId
+            )
+          );
+        } catch (error) {
+          message.error(t("files.messages.fileSaveFailed"));
+          window.electronAPI?.logError?.("handleImportConfirm saveFile threw", {
+            err: String(error),
+            path: importFilePath,
+          });
+          notifyError(error, t("files.messages.fileSaveFailed"));
+          return;
+        }
         if (saveResponse.success) {
           notifyProgress("save-file", "success");
+          const saveData = saveResponse.data as {
+            file_id?: string;
+            saved_path?: string;
+            filename?: string;
+            summary?: string;
+          } | undefined;
+          const fileId = saveData?.file_id;
+          let savedPath = (saveData?.saved_path || importFilePath).trim();
+          let savedName = (saveData?.filename || savedPath.split(/[\\/]/).pop() || importFilePath.split(/[\\/]/).pop() || "").trim();
+          let cfgLatest: import("../shared/types").AppConfig | undefined;
+          try {
+            cfgLatest = (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
+          } catch (cfgError) {
+            window.electronAPI?.logError?.("getAppConfig (confirm) failed", {
+              err: String(cfgError),
+            });
+          }
+          let contentForAnalysis: string | undefined =
+            typeof saveData?.summary === "string" ? saveData.summary : undefined;
+          const language = (cfgLatest?.language || "en") as "zh" | "en";
+
+          if (fileId && cfgLatest?.checkFileNameOnImport) {
+            const assessment = await assessFileNameAfterImport({
+              fileId,
+              filePath: savedPath,
+              currentName: savedName,
+              language,
+              existingContent: contentForAnalysis,
+            });
+            if (assessment.updatedPath) {
+              savedPath = assessment.updatedPath;
+            }
+            if (assessment.updatedName) {
+              savedName = assessment.updatedName;
+            }
+            if (!contentForAnalysis && assessment.content) {
+              contentForAnalysis = assessment.content;
+            }
+          }
+
           message.success(
             t("files.import.fileSavedTo", { path: selectedDirectory })
           );
@@ -1245,20 +1564,12 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           setImportFilePath("");
           setSelectedDirectory("");
           onImported?.();
-          const fileId = (saveResponse.data as { file_id?: string } | undefined)
-            ?.file_id;
           if (fileId) {
-            // The file has been saved and recorded in DB; avoid duplicate DB insert in RAG import
-            // If we had image description earlier in processFile, reuse it here by previewing if needed
-            let contentForAnalysis: string | undefined = undefined;
             try {
-              if (isImagePath(importFilePath)) {
+              if (!contentForAnalysis && isImagePath(savedPath)) {
                 notifyProgress("describe-image", "start", t("files.messages.describingImage"));
                 message.info(t("files.messages.describingImage"));
-                const cfg4 =
-                  (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
-                const langConfirm = (cfg4?.language || "en") as "zh" | "en";
-                contentForAnalysis = await describeImageContent(importFilePath, langConfirm);
+                contentForAnalysis = await describeImageContent(savedPath, language);
                 try {
                   showSegmentedInfo(contentForAnalysis);
                 } catch {
@@ -1272,19 +1583,17 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
               message.error(displayMessage);
               window.electronAPI?.logError?.("describe-image (confirm) failed", {
                 err: String(e),
-                path: importFilePath,
+                path: savedPath,
               });
             }
             try {
-              const cfg5 =
-                (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
               const descForRag =
                 contentForAnalysis && contentForAnalysis.trim()
                   ? contentForAnalysis
                   : undefined;
               let hideLoading: undefined | (() => void);
               try {
-                if (cfg5?.autoSaveRAG) {
+                if (cfgLatest?.autoSaveRAG) {
                   notifyProgress("import-rag", "start", t("files.messages.importingRag"));
                   hideLoading = message.loading(
                     t("files.messages.importingRag"),
@@ -1389,14 +1698,68 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
               separator
             )}`;
 
-        const saveResponse = await apiService.saveFile(
-          importFilePath,
-          fullTargetDirectory,
-          false,
-          stagedFileId
-        );
+        let saveResponse;
+        try {
+          saveResponse = await withDirectoryWatcherPaused(() =>
+            apiService.saveFile(
+              importFilePath,
+              fullTargetDirectory,
+              false,
+              stagedFileId
+            )
+          );
+        } catch (error) {
+          message.error(t("files.messages.fileSaveFailed"));
+          window.electronAPI?.logError?.(
+            "handleManualSelectConfirm saveFile threw",
+            { err: String(error), path: importFilePath }
+          );
+          notifyError(error, t("files.messages.fileSaveFailed"));
+          return;
+        }
         if (saveResponse.success) {
           notifyProgress("save-file", "success");
+          const saveData = saveResponse.data as {
+            file_id?: string;
+            saved_path?: string;
+            filename?: string;
+            summary?: string;
+          } | undefined;
+          const fileId = saveData?.file_id;
+          let savedPath = (saveData?.saved_path || importFilePath).trim();
+          let savedName = (saveData?.filename || savedPath.split(/[\\/]/).pop() || importFilePath.split(/[\\/]/).pop() || "").trim();
+          let cfgLatest: import("../shared/types").AppConfig | undefined;
+          let language: "zh" | "en" = "en";
+          try {
+            cfgLatest = (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
+            language = (cfgLatest?.language || "en") as "zh" | "en";
+          } catch (cfgError) {
+            window.electronAPI?.logError?.("getAppConfig (manual confirm) failed", {
+              err: String(cfgError),
+            });
+          }
+          let contentForAnalysis: string | undefined =
+            typeof saveData?.summary === "string" ? saveData.summary : undefined;
+
+          if (fileId && cfgLatest?.checkFileNameOnImport) {
+            const assessment = await assessFileNameAfterImport({
+              fileId,
+              filePath: savedPath,
+              currentName: savedName,
+              language,
+              existingContent: contentForAnalysis,
+            });
+            if (assessment.updatedPath) {
+              savedPath = assessment.updatedPath;
+            }
+            if (assessment.updatedName) {
+              savedName = assessment.updatedName;
+            }
+            if (!contentForAnalysis && assessment.content) {
+              contentForAnalysis = assessment.content;
+            }
+          }
+
           message.success(
             t("files.import.fileSavedTo", { path: selectedDirectory })
           );
@@ -1405,12 +1768,92 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           setImportFilePath("");
           setSelectedDirectory("");
           onImported?.();
-          const fileId = (saveResponse.data as { file_id?: string } | undefined)
-            ?.file_id;
+
           if (fileId) {
-            // The file has been saved and recorded in DB; avoid duplicate DB insert in RAG import
-            await handleRagImport(fileId, true);
+            try {
+              if (!contentForAnalysis && isImagePath(savedPath)) {
+                notifyProgress("describe-image", "start", t("files.messages.describingImage"));
+                message.info(t("files.messages.describingImage"));
+                contentForAnalysis = await describeImageContent(savedPath, language);
+                try {
+                  showSegmentedInfo(contentForAnalysis);
+                } catch {
+                  // ignore message rendering failures
+                }
+                notifyProgress("describe-image", "success");
+              }
+            } catch (e) {
+              const displayMessage = t("files.messages.describeImageFailed");
+              notifyProgress("describe-image", "error", displayMessage);
+              message.error(displayMessage);
+              window.electronAPI?.logError?.("describe-image (manual confirm) failed", {
+                err: String(e),
+                path: savedPath,
+              });
+            }
+
+            try {
+              const descForRag =
+                contentForAnalysis && contentForAnalysis.trim()
+                  ? contentForAnalysis
+                  : undefined;
+              let hideLoading: undefined | (() => void);
+              try {
+                if (cfgLatest?.autoSaveRAG) {
+                  notifyProgress("import-rag", "start", t("files.messages.importingRag"));
+                  hideLoading = message.loading(
+                    t("files.messages.importingRag"),
+                    0
+                  );
+                  const ragResponse = await apiService.importToRag(
+                    fileId,
+                    true,
+                    descForRag
+                  );
+                  if (ragResponse.success) {
+                    notifyProgress(
+                      "import-rag",
+                      "success",
+                      t("files.messages.importedRagSuccess")
+                    );
+                    message.success(t("files.messages.importedRagSuccess"));
+                  } else {
+                    const failureMessage = getConversionMessage({
+                      message: ragResponse.error?.message ?? ragResponse.message,
+                      code: ragResponse.error?.code,
+                      details: ragResponse.error?.details,
+                      payload: ragResponse,
+                    });
+                    const fallback = t("files.messages.saveSuccessRagFailed");
+                    const displayMessage = failureMessage ?? fallback;
+                    notifyProgress("import-rag", failureMessage ? "error" : "success", displayMessage);
+                    if (failureMessage) {
+                      message.error(displayMessage);
+                    } else {
+                      message.warning(displayMessage);
+                    }
+                  }
+                }
+              } finally {
+                if (hideLoading) hideLoading();
+              }
+            } catch (e) {
+              const fallback = t("files.messages.saveSuccessRagFailed");
+              const conversionMessage = getConversionMessage(e);
+              const displayMessage = conversionMessage ?? fallback;
+              notifyProgress("import-rag", "error", displayMessage);
+              if (conversionMessage) {
+                message.error(displayMessage);
+              } else {
+                message.warning(displayMessage);
+              }
+              window.electronAPI?.logError?.("importToRag (manual confirm) failed", {
+                err: String(e),
+                conversionMessage: conversionMessage ?? undefined,
+              });
+            }
           }
+
           notifySuccess(t("files.import.fileSavedTo", { path: selectedDirectory }));
           resolveCurrentImport();
         } else {

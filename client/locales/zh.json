@@ -206,6 +206,7 @@
       "autoTagEnabled": "自动打标签",
       "tagSummaryMaxLength": "标签摘要最大长度",
       "autoClassify": "自动分类无需确认",
+    "checkFileNameOnImport": "导入时检查文件名",
   "enableDirectoryWatcher": "启用目录监听",
       "useLocalService": "使用本地服务",
       "workDirectory": "当前工作空间",
@@ -234,6 +235,7 @@
       "autoTagEnabled": "在导入或处理文件时自动提取标签。",
       "tagSummaryMaxLength": "生成标签摘要时使用的最大字符数（影响自动打标签）。",
       "autoClassify": "保存文件到推荐目录时跳过确认步骤。",
+    "checkFileNameOnImport": "导入文件时自动校验文件名，发现非法字符或命名不规范时阻止导入。",
   "enableDirectoryWatcher": "监听工作目录中的新文件并自动加入导入队列。",
       "useLocalService": "启用后使用本地 Python 服务（通常为 http://localhost:8000），关闭后可配置远程 API 地址。",
       "workDirectory": "工作空间在初始化流程中设置，可通过重新运行向导进行修改。",
@@ -750,7 +752,11 @@
       "fileNameAssessmentSuggestionInvalid": "建议的文件名无效。",
       "fileNameAssessmentSuggestionSame": "建议的文件名与当前名称相同。",
       "fileNameAssessmentRenamed": "文件已重命名为 {name}。",
-      "fileNameAssessmentFailed": "文件名校验失败。"
+  "fileNameAssessmentFailed": "文件名校验失败。",
+  "fileNameValidationInvalidChars": "文件名包含非法字符（<>:\"/\\|?*），请重命名后再导入。",
+  "fileNameValidationReserved": "文件名与系统保留字冲突，请重命名后再导入。",
+  "fileNameValidationTooLong": "文件名超过 {limit} 个字符，请缩短后再导入。",
+  "fileNameValidationSuggestion": "推荐文件名：{name}"
     },
     "createFolder": {
       "modalTitle": "创建文件夹",

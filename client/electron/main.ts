@@ -67,6 +67,7 @@ let tray: Tray | null;
 let isQuitting = false; // Track whether the app is in an explicit quit flow
 let directoryWatcher: DirectoryWatcher | null = null;
 let directoryWatcherImporterCount = 0;
+let directoryWatcherPauseCount = 0;
 
 const sendToRendererWindows = (channel: string, payload: unknown): void => {
   if (botWin && !botWin.isDestroyed()) {
@@ -121,12 +122,50 @@ const ensureDirectoryWatcher = (): DirectoryWatcher => {
 const refreshDirectoryWatcher = (config?: AppConfig): void => {
   const cfg = config ?? configManager.getConfig();
   const watcher = ensureDirectoryWatcher();
+
+  if (directoryWatcherPauseCount > 0) {
+    void watcher.suspendMonitoring();
+    return;
+  }
+
   watcher.updateConfig({
     enabled: Boolean(cfg.enableDirectoryWatcher),
     workDirectory: cfg.workDirectory,
   });
   if (directoryWatcherImporterCount > 0) {
     watcher.notifyRendererAvailable();
+  }
+};
+
+const pauseDirectoryWatcher = async (): Promise<void> => {
+  directoryWatcherPauseCount += 1;
+  if (directoryWatcherPauseCount === 1) {
+    try {
+      await ensureDirectoryWatcher().suspendMonitoring();
+    } catch (error) {
+      logger.error("Failed to pause directory watcher", {
+        error: String(error),
+      });
+    }
+  }
+};
+
+const resumeDirectoryWatcher = async (): Promise<void> => {
+  if (directoryWatcherPauseCount === 0) {
+    refreshDirectoryWatcher();
+    return;
+  }
+
+  directoryWatcherPauseCount = Math.max(0, directoryWatcherPauseCount - 1);
+  if (directoryWatcherPauseCount === 0) {
+    try {
+      await ensureDirectoryWatcher().resumeMonitoring();
+    } catch (error) {
+      logger.error("Failed to resume directory watcher", {
+        error: String(error),
+      });
+    }
+    refreshDirectoryWatcher();
   }
 };
 
@@ -523,6 +562,16 @@ function setupIpcHandlers() {
   ipcMain.on("directory-watcher:unregister-importer", () => {
     directoryWatcherImporterCount = Math.max(0, directoryWatcherImporterCount - 1);
     ensureDirectoryWatcher().notifyRendererUnavailable();
+  });
+
+  ipcMain.handle("directory-watcher:pause", async () => {
+    await pauseDirectoryWatcher();
+    return true;
+  });
+
+  ipcMain.handle("directory-watcher:resume", async () => {
+    await resumeDirectoryWatcher();
+    return true;
   });
 
   // IPC handler for clearing all data and relaunching the app
