@@ -39,12 +39,10 @@ export const initializeSentry = async (): Promise<void> => {
       sendDefaultPii: false,
     });
 
-    Sentry.configureScope((scope) => {
-      if (appConfig?.llmProvider) {
-        scope.setTag("llm_provider", appConfig.llmProvider);
-      }
-      scope.setTag("include_logs_default", String(Boolean(appConfig?.sentry?.sendLogsByDefault)));
-    });
+    if (appConfig?.llmProvider) {
+      Sentry.setTag("llm_provider", appConfig.llmProvider);
+    }
+    Sentry.setTag("include_logs_default", String(Boolean(appConfig?.sentry?.sendLogsByDefault)));
 
     initialized = true;
   } catch (error) {
