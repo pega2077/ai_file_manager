@@ -5,6 +5,13 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 import { apiService } from '../services/api';
+import type { AppConfig } from '../shared/types';
+import {
+  DEFAULT_SUPPORTED_PREVIEW_EXTENSIONS,
+  extractPreviewExtension,
+  isPreviewExtensionSupported,
+  sanitizePreviewExtensions,
+} from '../../shared/filePreviewConfig';
 
 interface FilePreviewProps {
   filePath: string;
@@ -29,6 +36,10 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [supportedExtensions, setSupportedExtensions] = useState<string[]>(() =>
+    Array.from(DEFAULT_SUPPORTED_PREVIEW_EXTENSIONS)
+  );
+  const [extensionsReady, setExtensionsReady] = useState(false);
 
   // When maximized we allow the preview to take most of the viewport height
   const previewMaxHeight = isMaximized ? 'calc(100vh - 150px)' : '60vh';
@@ -47,11 +58,108 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
     return `<base href="${safeBase}">\n${previewData.content}`;
   }, [previewData]);
 
+  const normalizedExtension = useMemo(() => extractPreviewExtension(fileName || filePath), [fileName, filePath]);
+
+  const previewAllowed = useMemo(
+    () => isPreviewExtensionSupported(normalizedExtension, supportedExtensions),
+    [normalizedExtension, supportedExtensions]
+  );
+
+  const supportedExtensionsLabel = useMemo(
+    () =>
+      supportedExtensions
+        .map((ext) => `.${ext}`)
+        .sort((a, b) => a.localeCompare(b))
+        .join(', '),
+    [supportedExtensions]
+  );
+
   useEffect(() => {
-    const loadPreview = async () => {
+    if (!visible) {
+      return;
+    }
+
+    let cancelled = false;
+    setExtensionsReady(false);
+
+    const loadSupportedExtensions = async () => {
+      if (!window.electronAPI?.getAppConfig) {
+        if (!cancelled) {
+          setExtensionsReady(true);
+        }
+        return;
+      }
+
+      try {
+        const rawConfig = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+        if (cancelled) {
+          return;
+        }
+        const sanitized = sanitizePreviewExtensions(
+          rawConfig?.previewSupportedExtensions,
+          DEFAULT_SUPPORTED_PREVIEW_EXTENSIONS
+        );
+        setSupportedExtensions((current) => {
+          if (
+            current.length === sanitized.length &&
+            current.every((value, index) => value === sanitized[index])
+          ) {
+            return current;
+          }
+          return sanitized;
+        });
+      } catch (error) {
+        window.electronAPI?.logError?.('filePreview.loadSupportedExtensionsFailed', {
+          err: String(error),
+        });
+      } finally {
+        if (!cancelled) {
+          setExtensionsReady(true);
+        }
+      }
+    };
+
+    void loadSupportedExtensions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      setLoading(false);
+      return;
+    }
+
+    if (!filePath) {
+      setLoading(false);
+      setPreviewData(null);
+      return;
+    }
+
+    if (!extensionsReady) {
       setLoading(true);
+      setPreviewData(null);
+      return;
+    }
+
+    if (!previewAllowed) {
+      setLoading(false);
+      setPreviewData(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setPreviewData(null);
+
+    const loadPreview = async () => {
       try {
         const response = await apiService.previewFile(filePath, { origin: true });
+        if (cancelled) {
+          return;
+        }
         if (response.success) {
           setPreviewData(response.data as PreviewData);
         } else {
@@ -59,18 +167,25 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
           onClose();
         }
       } catch (error) {
+        if (cancelled) {
+          return;
+        }
         message.error(t('filePreview.messages.loadFailed'));
         console.error(error);
         onClose();
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    if (visible && filePath) {
-      loadPreview();
-    }
-  }, [visible, filePath, onClose, t]);
+    void loadPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, filePath, previewAllowed, extensionsReady, onClose, t]);
 
   // When maximized, intercept Escape to exit maximize mode instead of closing modal
   useEffect(() => {
@@ -341,7 +456,18 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
       destroyOnHidden
     >
       <Spin spinning={loading}>
-        {renderPreviewContent()}
+        {!extensionsReady ? null : previewAllowed ? (
+          renderPreviewContent()
+        ) : (
+          <Alert
+            type="info"
+            showIcon
+            message={t('filePreview.messages.previewDisabled')}
+            description={t('filePreview.messages.supportedTypesHint', {
+              types: supportedExtensionsLabel,
+            })}
+          />
+        )}
       </Spin>
     </Modal>
   );

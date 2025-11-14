@@ -1,8 +1,9 @@
 import fs from "fs";
 import path from "path";
 import { logger } from "./logger";
-import {app} from "electron";
+import { app } from "electron";
 import { getBaseDir, resolveProjectRoot, resolveDatabaseAbsolutePath } from "./backend/utils/pathHelper";
+import { DEFAULT_SUPPORTED_PREVIEW_EXTENSIONS, sanitizePreviewExtensions } from "../shared/filePreviewConfig";
 
 export interface AppConfig {
   useLocalService: boolean;
@@ -127,6 +128,8 @@ export interface AppConfig {
   showHiddenFiles?: boolean;
   /** Enable file preview feature */
   enablePreview?: boolean;
+  /** Supported file extensions for preview (lowercase, without dot) */
+  previewSupportedExtensions?: string[];
   /** Auto-import to RAG after save */
   autoSaveRAG?: boolean;
   /** Enable automatic tagging when importing/processing files */
@@ -222,6 +225,7 @@ const DEFAULT_CONFIG: AppConfig = {
   autoSave: true,
   showHiddenFiles: false,
   enablePreview: true,
+  previewSupportedExtensions: Array.from(DEFAULT_SUPPORTED_PREVIEW_EXTENSIONS),
   autoSaveRAG: true,
   autoTagEnabled: true,
   tagSummaryMaxLength: 1000,
@@ -270,8 +274,18 @@ export class ConfigManager {
 
     this.configPath = path.join(appRoot, 'config.json');
     logger.info('ConfigManager: Config path set to', this.configPath);
-    this.config = { ...DEFAULT_CONFIG };
+    this.config = this.normalizeConfig({ ...DEFAULT_CONFIG });
     logger.info('ConfigManager: Initialized with default config', this.config);
+  }
+
+  private normalizeConfig(config: AppConfig): AppConfig {
+    return {
+      ...config,
+      previewSupportedExtensions: sanitizePreviewExtensions(
+        config.previewSupportedExtensions,
+        DEFAULT_SUPPORTED_PREVIEW_EXTENSIONS
+      ),
+    };
   }
 
   /**
@@ -445,7 +459,7 @@ export class ConfigManager {
           merged.checkFileNameOnImport = DEFAULT_CONFIG.checkFileNameOnImport;
         }
 
-        this.config = merged;
+        this.config = this.normalizeConfig(merged);
         logger.info('Config loaded from:', this.configPath);
       } else {
         logger.warn('Config file not found, using defaults. Path:', this.configPath);
@@ -455,12 +469,12 @@ export class ConfigManager {
     } catch (error) {
       logger.error('Failed to load config:', error);
       // 出错时使用默认配置，并尝试注入环境变量中的 OpenAI Key
-      const merged: AppConfig = { ...DEFAULT_CONFIG };
+      const merged: AppConfig = this.normalizeConfig({ ...DEFAULT_CONFIG });
       const envKey = process.env.OPENAI_API_KEY || process.env.OPENAIKEY || process.env.OPENAI_TOKEN;
       if (envKey) {
         merged.openai = { ...(merged.openai || {}), openaiApiKey: envKey };
       }
-      this.config = merged;
+      this.config = this.normalizeConfig(merged);
     }
 
     return this.config;
@@ -471,6 +485,7 @@ export class ConfigManager {
    */
   saveConfig(): void {
     try {
+      this.config = this.normalizeConfig(this.config);
       const configDir = path.dirname(this.configPath);
       if (!fs.existsSync(configDir)) {
         fs.mkdirSync(configDir, { recursive: true });
@@ -494,7 +509,7 @@ export class ConfigManager {
    * 更新配置
    */
   updateConfig(updates: Partial<AppConfig>): void {
-    this.config = { ...this.config, ...updates };
+    this.config = this.normalizeConfig({ ...this.config, ...updates });
     this.saveConfig();
   }
 

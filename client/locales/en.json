@@ -1022,6 +1022,8 @@
     "messages": {
       "loadFailed": "Failed to load preview",
       "unsupportedFileType": "Unsupported file type",
+      "previewDisabled": "Preview is not available for this file type.",
+      "supportedTypesHint": "Supported types: {types}",
       "truncatedMessage": "... File content is too long, truncated display (first 10KB)...",
       "openFolderFailed": "Failed to open folder",
       "openFileFailed": "Failed to open file",

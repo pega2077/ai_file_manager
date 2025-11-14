@@ -202,6 +202,7 @@ export interface AppConfig {
   autoSave?: boolean;
   showHiddenFiles?: boolean;
   enablePreview?: boolean;
+  previewSupportedExtensions?: string[];
   autoSaveRAG?: boolean;
   autoTagEnabled?: boolean;
   tagSummaryMaxLength?: number;

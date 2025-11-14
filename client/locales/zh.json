@@ -1028,6 +1028,8 @@
     "messages": {
       "loadFailed": "加载预览失败",
       "unsupportedFileType": "不支持的文件类型",
+      "previewDisabled": "当前文件类型未启用预览。",
+      "supportedTypesHint": "支持的类型: {types}",
       "truncatedMessage": "... 文件内容过长，已截断显示（前10KB）...",
       "openFolderFailed": "打开文件夹失败",
       "openFileFailed": "打开文件失败",
