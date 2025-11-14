@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import type { Archiver, ArchiverCreator } from "archiver";
 import { ensureLogsDirSync } from "./backend/utils/pathHelper";
 
 class Logger {
@@ -106,14 +107,14 @@ class Logger {
 
       const archiveName = `logs-${Date.now()}.zip`;
       const archivePath = path.join(logsDir, archiveName);
-      const archiver = (await import('archiver')).default;
+      const createArchiver: ArchiverCreator = (await import('archiver')).default;
       await new Promise<void>((resolve, reject) => {
         const output = fs.createWriteStream(archivePath);
-        const archive = archiver('zip', { zlib: { level: 9 } });
+        const archive: Archiver = createArchiver('zip', { zlib: { level: 9 } });
 
         output.on('close', () => resolve());
-        output.on('error', (error) => reject(error));
-        archive.on('error', (error) => reject(error));
+        output.on('error', (error: NodeJS.ErrnoException) => reject(error));
+        archive.on('error', (error: Error) => reject(error));
 
         archive.pipe(output);
 
@@ -121,7 +122,7 @@ class Logger {
           archive.file(path.join(logsDir, file), { name: file });
         }
 
-        archive.finalize().catch(reject);
+        void archive.finalize().catch(reject);
       });
 
       return archivePath;

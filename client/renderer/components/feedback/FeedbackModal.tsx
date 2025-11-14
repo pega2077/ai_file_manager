@@ -16,6 +16,7 @@ import type { CheckboxChangeEvent } from "antd/es/checkbox";
 import { UploadOutlined } from "@ant-design/icons";
 import type { RcFile, UploadFile, UploadChangeParam } from "antd/es/upload/interface";
 import * as Sentry from "@sentry/react";
+import type { TranslationFunction } from "../../shared/i18n/I18nProvider";
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -23,7 +24,7 @@ const { Text } = Typography;
 interface FeedbackModalProps {
   open: boolean;
   onClose: () => void;
-  t: (key: string, vars?: Record<string, unknown>) => string;
+  t: TranslationFunction;
   defaultIncludeLogs?: boolean;
 }
 

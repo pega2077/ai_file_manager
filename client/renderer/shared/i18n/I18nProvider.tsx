@@ -11,7 +11,7 @@ import {
 
 const STORAGE_KEY = 'ai-file-manager.locale'
 
-type TranslationFunction = (key: string, params?: Record<string, string | number>) => string
+export type TranslationFunction = (key: string, params?: Record<string, string | number>) => string
 
 type SetLocaleFunction = (locale: SupportedLocale) => void
 
