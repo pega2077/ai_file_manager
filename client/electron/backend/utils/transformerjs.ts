@@ -13,9 +13,9 @@ export interface TransformerjsConfig {
   cacheDir?: string;
 }
 
-let embeddingPipeline: any = null;
-let textGenerationPipeline: any = null;
-let imageToTextPipeline: any = null;
+let embeddingPipeline: unknown = null;
+let textGenerationPipeline: unknown = null;
+let imageToTextPipeline: unknown = null;
 
 function resolveConfig(): TransformerjsConfig {
   const cfg = configManager.getConfig();
@@ -33,7 +33,7 @@ async function getEmbeddingPipeline(model?: string) {
   const config = resolveConfig();
   const modelName = model || config.embedModel || "Xenova/all-MiniLM-L6-v2";
   
-  if (embeddingPipeline && embeddingPipeline.model?.name === modelName) {
+  if (embeddingPipeline && (embeddingPipeline as { model?: { name: string } }).model?.name === modelName) {
     return embeddingPipeline;
   }
   
@@ -41,13 +41,13 @@ async function getEmbeddingPipeline(model?: string) {
   
   try {
     embeddingPipeline = await pipeline("feature-extraction", modelName, {
-      progress_callback: (progress: any) => {
-        if (progress.status === "progress") {
+      progress_callback: (progress: { status: string; file?: string; loaded?: number; total?: number }) => {
+        if (progress.status === "progress" && progress.file && progress.loaded && progress.total) {
           logger.info(`Model download: ${progress.file} - ${Math.round((progress.loaded / progress.total) * 100)}%`);
         }
       },
     });
-    embeddingPipeline.model = { name: modelName };
+    (embeddingPipeline as { model?: { name: string } }).model = { name: modelName };
     return embeddingPipeline;
   } catch (e) {
     logger.error(`Failed to load embedding model ${modelName}`, e);
@@ -59,7 +59,7 @@ async function getTextGenerationPipeline(model?: string) {
   const config = resolveConfig();
   const modelName = model || config.chatModel || "Xenova/LaMini-Flan-T5-783M";
   
-  if (textGenerationPipeline && textGenerationPipeline.model?.name === modelName) {
+  if (textGenerationPipeline && (textGenerationPipeline as { model?: { name: string } }).model?.name === modelName) {
     return textGenerationPipeline;
   }
   
@@ -67,13 +67,13 @@ async function getTextGenerationPipeline(model?: string) {
   
   try {
     textGenerationPipeline = await pipeline("text2text-generation", modelName, {
-      progress_callback: (progress: any) => {
-        if (progress.status === "progress") {
+      progress_callback: (progress: { status: string; file?: string; loaded?: number; total?: number }) => {
+        if (progress.status === "progress" && progress.file && progress.loaded && progress.total) {
           logger.info(`Model download: ${progress.file} - ${Math.round((progress.loaded / progress.total) * 100)}%`);
         }
       },
     });
-    textGenerationPipeline.model = { name: modelName };
+    (textGenerationPipeline as { model?: { name: string } }).model = { name: modelName };
     return textGenerationPipeline;
   } catch (e) {
     logger.error(`Failed to load text generation model ${modelName}`, e);
@@ -85,7 +85,7 @@ async function getImageToTextPipeline(model?: string) {
   const config = resolveConfig();
   const modelName = model || config.visionModel || "Xenova/vit-gpt2-image-captioning";
   
-  if (imageToTextPipeline && imageToTextPipeline.model?.name === modelName) {
+  if (imageToTextPipeline && (imageToTextPipeline as { model?: { name: string } }).model?.name === modelName) {
     return imageToTextPipeline;
   }
   
@@ -93,13 +93,13 @@ async function getImageToTextPipeline(model?: string) {
   
   try {
     imageToTextPipeline = await pipeline("image-to-text", modelName, {
-      progress_callback: (progress: any) => {
-        if (progress.status === "progress") {
+      progress_callback: (progress: { status: string; file?: string; loaded?: number; total?: number }) => {
+        if (progress.status === "progress" && progress.file && progress.loaded && progress.total) {
           logger.info(`Model download: ${progress.file} - ${Math.round((progress.loaded / progress.total) * 100)}%`);
         }
       },
     });
-    imageToTextPipeline.model = { name: modelName };
+    (imageToTextPipeline as { model?: { name: string } }).model = { name: modelName };
     return imageToTextPipeline;
   } catch (e) {
     logger.error(`Failed to load image-to-text model ${modelName}`, e);
@@ -167,7 +167,7 @@ export async function generateStructuredJsonWithTransformerjs(
     if (Array.isArray(output)) {
       responseText = output[0]?.generated_text || "";
     } else if (typeof output === "object" && output !== null) {
-      responseText = (output as any).generated_text || "";
+      responseText = (output as { generated_text?: string }).generated_text || "";
     }
     
     logger.info("Generated text with transformerjs");
@@ -219,7 +219,7 @@ export async function describeImageWithTransformerjs(
     if (Array.isArray(output)) {
       description = output[0]?.generated_text || "";
     } else if (typeof output === "object" && output !== null) {
-      description = (output as any).generated_text || "";
+      description = (output as { generated_text?: string }).generated_text || "";
     }
     
     logger.info("Generated image description with transformerjs");

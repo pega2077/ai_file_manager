@@ -22,7 +22,8 @@
 - **本地服务层**: 嵌入在 Electron 主进程中的 Node.js（Express）本地服务
 - **文档处理**: 基于可配置的 `fileConvertEndpoint` 远程转换服务，由 Node 统一调度
 - **数据存储**: SQLite（通过 Sequelize 维护元信息）+ Faiss 向量索引（faiss-node）
-- **AI 模型**: 可插拔的 LLM / Embedding 提供方（OpenAI、Azure、OpenRouter、百炼、Ollama 等）
+- **AI 模型**: 可插拔的 LLM / Embedding 提供方（OpenAI、Azure、OpenRouter、百炼、Ollama、Transformer.js 等）
+  - **Transformer.js**: 支持在本地运行大语言模型，无需外部 API，保护数据隐私
 
 ## 项目结构
 
