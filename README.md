@@ -11,6 +11,7 @@ A smart file manager powered by AI. It automatically classifies your imported fi
 
 - 📁 **Document Import and Management** - Supports multiple document formats, automatically converts to Markdown format
 - 🏷️ **Intelligent Classification** - Automatically classifies and tags documents
+- 🔖 **Tag Organization (New)** - Intelligent tag normalization with synonym checking to maintain tag consistency
 - 🔍 **Semantic Search** - Intelligent document retrieval based on vector database
 - 💬 **Intelligent Q&A** - Document content Q&A based on RAG technology
 - 🗄️ **Local Storage** - All data stored locally, protecting privacy and security
@@ -60,6 +61,14 @@ ai_file_manager/
 - SQLite stores document metadata
 - Vector database stores document embeddings
 - Local model deployment, data not uploaded
+
+### 5. Tag Organization (New Feature)
+- User-configurable preset tag library
+- Automatic merging of preset and database tags
+- Synonym checking using Levenshtein distance algorithm (80% similarity threshold)
+- Intelligent tag library caching (5-minute TTL)
+- Automatic tag normalization for consistency
+- Detailed documentation: [TAG_ORGANIZATION.md](TAG_ORGANIZATION.md)
 
 ## Development Status
 
