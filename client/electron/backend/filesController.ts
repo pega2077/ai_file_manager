@@ -24,6 +24,7 @@ import { configManager } from "../configManager";
 import type { AppConfig } from "../configManager";
 import { i18n } from "../languageHelper";
 import { extractVideoScreenshots } from "./utils/videoCapture";
+import { tagService } from "./utils/tagService";
 
 function getTextConversionFailedMessage(): string {
   return i18n.t("backend.files.errors.textConversionFailed", "Failed to convert file to text");
@@ -401,7 +402,23 @@ export async function updateFileHandler(req: Request, res: Response): Promise<vo
     if (newPath !== oldPath) update.path = newPath;
     if (type && type !== row.type) update.type = type;
     if (category && category !== row.category) update.category = category;
-    if (newTags) update.tags = JSON.stringify(newTags);
+    
+    // Apply synonym checking to normalize tags when updating
+    let normalizedTags = newTags;
+    if (newTags) {
+      try {
+        normalizedTags = await tagService.normalizeTags(newTags);
+        logger.info("Tags normalized with synonym checking during update", { 
+          fileId, 
+          original: newTags, 
+          normalized: normalizedTags 
+        });
+      } catch (err) {
+        logger.warn("Failed to normalize tags during update", err as unknown);
+        normalizedTags = newTags; // Fallback to original tags
+      }
+      update.tags = JSON.stringify(normalizedTags);
+    }
 
     try {
       if (Object.keys(update).length > 1) {
@@ -433,7 +450,7 @@ export async function updateFileHandler(req: Request, res: Response): Promise<vo
         path: newPath,
         type,
         category,
-        tags: newTags ?? (row.tags ? JSON.parse(row.tags) : []),
+        tags: normalizedTags ?? (row.tags ? JSON.parse(row.tags) : []),
         renamed: renamedOnDisk,
         updated_at: nowIso,
       },
@@ -1999,6 +2016,20 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
 
     const hasSummaryUpdate = typeof autoSummary === "string" && autoSummary.length > 0;
     const hasTagUpdate = Array.isArray(autoTags) && autoTags.length > 0;
+    
+    // Apply synonym checking to normalize tags against the tag library
+    if (hasTagUpdate) {
+      try {
+        autoTags = await tagService.normalizeTags(autoTags);
+        logger.info("Tags normalized with synonym checking", { 
+          fileId: effectiveFileId, 
+          tagCount: autoTags.length 
+        });
+      } catch (err) {
+        logger.warn("Failed to normalize tags with synonym checking", err as unknown);
+      }
+    }
+    
     const importStatusUpdate: { imported: boolean; updated_at: string; summary?: string | null; tags?: string | null } = {
       imported: true,
       updated_at: new Date().toISOString(),
@@ -3068,6 +3099,137 @@ export async function queryFilesByPathHandler(req: Request, res: Response): Prom
   }
 }
 
+// -------- Tag Management Endpoints --------
+
+/**
+ * GET /api/tags/library
+ * Get the merged tag library (preset tags + database tags)
+ */
+export async function getTagLibraryHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const forceRefresh = req.query.refresh === 'true';
+    const tags = await tagService.getTagLibrary(forceRefresh);
+    
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        tags,
+        count: tags.length,
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/tags/library failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Failed to get tag library", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+/**
+ * POST /api/tags/normalize
+ * Normalize a list of tags using synonym checking
+ * Body: { tags: string[] }
+ */
+export async function normalizeTagsHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const body = req.body as { tags?: unknown } | undefined;
+    const inputTags = Array.isArray(body?.tags) ? body.tags : [];
+    
+    const normalizedTags = await tagService.normalizeTags(inputTags);
+    
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        original: inputTags,
+        normalized: normalizedTags,
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/tags/normalize failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Failed to normalize tags", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+/**
+ * POST /api/tags/cache/clear
+ * Clear the tag library cache
+ */
+export async function clearTagCacheHandler(req: Request, res: Response): Promise<void> {
+  try {
+    tagService.clearCache();
+    
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: {
+        message: "Tag cache cleared successfully",
+      },
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/tags/cache/clear failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Failed to clear tag cache", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
+/**
+ * GET /api/tags/cache/status
+ * Get the current status of the tag cache
+ */
+export async function getTagCacheStatusHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const status = tagService.getCacheStatus();
+    
+    res.status(200).json({
+      success: true,
+      message: "ok",
+      data: status,
+      error: null,
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  } catch (err) {
+    logger.error("/api/tags/cache/status failed", err as unknown);
+    res.status(500).json({
+      success: false,
+      message: "internal_error",
+      data: null,
+      error: { code: "INTERNAL_ERROR", message: "Failed to get tag cache status", details: null },
+      timestamp: new Date().toISOString(),
+      request_id: "",
+    });
+  }
+}
+
 
 export function registerFilesRoutes(app: Express) {
   // POST /api/files/list
@@ -3102,4 +3264,12 @@ export function registerFilesRoutes(app: Express) {
   app.post("/api/files/extract-tags", extractTagsHandler);
   // POST /api/files/query-by-paths
   app.post("/api/files/query-by-paths", queryFilesByPathHandler);
+  // GET /api/tags/library - Get merged tag library
+  app.get("/api/tags/library", getTagLibraryHandler);
+  // POST /api/tags/normalize - Normalize tags with synonym checking
+  app.post("/api/tags/normalize", normalizeTagsHandler);
+  // POST /api/tags/cache/clear - Clear tag cache
+  app.post("/api/tags/cache/clear", clearTagCacheHandler);
+  // GET /api/tags/cache/status - Get cache status
+  app.get("/api/tags/cache/status", getTagCacheStatusHandler);
 }
