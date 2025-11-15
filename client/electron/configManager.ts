@@ -162,6 +162,8 @@ export interface AppConfig {
     environment?: string;
     sendLogsByDefault?: boolean;
   };
+  /** Preset tag library for tag organization with synonym checking */
+  presetTags?: string[];
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -246,6 +248,16 @@ const DEFAULT_CONFIG: AppConfig = {
     environment: "production",
     sendLogsByDefault: false,
   },
+  presetTags: [
+    // Common document categories
+    '工作', '学习', '项目', '会议', '报告', '总结',
+    // Media and content types  
+    '图片', '视频', '音频', '文档', '演示',
+    // General classifications
+    '重要', '紧急', '参考', '归档', '草稿',
+    // Domain specific
+    '技术', '设计', '营销', '财务', '法律',
+  ],
 };
 
 export class ConfigManager {
