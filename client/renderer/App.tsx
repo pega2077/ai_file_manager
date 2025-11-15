@@ -15,6 +15,7 @@ import OllamaConfig from './pages/providers/OllamaConfig';
 import OpenAIConfig from './pages/providers/OpenAIConfig';
 import OpenRouterConfig from './pages/providers/OpenRouterConfig';
 import BailianConfig from './pages/providers/BailianConfig';
+import TransformerjsConfig from './pages/providers/TransformerjsConfig';
 
 type NavigationPayload = {
   route?: string;
@@ -67,6 +68,7 @@ function App() {
           <Route path="/settings/providers/openai" element={<OpenAIConfig />} />
           <Route path="/settings/providers/openrouter" element={<OpenRouterConfig />} />
           <Route path="/settings/providers/bailian" element={<BailianConfig />} />
+          <Route path="/settings/providers/transformerjs" element={<TransformerjsConfig />} />
           <Route path="/bot" element={<Bot />} />
           <Route path="/convert" element={<Convert />} />
         </Routes>

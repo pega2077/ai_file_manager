@@ -40,6 +40,11 @@
     "bailianEmbedModel": "text-embedding-v4",
     "bailianVisionModel": "qwen3-vl-plus"
   },
+  "transformerjs": {
+    "transformerjsChatModel": "Xenova/LaMini-Flan-T5-783M",
+    "transformerjsEmbedModel": "Xenova/all-MiniLM-L6-v2",
+    "transformerjsVisionModel": "Xenova/vit-gpt2-image-captioning"
+  },
   "fileConvertEndpoint": "https://converter.pegamob.com",
   "sqliteDbPath": "database\\files.db",
   "language": "zh",

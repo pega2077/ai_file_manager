@@ -160,7 +160,8 @@
         "openai": "OpenAI",
         "openrouter": "OpenRouter",
         "bailian": "Alibaba Bailian",
-        "azureOpenai": "Azure OpenAI"
+        "azureOpenai": "Azure OpenAI",
+        "transformerjs": "Transformer.js (local)"
         },
         "pegaModes": {
           "ollama": "Pega Ollama gateway",
@@ -261,7 +262,8 @@
         "openai": "OpenAI",
         "openrouter": "OpenRouter",
         "bailian": "Alibaba Bailian",
-        "azureOpenai": "Azure OpenAI"
+        "azureOpenai": "Azure OpenAI",
+        "transformerjs": "Transformer.js (local)"
       }
     },
     "common": {
@@ -279,6 +281,7 @@
       "configureOpenai": "Configure OpenAI",
       "configureOpenrouter": "Configure OpenRouter",
       "configureBailian": "Configure Bailian",
+      "configureTransformerjs": "Configure Transformer.js",
       "refreshPegaStatus": "Check status",
       "feedback": "Send feedback"
     },
@@ -495,6 +498,32 @@
           "label": "Embedding model",
           "placeholder": "text-embedding-v1",
           "extra": "Default embedding model: text-embedding-v1"
+        }
+      }
+    },
+    "transformerjs": {
+      "title": "Transformer.js Local Model Configuration",
+      "description": "Use Transformer.js to run large language models locally without external APIs. Models will be automatically downloaded to local cache.",
+      "fields": {
+        "chatModel": {
+          "label": "Chat model",
+          "placeholder": "Xenova/LaMini-Flan-T5-783M",
+          "extra": "Default model: Xenova/LaMini-Flan-T5-783M (small text generation model)"
+        },
+        "embedModel": {
+          "label": "Embedding model",
+          "placeholder": "Xenova/all-MiniLM-L6-v2",
+          "extra": "Default embedding model: Xenova/all-MiniLM-L6-v2 (lightweight embedding model)"
+        },
+        "visionModel": {
+          "label": "Vision model",
+          "placeholder": "Xenova/vit-gpt2-image-captioning",
+          "extra": "Default vision model: Xenova/vit-gpt2-image-captioning (image captioning model)"
+        },
+        "cacheDir": {
+          "label": "Cache directory",
+          "placeholder": "Leave empty for default location",
+          "extra": "Optional: specify model cache directory, leave empty to use system default"
         }
       }
     }

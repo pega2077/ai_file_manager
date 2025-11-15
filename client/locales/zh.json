@@ -159,7 +159,8 @@
         "openai": "OpenAI",
         "openrouter": "OpenRouter",
         "bailian": "阿里百炼",
-        "azureOpenai": "Azure OpenAI"
+        "azureOpenai": "Azure OpenAI",
+        "transformerjs": "Transformer.js（本地）"
         },
         "pegaModes": {
           "ollama": "Pega Ollama 网关",
@@ -260,7 +261,8 @@
         "openai": "OpenAI",
         "openrouter": "OpenRouter",
         "bailian": "阿里百炼",
-        "azureOpenai": "Azure OpenAI"
+        "azureOpenai": "Azure OpenAI",
+        "transformerjs": "Transformer.js（本地）"
       },
       "pegaModes": {
         "ollama": "Pega Ollama 网关",
@@ -282,6 +284,7 @@
       "configureOpenai": "配置 OpenAI",
       "configureOpenrouter": "配置 OpenRouter",
       "configureBailian": "配置百炼",
+      "configureTransformerjs": "配置 Transformer.js",
       "refreshPegaStatus": "检查状态",
       "feedback": "反馈问题"
     },
@@ -498,6 +501,32 @@
           "label": "嵌入模型",
           "placeholder": "text-embedding-v1",
           "extra": "默认嵌入模型：text-embedding-v1"
+        }
+      }
+    },
+    "transformerjs": {
+      "title": "Transformer.js 本地模型配置",
+      "description": "使用 Transformer.js 在本地运行大语言模型，无需外部 API。模型会自动下载到本地缓存。",
+      "fields": {
+        "chatModel": {
+          "label": "对话模型",
+          "placeholder": "Xenova/LaMini-Flan-T5-783M",
+          "extra": "默认模型：Xenova/LaMini-Flan-T5-783M（小型文本生成模型）"
+        },
+        "embedModel": {
+          "label": "嵌入模型",
+          "placeholder": "Xenova/all-MiniLM-L6-v2",
+          "extra": "默认嵌入模型：Xenova/all-MiniLM-L6-v2（轻量级嵌入模型）"
+        },
+        "visionModel": {
+          "label": "视觉模型",
+          "placeholder": "Xenova/vit-gpt2-image-captioning",
+          "extra": "默认视觉模型：Xenova/vit-gpt2-image-captioning（图像描述模型）"
+        },
+        "cacheDir": {
+          "label": "缓存目录",
+          "placeholder": "留空使用默认位置",
+          "extra": "可选：指定模型缓存目录，留空则使用系统默认位置"
         }
       }
     }

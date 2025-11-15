@@ -27,13 +27,18 @@ import {
   generateStructuredJsonWithBailian,
   describeImageWithBailian,
 } from "./bailian";
+import {
+  embedWithTransformerjs,
+  generateStructuredJsonWithTransformerjs,
+  describeImageWithTransformerjs,
+} from "./transformerjs";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 export type LlmMessage = OllamaMessage; // role + string content
 
 export type LlmTask = "chat" | "embed" | "vision";
 
-export type ProviderName = "ollama" | "openai" | "azure-openai" | "openrouter" | "bailian" | "pega";
+export type ProviderName = "ollama" | "openai" | "azure-openai" | "openrouter" | "bailian" | "pega" | "transformerjs";
 
 function getPegaMode(): "ollama" | "openrouter" {
   const cfg = configManager.getConfig();
@@ -44,7 +49,7 @@ function getPegaMode(): "ollama" | "openrouter" {
 export function getActiveProvider(): ProviderName {
   const cfg = configManager.getConfig();
   const p = cfg.llmProvider || "ollama";
-  if (p === "openai" || p === "azure-openai" || p === "openrouter" || p === "bailian" || p === "pega") {
+  if (p === "openai" || p === "azure-openai" || p === "openrouter" || p === "bailian" || p === "pega" || p === "transformerjs") {
     return p;
   }
   return "ollama";
@@ -105,6 +110,12 @@ export function getActiveModelName(task: LlmTask, providerOverride?: ProviderNam
     }
     return pc.pegaModel || cfg.pegaModel || "";
   }
+  if (provider === "transformerjs") {
+    const tc = cfg.transformerjs || {};
+    if (task === "embed") return tc.transformerjsEmbedModel || cfg.transformerjsEmbedModel || "";
+    if (task === "vision") return tc.transformerjsVisionModel || tc.transformerjsChatModel || cfg.transformerjsVisionModel || cfg.transformerjsChatModel || "";
+    return tc.transformerjsChatModel || cfg.transformerjsChatModel || "";
+  }
   // default to ollama
   const oc = cfg.ollama || {};
   if (task === "embed") return oc.ollamaEmbedModel || cfg.ollamaEmbedModel || "";
@@ -127,6 +138,9 @@ export async function embedText(inputs: string[], overrideModel?: string): Promi
     return getPegaMode() === "openrouter"
       ? embedWithPegaOpenRouter(inputs, overrideModel)
       : pegaOllamaClient.embed(inputs, overrideModel);
+  }
+  if (provider === "transformerjs") {
+    return embedWithTransformerjs(inputs, overrideModel);
   }
   return ollamaClient.embed(inputs, overrideModel);
 }
@@ -180,6 +194,11 @@ export async function generateStructuredJson(
       lang
     );
   }
+  if (provider === "transformerjs") {
+    const simpleMessages = messages.map((m) => ({ role: m.role, content: m.content }));
+    const schema = responseFormat?.json_schema?.schema as Record<string, unknown> | undefined;
+    return generateStructuredJsonWithTransformerjs(simpleMessages, schema, temperature, maxTokens, overrideModel || undefined);
+  }
   return ollamaClient.generateStructuredJson(
     messages,
     responseFormat,
@@ -212,6 +231,10 @@ export async function describeImage(
   if (provider === "bailian") {
     const img = Array.isArray(imageBase64) ? imageBase64[0] : imageBase64;
     return describeImageWithBailian(img, options?.prompt, options?.overrideModel, options?.timeoutMs, options?.maxTokens);
+  }
+  if (provider === "transformerjs") {
+    const img = Array.isArray(imageBase64) ? imageBase64[0] : imageBase64;
+    return describeImageWithTransformerjs(img, options?.prompt, options?.overrideModel, options?.maxTokens);
   }
   const imgs = Array.isArray(imageBase64) ? imageBase64 : [imageBase64];
   const describeOptions: DescribeImageOptions | undefined = options

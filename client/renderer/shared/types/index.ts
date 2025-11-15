@@ -170,16 +170,24 @@ export interface BailianConfig {
   bailianVisionModel?: string;
 }
 
+export interface TransformerjsConfig {
+  transformerjsChatModel?: string;
+  transformerjsEmbedModel?: string;
+  transformerjsVisionModel?: string;
+  transformerjsCacheDir?: string;
+}
+
 export interface AppConfig {
   useLocalService: boolean;
   localServicePort: number;
   localServiceHost: string;
   /** Selected LLM provider for chat/completions */
-  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega';
+  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'transformerjs';
   ollama?: OllamaConfig;
   openai?: OpenAIConfig;
   openrouter?: OpenRouterConfig;
   bailian?: BailianConfig;
+  transformerjs?: TransformerjsConfig;
   ollamaEndpoint?: string;
   ollamaModel?: string;
   ollamaEmbedModel?: string;
