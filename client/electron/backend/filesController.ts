@@ -3174,7 +3174,7 @@ export async function normalizeTagsHandler(req: Request, res: Response): Promise
  * POST /api/tags/cache/clear
  * Clear the tag library cache
  */
-export async function clearTagCacheHandler(req: Request, res: Response): Promise<void> {
+export async function clearTagCacheHandler(_req: Request, res: Response): Promise<void> {
   try {
     tagService.clearCache();
     
@@ -3205,7 +3205,7 @@ export async function clearTagCacheHandler(req: Request, res: Response): Promise
  * GET /api/tags/cache/status
  * Get the current status of the tag cache
  */
-export async function getTagCacheStatusHandler(req: Request, res: Response): Promise<void> {
+export async function getTagCacheStatusHandler(_req: Request, res: Response): Promise<void> {
   try {
     const status = tagService.getCacheStatus();
     

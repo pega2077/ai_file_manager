@@ -1,4 +1,3 @@
-import { compareTwoStrings } from "string-similarity";
 import FileModel from "../models/file";
 import { logger } from "../../logger";
 import { configManager } from "../../configManager";
@@ -10,12 +9,55 @@ import { configManager } from "../../configManager";
  * - Manages preset tag library from configuration
  * - Queries existing tags from database
  * - Merges and caches tag library
- * - Performs synonym checking for new tags
+ * - Performs synonym checking for new tags using Levenshtein distance
  */
 
 interface TagCacheEntry {
   tags: string[];
   timestamp: number;
+}
+
+/**
+ * Calculate Levenshtein distance between two strings
+ * Used for fuzzy string matching to detect similar tags
+ */
+function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = [];
+
+  // Initialize matrix
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  // Calculate distances
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j] + 1      // deletion
+        );
+      }
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+/**
+ * Calculate similarity score between two strings (0-1, 1 being identical)
+ */
+function stringSimilarity(a: string, b: string): number {
+  const maxLen = Math.max(a.length, b.length);
+  if (maxLen === 0) return 1;
+  const distance = levenshteinDistance(a, b);
+  return 1 - distance / maxLen;
 }
 
 class TagService {
@@ -157,7 +199,7 @@ class TagService {
     let bestScore = 0;
 
     tagLibrary.forEach(tag => {
-      const score = compareTwoStrings(normalizedInput.toLowerCase(), tag.toLowerCase());
+      const score = stringSimilarity(normalizedInput.toLowerCase(), tag.toLowerCase());
       if (score > bestScore && score >= this.SIMILARITY_THRESHOLD) {
         bestScore = score;
         bestMatch = tag;
