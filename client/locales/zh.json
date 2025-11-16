@@ -511,6 +511,7 @@
       "downloadSuccess": "模型 {{model}} 下载成功",
       "downloadError": "模型 {{model}} 下载失败",
       "downloadComplete": "下载完成",
+      "networkError": "网络错误：无法连接到模型服务器，请检查网络连接",
       "fields": {
         "chatModel": {
           "label": "对话模型",
@@ -531,7 +532,18 @@
           "label": "缓存目录",
           "placeholder": "留空使用默认位置（程序目录/models）",
           "extra": "可选：指定模型缓存目录，留空则使用程序执行目录下的 models 文件夹"
+        },
+        "quantization": {
+          "label": "量化等级",
+          "placeholder": "选择量化等级",
+          "extra": "量化可以减小模型大小和提高推理速度，但可能略微降低精度。推荐使用 q8"
         }
+      },
+      "quantizationOptions": {
+        "fp32": "FP32 - 全精度（最高质量，最大体积）",
+        "fp16": "FP16 - 半精度（高质量，中等体积）",
+        "q8": "Q8 - 8位量化（推荐，平衡质量和速度）",
+        "q4": "Q4 - 4位量化（最快速度，最小体积）"
       }
     }
   },

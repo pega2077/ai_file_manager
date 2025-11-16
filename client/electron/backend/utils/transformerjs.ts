@@ -13,6 +13,7 @@ export interface TransformerjsConfig {
   embedModel?: string;
   visionModel?: string;
   cacheDir?: string;
+  quantization?: string; // Quantization dtype: fp32, fp16, q8, q4, etc.
 }
 
 let embeddingPipeline: unknown = null;
@@ -46,6 +47,7 @@ function resolveConfig(): TransformerjsConfig {
     embedModel: tc.transformerjsEmbedModel || cfg.transformerjsEmbedModel || "Xenova/all-MiniLM-L6-v2",
     visionModel: tc.transformerjsVisionModel || cfg.transformerjsVisionModel || "Xenova/vit-gpt2-image-captioning",
     cacheDir: cacheDir,
+    quantization: tc.transformerjsQuantization || cfg.transformerjsQuantization || "q8", // Default to q8 for balance of speed and quality
   };
 }
 
@@ -57,10 +59,11 @@ async function getEmbeddingPipeline(model?: string) {
     return embeddingPipeline;
   }
   
-  logger.info(`Loading transformerjs embedding model: ${modelName}`);
+  logger.info(`Loading transformerjs embedding model: ${modelName} with quantization: ${config.quantization}`);
   
   try {
     embeddingPipeline = await pipeline("feature-extraction", modelName, {
+      dtype: config.quantization as 'fp32' | 'fp16' | 'q8' | 'q4',
       progress_callback: (progress: { status: string; file?: string; loaded?: number; total?: number }) => {
         if (progress.status === "progress" && progress.file && progress.loaded && progress.total) {
           logger.info(`Model download: ${progress.file} - ${Math.round((progress.loaded / progress.total) * 100)}%`);
@@ -83,10 +86,11 @@ async function getTextGenerationPipeline(model?: string) {
     return textGenerationPipeline;
   }
   
-  logger.info(`Loading transformerjs text generation model: ${modelName}`);
+  logger.info(`Loading transformerjs text generation model: ${modelName} with quantization: ${config.quantization}`);
   
   try {
     textGenerationPipeline = await pipeline("text2text-generation", modelName, {
+      dtype: config.quantization as 'fp32' | 'fp16' | 'q8' | 'q4',
       progress_callback: (progress: { status: string; file?: string; loaded?: number; total?: number }) => {
         if (progress.status === "progress" && progress.file && progress.loaded && progress.total) {
           logger.info(`Model download: ${progress.file} - ${Math.round((progress.loaded / progress.total) * 100)}%`);
@@ -109,10 +113,11 @@ async function getImageToTextPipeline(model?: string) {
     return imageToTextPipeline;
   }
   
-  logger.info(`Loading transformerjs image-to-text model: ${modelName}`);
+  logger.info(`Loading transformerjs image-to-text model: ${modelName} with quantization: ${config.quantization}`);
   
   try {
     imageToTextPipeline = await pipeline("image-to-text", modelName, {
+      dtype: config.quantization as 'fp32' | 'fp16' | 'q8' | 'q4',
       progress_callback: (progress: { status: string; file?: string; loaded?: number; total?: number }) => {
         if (progress.status === "progress" && progress.file && progress.loaded && progress.total) {
           logger.info(`Model download: ${progress.file} - ${Math.round((progress.loaded / progress.total) * 100)}%`);
@@ -286,8 +291,9 @@ export async function downloadModel(
       pipelineType = 'image-to-text';
     }
     
-    // Download the model by creating a pipeline
+    // Download the model by creating a pipeline with quantization
     await pipeline(pipelineType, modelName, {
+      dtype: config.quantization as 'fp32' | 'fp16' | 'q8' | 'q4',
       progress_callback: (progress: { status: string; file?: string; loaded?: number; total?: number }) => {
         if (progress.status === "progress" && progress.file && progress.loaded && progress.total) {
           const percent = (progress.loaded / progress.total) * 100;

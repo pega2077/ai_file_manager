@@ -43,7 +43,8 @@
   "transformerjs": {
     "transformerjsChatModel": "Xenova/LaMini-Flan-T5-783M",
     "transformerjsEmbedModel": "Xenova/all-MiniLM-L6-v2",
-    "transformerjsVisionModel": "Xenova/vit-gpt2-image-captioning"
+    "transformerjsVisionModel": "Xenova/vit-gpt2-image-captioning",
+    "transformerjsQuantization": "q8"
   },
   "fileConvertEndpoint": "https://converter.pegamob.com",
   "sqliteDbPath": "database\\files.db",

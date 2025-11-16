@@ -508,6 +508,7 @@
       "downloadSuccess": "Model {{model}} downloaded successfully",
       "downloadError": "Failed to download model {{model}}",
       "downloadComplete": "Download complete",
+      "networkError": "Network error: Unable to connect to model server, please check your network connection",
       "fields": {
         "chatModel": {
           "label": "Chat model",
@@ -528,7 +529,18 @@
           "label": "Cache directory",
           "placeholder": "Leave empty for default location (program directory/models)",
           "extra": "Optional: specify model cache directory, leave empty to use the models folder under program execution directory"
+        },
+        "quantization": {
+          "label": "Quantization Level",
+          "placeholder": "Select quantization level",
+          "extra": "Quantization reduces model size and improves inference speed, but may slightly reduce accuracy. Q8 is recommended"
         }
+      },
+      "quantizationOptions": {
+        "fp32": "FP32 - Full Precision (Highest quality, largest size)",
+        "fp16": "FP16 - Half Precision (High quality, medium size)",
+        "q8": "Q8 - 8-bit Quantized (Recommended, balanced quality and speed)",
+        "q4": "Q4 - 4-bit Quantized (Fastest, smallest size)"
       }
     }
   },
