@@ -6,6 +6,7 @@
   // Unpack native modules and dynamic libraries so Node can dlopen them at runtime
   "asarUnpack": [
     "node_modules/faiss-node/**",
+    "node_modules/onnxruntime-node/**",
     "**/*.node",
     "**/*.dylib",
     "**/*.so*"
@@ -21,6 +22,14 @@
     {
       "from": "node_modules/faiss-node",
       "to": "node_modules/faiss-node",
+      "filter": [
+        "**/*"
+      ]
+    },
+    {
+      // Ensure onnxruntime-node native bindings are packaged for local model inference
+      "from": "node_modules/onnxruntime-node",
+      "to": "node_modules/onnxruntime-node",
       "filter": [
         "**/*"
       ]
