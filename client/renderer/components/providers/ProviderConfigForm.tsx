@@ -4,15 +4,15 @@ import type { FormInstance } from 'antd/es/form';
 import { useTranslation } from '../../shared/i18n/I18nProvider';
 import type { AppConfig } from '../../shared/types';
 
-type ProviderKey = 'ollama' | 'openai' | 'openrouter' | 'bailian';
+type ProviderKey = 'ollama' | 'openai' | 'openrouter' | 'bailian' | 'llamacpp';
 
-type ProviderRecord = Record<string, string | undefined>;
+type ProviderRecord = Record<string, string | number | undefined>;
 
 type ProviderConfigResponse = NonNullable<AppConfig[ProviderKey]> | Record<string, unknown>;
 
 export interface FieldDefinition {
   name: string;
-  inputType?: 'text' | 'password';
+  inputType?: 'text' | 'password' | 'number';
   labelKey: string;
   placeholderKey?: string;
   extraKey?: string;
@@ -41,7 +41,18 @@ const sanitizeEntries = (raw: FormValues, fields: FieldDefinition[]): ProviderRe
       return;
     }
     const trimmed = value.trim();
-    result[field.name] = trimmed.length > 0 ? trimmed : undefined;
+    
+    // Handle number fields
+    if (field.inputType === 'number') {
+      if (trimmed.length === 0) {
+        result[field.name] = undefined;
+      } else {
+        const num = Number(trimmed);
+        result[field.name] = isNaN(num) ? undefined : num;
+      }
+    } else {
+      result[field.name] = trimmed.length > 0 ? trimmed : undefined;
+    }
   });
   return result;
 };
@@ -50,7 +61,11 @@ const toDisplayValues = (record: ProviderRecord, fields: FieldDefinition[]): For
   const result: FormValues = {};
   fields.forEach((field) => {
     const value = record[field.name];
-    result[field.name] = typeof value === 'string' ? value : '';
+    if (typeof value === 'number') {
+      result[field.name] = value.toString();
+    } else {
+      result[field.name] = typeof value === 'string' ? value : '';
+    }
   });
   return result;
 };
@@ -168,7 +183,9 @@ const ProviderConfigForm = ({
         <Spin spinning={loading || saving} tip={loading ? t('providerConfig.common.loading') : undefined}>
           <Form<FormValues> form={form} layout="vertical" onFinish={handleSubmit} disabled={loading || saving}>
             {fields.map((field) => {
-              const InputComponent = field.inputType === 'password' ? Input.Password : Input;
+              const isPassword = field.inputType === 'password';
+              const isNumber = field.inputType === 'number';
+              const InputComponent = isPassword ? Input.Password : Input;
               return (
                 <Form.Item
                   key={field.name}
@@ -177,9 +194,10 @@ const ProviderConfigForm = ({
                   extra={field.extraKey ? t(field.extraKey) : undefined}
                 >
                   <InputComponent
+                    type={isNumber ? 'number' : 'text'}
                     placeholder={field.placeholderKey ? t(field.placeholderKey) : undefined}
-                    allowClear={field.inputType !== 'password'}
-                    autoComplete={field.inputType === 'password' ? 'new-password' : 'off'}
+                    allowClear={!isPassword}
+                    autoComplete={isPassword ? 'new-password' : 'off'}
                   />
                 </Form.Item>
               );

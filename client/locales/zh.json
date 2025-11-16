@@ -284,6 +284,7 @@
       "configureOpenai": "配置 OpenAI",
       "configureOpenrouter": "配置 OpenRouter",
       "configureBailian": "配置百炼",
+      "configureLlamacpp": "配置 LlamaCpp",
       "refreshPegaStatus": "检查状态",
       "feedback": "反馈问题"
     },

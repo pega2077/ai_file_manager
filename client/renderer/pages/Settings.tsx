@@ -39,7 +39,8 @@ type LlmProvider =
   | "azure-openai"
   | "openrouter"
   | "bailian"
-  | "pega";
+  | "pega"
+  | "llamacpp";
 
 interface SettingsState {
   language: SupportedLocale;
@@ -955,6 +956,9 @@ const Settings = () => {
                   </Button>
                   <Button onClick={() => navigate("/settings/providers/bailian")}>
                     {t("settings.actions.configureBailian")}
+                  </Button>
+                  <Button onClick={() => navigate("/settings/providers/llamacpp")}>
+                    {t("settings.actions.configureLlamacpp")}
                   </Button>
                 </div>
                 <Text

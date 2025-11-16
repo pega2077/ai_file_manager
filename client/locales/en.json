@@ -281,6 +281,7 @@
       "configureOpenai": "Configure OpenAI",
       "configureOpenrouter": "Configure OpenRouter",
       "configureBailian": "Configure Bailian",
+      "configureLlamacpp": "Configure LlamaCpp",
       "refreshPegaStatus": "Check status",
       "feedback": "Send feedback"
     },

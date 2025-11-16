@@ -34,7 +34,7 @@ export type LlmMessage = OllamaMessage; // role + string content
 
 export type LlmTask = "chat" | "embed" | "vision";
 
-export type ProviderName = "ollama" | "openai" | "azure-openai" | "openrouter" | "bailian" | "pega";
+export type ProviderName = "ollama" | "openai" | "azure-openai" | "openrouter" | "bailian" | "pega" | "llamacpp";
 
 function getPegaMode(): "ollama" | "openrouter" {
   const cfg = configManager.getConfig();
