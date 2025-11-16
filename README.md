@@ -23,6 +23,7 @@ A smart file manager powered by AI. It automatically classifies your imported fi
 - **Document Processing**: Remote file conversion via the configurable `fileConvertEndpoint` service (with Node orchestration)
 - **Data Storage**: SQLite (document metadata via Sequelize) + Faiss vector index (faiss-node)
 - **AI Models**: Pluggable LLM / embedding providers (OpenAI, Azure, OpenRouter, Bailian, Ollama, etc.)
+  - See [LLM Provider Architecture](docs/LLM_PROVIDER_ARCHITECTURE.md) for detailed documentation
 
 ## Project Structure
 

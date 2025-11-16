@@ -1,12 +1,15 @@
 import type { AppConfig } from "../../configManager";
-import { BaseOllamaClient, type OllamaResolvedConfig } from "./ollama";
+import { OllamaClient, type OllamaResolvedConfig } from "./OllamaProvider";
 
-export class PegaOllamaClient extends BaseOllamaClient {
-  protected readonly providerLabel = "Pega";
+const trimEndpoint = (value?: string): string => (value ?? "").replace(/\/+$/, "");
+
+export class PegaOllamaClient extends OllamaClient {
+  // Use a more specific readonly modifier to allow this override
+  protected readonly providerLabel: string = "Pega";
 
   protected resolveConfig(cfg: AppConfig): OllamaResolvedConfig {
     const section = cfg.pega ?? {};
-    const baseEndpoint = this.trimEndpoint(section.pegaEndpoint || cfg.pegaEndpoint);
+    const baseEndpoint = trimEndpoint(section.pegaEndpoint || cfg.pegaEndpoint);
     return {
       endpoint: baseEndpoint ? `${baseEndpoint}/ollama` : "",
       chatModel: section.pegaModel || cfg.pegaModel,
