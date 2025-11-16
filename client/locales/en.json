@@ -160,7 +160,8 @@
         "openai": "OpenAI",
         "openrouter": "OpenRouter",
         "bailian": "Alibaba Bailian",
-        "azureOpenai": "Azure OpenAI"
+        "azureOpenai": "Azure OpenAI",
+        "llamacpp": "LlamaCpp (local)"
         },
         "pegaModes": {
           "ollama": "Pega Ollama gateway",
@@ -261,7 +262,8 @@
         "openai": "OpenAI",
         "openrouter": "OpenRouter",
         "bailian": "Alibaba Bailian",
-        "azureOpenai": "Azure OpenAI"
+        "azureOpenai": "Azure OpenAI",
+        "llamacpp": "LlamaCpp (local)"
       }
     },
     "common": {
@@ -495,6 +497,47 @@
           "label": "Embedding model",
           "placeholder": "text-embedding-v1",
           "extra": "Default embedding model: text-embedding-v1"
+        }
+      }
+    },
+    "llamacpp": {
+      "title": "LlamaCpp configuration",
+      "description": "Configure local LLM inference with node-llama-cpp. Download and manage GGUF models.",
+      "fields": {
+        "modelsDirectory": {
+          "label": "Models directory",
+          "placeholder": "Leave blank to use default",
+          "extra": "Directory where GGUF model files are stored"
+        },
+        "chatModelPath": {
+          "label": "Chat model path",
+          "placeholder": "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf",
+          "extra": "Filename or absolute path to chat model"
+        },
+        "embedModelPath": {
+          "label": "Embedding model path",
+          "placeholder": "nomic-embed-text-v1.5.Q4_K_M.gguf",
+          "extra": "Filename or absolute path to embedding model"
+        },
+        "visionModelPath": {
+          "label": "Vision model path",
+          "placeholder": "llava-v1.6-vicuna-7b.Q4_K_M.gguf",
+          "extra": "Filename or absolute path to vision model"
+        },
+        "contextSize": {
+          "label": "Context size",
+          "placeholder": "4096",
+          "extra": "Maximum context window size in tokens"
+        },
+        "gpuLayers": {
+          "label": "GPU layers",
+          "placeholder": "-1",
+          "extra": "Number of layers to offload to GPU (-1 for auto)"
+        },
+        "threads": {
+          "label": "CPU threads",
+          "placeholder": "Auto-detect",
+          "extra": "Number of threads for inference (leave blank for CPU count)"
         }
       }
     }

@@ -159,7 +159,8 @@
         "openai": "OpenAI",
         "openrouter": "OpenRouter",
         "bailian": "阿里百炼",
-        "azureOpenai": "Azure OpenAI"
+        "azureOpenai": "Azure OpenAI",
+        "llamacpp": "LlamaCpp（本地）"
         },
         "pegaModes": {
           "ollama": "Pega Ollama 网关",
@@ -260,7 +261,8 @@
         "openai": "OpenAI",
         "openrouter": "OpenRouter",
         "bailian": "阿里百炼",
-        "azureOpenai": "Azure OpenAI"
+        "azureOpenai": "Azure OpenAI",
+        "llamacpp": "LlamaCpp（本地）"
       },
       "pegaModes": {
         "ollama": "Pega Ollama 网关",
@@ -498,6 +500,47 @@
           "label": "嵌入模型",
           "placeholder": "text-embedding-v1",
           "extra": "默认嵌入模型：text-embedding-v1"
+        }
+      }
+    },
+    "llamacpp": {
+      "title": "LlamaCpp 配置",
+      "description": "使用 node-llama-cpp 配置本地大模型推理。下载和管理 GGUF 模型文件。",
+      "fields": {
+        "modelsDirectory": {
+          "label": "模型目录",
+          "placeholder": "留空使用默认目录",
+          "extra": "存储 GGUF 模型文件的目录"
+        },
+        "chatModelPath": {
+          "label": "对话模型路径",
+          "placeholder": "Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf",
+          "extra": "对话模型的文件名或绝对路径"
+        },
+        "embedModelPath": {
+          "label": "嵌入模型路径",
+          "placeholder": "nomic-embed-text-v1.5.Q4_K_M.gguf",
+          "extra": "嵌入模型的文件名或绝对路径"
+        },
+        "visionModelPath": {
+          "label": "视觉模型路径",
+          "placeholder": "llava-v1.6-vicuna-7b.Q4_K_M.gguf",
+          "extra": "视觉模型的文件名或绝对路径"
+        },
+        "contextSize": {
+          "label": "上下文大小",
+          "placeholder": "4096",
+          "extra": "最大上下文窗口大小（tokens）"
+        },
+        "gpuLayers": {
+          "label": "GPU 层数",
+          "placeholder": "-1",
+          "extra": "卸载到 GPU 的层数（-1 表示自动）"
+        },
+        "threads": {
+          "label": "CPU 线程数",
+          "placeholder": "自动检测",
+          "extra": "推理使用的线程数（留空使用 CPU 核心数）"
         }
       }
     }

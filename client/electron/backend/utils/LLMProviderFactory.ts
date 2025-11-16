@@ -7,8 +7,9 @@ import { BaseLLMProvider } from "./BaseLLMProvider";
 import { openAIProvider } from "./OpenAIProvider";
 import { openRouterProvider } from "./OpenRouterProvider";
 import { ollamaProvider } from "./OllamaProvider";
+import { llamaCppProvider } from "./LlamaCppProvider";
 
-export type ProviderType = "openai" | "azure-openai" | "openrouter" | "ollama" | "bailian" | "pega";
+export type ProviderType = "openai" | "azure-openai" | "openrouter" | "ollama" | "bailian" | "pega" | "llamacpp";
 
 /**
  * Provider factory registry
@@ -22,6 +23,7 @@ class LLMProviderFactory {
     this.register("azure-openai", openAIProvider); // OpenAI handles Azure-compatible endpoints
     this.register("openrouter", openRouterProvider);
     this.register("ollama", ollamaProvider);
+    this.register("llamacpp", llamaCppProvider);
   }
 
   /**

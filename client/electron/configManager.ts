@@ -45,8 +45,24 @@ export interface AppConfig {
     /** Default multimodal/vision model */
     bailianVisionModel?: string;
   };
-  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' */
-  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega';
+  llamacpp?: {
+    /** Directory where GGUF models are stored */
+    modelsDirectory?: string;
+    /** Path to chat model file (absolute or relative to modelsDirectory) */
+    chatModelPath?: string;
+    /** Path to embedding model file (absolute or relative to modelsDirectory) */
+    embedModelPath?: string;
+    /** Path to vision model file (absolute or relative to modelsDirectory) */
+    visionModelPath?: string;
+    /** Context size for model inference */
+    contextSize?: number;
+    /** Number of layers to offload to GPU (-1 for auto) */
+    gpuLayers?: number;
+    /** Number of threads to use for inference */
+    threads?: number;
+  };
+  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'llamacpp' */
+  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'llamacpp';
   openai?: {
     /** OpenAI compatible endpoint (e.g., https://api.openai.com/v1 or custom) */
     openaiEndpoint?: string;
@@ -112,6 +128,14 @@ export interface AppConfig {
   bailianModel?: string;
   bailianEmbedModel?: string;
   bailianVisionModel?: string;
+  // Legacy LlamaCpp flat fields
+  modelsDirectory?: string;
+  chatModelPath?: string;
+  embedModelPath?: string;
+  visionModelPath?: string;
+  contextSize?: number;
+  gpuLayers?: number;
+  threads?: number;
   /** Optional HTTP endpoint for third-party file conversion service */
   fileConvertEndpoint?: string;
   /** Relative or absolute path to the local SQLite database file */
@@ -214,6 +238,15 @@ const DEFAULT_CONFIG: AppConfig = {
     bailianModel: "qwen-plus",
     bailianEmbedModel: "text-embedding-v4",
     bailianVisionModel: "qwen3-vl-plus",//
+  },
+  llamacpp: {
+    modelsDirectory: undefined, // Will use default in getDefaultModelsDirectory()
+    chatModelPath: undefined,
+    embedModelPath: undefined,
+    visionModelPath: undefined,
+    contextSize: 4096,
+    gpuLayers: -1, // Auto-detect
+    threads: undefined, // Will use CPU count
   },
   fileConvertEndpoint: "https://converter.pegamob.com",
   // Default to repository-standard SQLite location; can be overridden in config.json
