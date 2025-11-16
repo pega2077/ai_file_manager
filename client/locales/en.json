@@ -522,8 +522,8 @@
         },
         "cacheDir": {
           "label": "Cache directory",
-          "placeholder": "Leave empty for default location",
-          "extra": "Optional: specify model cache directory, leave empty to use system default"
+          "placeholder": "Leave empty for default location (program directory/models)",
+          "extra": "Optional: specify model cache directory, leave empty to use the models folder under program execution directory"
         }
       }
     }

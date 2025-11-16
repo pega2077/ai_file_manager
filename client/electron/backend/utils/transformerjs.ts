@@ -1,6 +1,8 @@
 import { configManager } from "../../configManager";
 import { logger } from "../../logger";
 import { pipeline, env } from "@xenova/transformers";
+import { getBaseDir } from "./pathHelper";
+import path from "path";
 
 // Configure transformers.js to use local cache
 env.allowLocalModels = true;
@@ -17,15 +19,33 @@ let embeddingPipeline: unknown = null;
 let textGenerationPipeline: unknown = null;
 let imageToTextPipeline: unknown = null;
 
+/**
+ * Get the default cache directory for transformer.js models
+ * Returns the "models" folder under the program execution directory
+ */
+export function getDefaultCacheDir(): string {
+  const baseDir = getBaseDir();
+  return path.join(baseDir, "models");
+}
+
 function resolveConfig(): TransformerjsConfig {
   const cfg = configManager.getConfig();
   const tc = cfg.transformerjs || {};
+  
+  // Use configured cache dir or default to "models" folder in base directory
+  const cacheDir = tc.transformerjsCacheDir || cfg.transformerjsCacheDir || getDefaultCacheDir();
+  
+  // Set the cache directory for transformers.js
+  if (cacheDir) {
+    env.cacheDir = cacheDir;
+    logger.info(`Transformer.js cache directory set to: ${cacheDir}`);
+  }
   
   return {
     chatModel: tc.transformerjsChatModel || cfg.transformerjsChatModel || "Xenova/LaMini-Flan-T5-783M",
     embedModel: tc.transformerjsEmbedModel || cfg.transformerjsEmbedModel || "Xenova/all-MiniLM-L6-v2",
     visionModel: tc.transformerjsVisionModel || cfg.transformerjsVisionModel || "Xenova/vit-gpt2-image-captioning",
-    cacheDir: tc.transformerjsCacheDir || cfg.transformerjsCacheDir,
+    cacheDir: cacheDir,
   };
 }
 
@@ -113,7 +133,7 @@ export async function embedWithTransformerjs(inputs: string[], overrideModel?: s
   }
   
   try {
-    const pipe = await getEmbeddingPipeline(overrideModel);
+    const pipe = await getEmbeddingPipeline(overrideModel) as (text: string, options: { pooling: string; normalize: boolean }) => Promise<{ data: ArrayLike<number> }>;
     const embeddings: number[][] = [];
     
     for (const text of inputs) {
@@ -139,7 +159,7 @@ export async function generateStructuredJsonWithTransformerjs(
   overrideModel?: string
 ): Promise<unknown> {
   try {
-    const pipe = await getTextGenerationPipeline(overrideModel);
+    const pipe = await getTextGenerationPipeline(overrideModel) as (prompt: string, options: { max_new_tokens: number; temperature: number; do_sample: boolean }) => Promise<unknown>;
     
     // Combine messages into a single prompt
     const prompt = messages
@@ -203,7 +223,7 @@ export async function describeImageWithTransformerjs(
   maxTokens?: number
 ): Promise<string> {
   try {
-    const pipe = await getImageToTextPipeline(overrideModel);
+    const pipe = await getImageToTextPipeline(overrideModel) as (image: Buffer, options: { max_new_tokens: number }) => Promise<unknown>;
     
     // Remove data URL prefix if present
     const base64Data = imageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
