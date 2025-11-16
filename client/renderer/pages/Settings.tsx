@@ -143,6 +143,7 @@ const Settings = () => {
         value: "azure-openai",
         label: t("settings.options.llmProviders.azureOpenai"),
       },
+      { value: "llamacpp", label: t("settings.options.llmProviders.llamacpp") },
     ],
     [t]
   );

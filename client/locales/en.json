@@ -540,6 +540,23 @@
           "placeholder": "Auto-detect",
           "extra": "Number of threads for inference (leave blank for CPU count)"
         }
+      },
+      "download": {
+        "title": "Download Model",
+        "description": "Download GGUF models from HuggingFace or other sources. Models will be saved to your configured models directory.",
+        "urlLabel": "Model URL",
+        "urlPlaceholder": "https://huggingface.co/.../model.gguf",
+        "urlRequired": "Model URL is required",
+        "urlInvalid": "Please enter a valid URL",
+        "fileNameLabel": "File Name",
+        "fileNamePlaceholder": "model.Q4_K_M.gguf",
+        "fileNameRequired": "File name is required",
+        "fileNameInvalid": "File name must end with .gguf",
+        "button": "Download Model",
+        "success": "Model downloaded successfully",
+        "error": "Failed to download model",
+        "ipcError": "IPC communication not available",
+        "examplesTitle": "Example URLs:"
       }
     }
   },

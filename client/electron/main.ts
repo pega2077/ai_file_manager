@@ -681,6 +681,19 @@ function setupIpcHandlers() {
     return true;
   });
 
+  ipcMain.handle("llamacpp:downloadModel", async (_event, params: { url: string; fileName: string }) => {
+    try {
+      logger.info(`Downloading LlamaCpp model: ${params.fileName} from ${params.url}`);
+      const { llamaCppProvider } = await import("./backend/utils/LlamaCppProvider");
+      const outputPath = await llamaCppProvider.downloadModel(params.url, params.fileName);
+      logger.info(`Model downloaded successfully: ${outputPath}`);
+      return { success: true, path: outputPath };
+    } catch (error) {
+      logger.error("Failed to download LlamaCpp model", error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
   // Removed deprecated sync-language-config IPC handler
 }
 

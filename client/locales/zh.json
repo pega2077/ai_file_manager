@@ -543,6 +543,23 @@
           "placeholder": "自动检测",
           "extra": "推理使用的线程数（留空使用 CPU 核心数）"
         }
+      },
+      "download": {
+        "title": "下载模型",
+        "description": "从 HuggingFace 或其他源下载 GGUF 模型文件。模型将保存到您配置的模型目录中。",
+        "urlLabel": "模型 URL",
+        "urlPlaceholder": "https://huggingface.co/.../model.gguf",
+        "urlRequired": "模型 URL 为必填项",
+        "urlInvalid": "请输入有效的 URL",
+        "fileNameLabel": "文件名",
+        "fileNamePlaceholder": "model.Q4_K_M.gguf",
+        "fileNameRequired": "文件名为必填项",
+        "fileNameInvalid": "文件名必须以 .gguf 结尾",
+        "button": "下载模型",
+        "success": "模型下载成功",
+        "error": "模型下载失败",
+        "ipcError": "IPC 通信不可用",
+        "examplesTitle": "示例 URL："
       }
     }
   },
