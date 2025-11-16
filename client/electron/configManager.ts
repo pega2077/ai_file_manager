@@ -54,6 +54,8 @@ export interface AppConfig {
     transformerjsVisionModel?: string;
     /** Optional cache directory for Transformer.js models */
     transformerjsCacheDir?: string;
+    /** Quantization level: fp32, fp16, q8, q4 */
+    transformerjsQuantization?: string;
   };
   /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'transformerjs' */
   llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'transformerjs';
@@ -126,6 +128,7 @@ export interface AppConfig {
   transformerjsEmbedModel?: string;
   transformerjsVisionModel?: string;
   transformerjsCacheDir?: string;
+  transformerjsQuantization?: string;
   /** Optional HTTP endpoint for third-party file conversion service */
   fileConvertEndpoint?: string;
   /** Relative or absolute path to the local SQLite database file */

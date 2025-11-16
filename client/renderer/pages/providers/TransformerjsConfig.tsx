@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Layout, Card, Form, Input, Button, Space, Typography, message, Progress, Divider } from 'antd';
+import { Layout, Card, Form, Input, Button, Space, Typography, message, Progress, Divider, Select } from 'antd';
 import { DownloadOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../../shared/i18n/I18nProvider';
 
 const { Content } = Layout;
 const { Title, Paragraph, Text } = Typography;
+const { Option } = Select;
 
 interface DownloadProgress {
   model: string;
   status: 'idle' | 'downloading' | 'completed' | 'error';
   progress: number;
   message?: string;
+  error?: string;
 }
 
 const TRANSFORMERJS_DEFAULTS = {
@@ -19,6 +21,7 @@ const TRANSFORMERJS_DEFAULTS = {
   transformerjsEmbedModel: 'Xenova/all-MiniLM-L6-v2',
   transformerjsVisionModel: 'Xenova/vit-gpt2-image-captioning',
   transformerjsCacheDir: '',
+  transformerjsQuantization: 'q8',
 };
 
 const TransformerjsConfig = () => {
@@ -41,6 +44,7 @@ const TransformerjsConfig = () => {
         transformerjsEmbedModel: transformerjsConfig.transformerjsEmbedModel || TRANSFORMERJS_DEFAULTS.transformerjsEmbedModel,
         transformerjsVisionModel: transformerjsConfig.transformerjsVisionModel || TRANSFORMERJS_DEFAULTS.transformerjsVisionModel,
         transformerjsCacheDir: transformerjsConfig.transformerjsCacheDir || TRANSFORMERJS_DEFAULTS.transformerjsCacheDir,
+        transformerjsQuantization: transformerjsConfig.transformerjsQuantization || TRANSFORMERJS_DEFAULTS.transformerjsQuantization,
       });
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -62,6 +66,7 @@ const TransformerjsConfig = () => {
         transformerjsEmbedModel: values.transformerjsEmbedModel?.trim() || undefined,
         transformerjsVisionModel: values.transformerjsVisionModel?.trim() || undefined,
         transformerjsCacheDir: values.transformerjsCacheDir?.trim() || undefined,
+        transformerjsQuantization: values.transformerjsQuantization || undefined,
       };
       await window.electronAPI.updateAppConfig({ transformerjs: config });
       message.success(t('providerConfig.common.saveSuccess'));
@@ -123,11 +128,27 @@ const TransformerjsConfig = () => {
       }
     } catch (error) {
       console.error('Failed to download model:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isNetworkError = errorMessage.toLowerCase().includes('network') || 
+                            errorMessage.toLowerCase().includes('fetch') ||
+                            errorMessage.toLowerCase().includes('connection') ||
+                            errorMessage.toLowerCase().includes('timeout');
+      
       setDownloadProgress(prev => ({
         ...prev,
-        [modelType]: { ...prev[modelType], status: 'error', progress: 0 },
+        [modelType]: { 
+          ...prev[modelType], 
+          status: 'error', 
+          progress: 0,
+          error: isNetworkError ? t('providerConfig.transformerjs.networkError') : errorMessage,
+        },
       }));
-      message.error(t('providerConfig.transformerjs.downloadError', { model: modelName }));
+      
+      if (isNetworkError) {
+        message.error(t('providerConfig.transformerjs.networkError'));
+      } else {
+        message.error(t('providerConfig.transformerjs.downloadError', { model: modelName }));
+      }
     }
   };
 
@@ -154,6 +175,9 @@ const TransformerjsConfig = () => {
         )}
         {progress.status === 'completed' && (
           <Text type="success">{t('providerConfig.transformerjs.downloadComplete')}</Text>
+        )}
+        {progress.status === 'error' && progress.error && (
+          <Text type="danger" style={{ fontSize: '12px' }}>{progress.error}</Text>
         )}
       </Space>
     );
@@ -209,6 +233,21 @@ const TransformerjsConfig = () => {
                 extra={t('providerConfig.transformerjs.fields.cacheDir.extra')}
               >
                 <Input placeholder={t('providerConfig.transformerjs.fields.cacheDir.placeholder')} />
+              </Form.Item>
+
+              <Divider />
+
+              <Form.Item
+                label={t('providerConfig.transformerjs.fields.quantization.label')}
+                name="transformerjsQuantization"
+                extra={t('providerConfig.transformerjs.fields.quantization.extra')}
+              >
+                <Select placeholder={t('providerConfig.transformerjs.fields.quantization.placeholder')}>
+                  <Option value="fp32">{t('providerConfig.transformerjs.quantizationOptions.fp32')}</Option>
+                  <Option value="fp16">{t('providerConfig.transformerjs.quantizationOptions.fp16')}</Option>
+                  <Option value="q8">{t('providerConfig.transformerjs.quantizationOptions.q8')}</Option>
+                  <Option value="q4">{t('providerConfig.transformerjs.quantizationOptions.q4')}</Option>
+                </Select>
               </Form.Item>
 
               <Space style={{ marginTop: 24 }}>

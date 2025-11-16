@@ -175,6 +175,7 @@ export interface TransformerjsConfig {
   transformerjsEmbedModel?: string;
   transformerjsVisionModel?: string;
   transformerjsCacheDir?: string;
+  transformerjsQuantization?: string;
 }
 
 export interface AppConfig {
