@@ -6,6 +6,7 @@ import type {
 } from "openai/resources/chat/completions";
 import { httpPostJson } from "./httpClient";
 import { normalizeJsonSchema } from "./openrouter";
+import { MIN_JSON_COMPLETION_TOKENS } from "./llmProviderTypes";
 
 interface PegaOpenRouterEmbedResponse { embeddings: number[][] }
 
@@ -228,7 +229,7 @@ export async function generateStructuredJsonWithPegaOpenRouter(
   messages: ChatCompletionMessageParam[],
   schema?: Record<string, unknown>,
   temperature = 0.7,
-  maxTokens = 1500,
+  maxTokens = MIN_JSON_COMPLETION_TOKENS,
   overrideModel?: string
 ): Promise<unknown> {
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -243,13 +244,14 @@ export async function generateStructuredJsonWithPegaOpenRouter(
     const normalizedSchema = schema
       ? (normalizeJsonSchema(schema) as Record<string, unknown>)
       : undefined;
+    const tokenBudget = Math.max(maxTokens, MIN_JSON_COMPLETION_TOKENS);
     const response = await postPegaOpenRouterJson<PegaOpenRouterChatCompletionResponse>(
       resolved,
       "/chat/completions",
       {
         model,
         temperature,
-        max_tokens: maxTokens,
+        max_tokens: tokenBudget,
         messages,
         response_format: normalizedSchema
           ? { type: "json_schema", json_schema: { name: "schema", schema: normalizedSchema, strict: true } }

@@ -28,6 +28,7 @@ import {
   describeImageWithBailian,
 } from "./bailian";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { MIN_JSON_COMPLETION_TOKENS } from "./llmProviderTypes";
 
 export type LlmMessage = OllamaMessage; // role + string content
 
@@ -135,29 +136,30 @@ export async function generateStructuredJson(
   messages: LlmMessage[],
   responseFormat?: StructuredResponseFormat,
   temperature = 0.7,
-  maxTokens = 3000,
+  maxTokens = MIN_JSON_COMPLETION_TOKENS,
   overrideModel = "",
   lang?: SupportedLang,
   providerOverride?: ProviderName
 ): Promise<unknown> {
   const provider = providerOverride || getActiveProvider();
   console.log(`generateStructuredJson called with provider: ${provider}`);
+  const tokenBudget = Math.max(maxTokens, MIN_JSON_COMPLETION_TOKENS);
 
   if (provider === "openai" || provider === "azure-openai") {
     // Map to OpenAI message format (string content only)
     const oaMessages = messages.map((m) => ({ role: m.role, content: m.content }));
     const schema = responseFormat?.json_schema?.schema as Record<string, unknown> | undefined;
-    return generateStructuredJsonWithOpenAI(oaMessages, schema, temperature, maxTokens, overrideModel || undefined);
+    return generateStructuredJsonWithOpenAI(oaMessages, schema, temperature, tokenBudget, overrideModel || undefined);
   }
   if (provider === "openrouter") {
     const oaMessages = messages.map((m) => ({ role: m.role, content: m.content }));
     const schema = responseFormat?.json_schema?.schema as Record<string, unknown> | undefined;
-    return generateStructuredJsonWithOpenRouter(oaMessages, schema, temperature, maxTokens, overrideModel || undefined);
+    return generateStructuredJsonWithOpenRouter(oaMessages, schema, temperature, tokenBudget, overrideModel || undefined);
   }
   if (provider === "bailian") {
     const oaMessages = messages.map((m) => ({ role: m.role, content: m.content }));
     const schema = responseFormat?.json_schema?.schema as Record<string, unknown> | undefined;
-    return generateStructuredJsonWithBailian(oaMessages, schema, temperature, maxTokens, overrideModel || undefined);
+    return generateStructuredJsonWithBailian(oaMessages, schema, temperature, tokenBudget, overrideModel || undefined);
   }
   if (provider === "pega") {
     if (getPegaMode() === "openrouter") {
@@ -167,7 +169,7 @@ export async function generateStructuredJson(
         oaMessages,
         schema,
         temperature,
-        maxTokens,
+        tokenBudget,
         overrideModel || undefined
       );
     }
@@ -175,7 +177,7 @@ export async function generateStructuredJson(
       messages,
       responseFormat,
       temperature,
-      maxTokens,
+      tokenBudget,
       overrideModel,
       lang
     );
@@ -184,7 +186,7 @@ export async function generateStructuredJson(
     messages,
     responseFormat,
     temperature,
-    maxTokens,
+    tokenBudget,
     overrideModel,
     lang
   );

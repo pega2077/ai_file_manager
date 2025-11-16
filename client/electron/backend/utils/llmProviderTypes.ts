@@ -5,6 +5,9 @@
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import type { SupportedLang } from "./promptHelper";
 
+/** Minimum completion tokens to keep JSON outputs intact */
+export const MIN_JSON_COMPLETION_TOKENS = 3072;
+
 /**
  * Unified configuration structure resolved from AppConfig
  */

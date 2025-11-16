@@ -1,6 +1,7 @@
 import { configManager } from "../../configManager";
 import { logger } from "../../logger";
 import { httpPostJson } from "./httpClient";
+import { MIN_JSON_COMPLETION_TOKENS } from "./llmProviderTypes";
 
 export type BailianRole = "system" | "user" | "assistant";
 
@@ -146,7 +147,7 @@ export async function generateStructuredJsonWithBailian(
   messages: { role: BailianRole; content: string }[],
   schema?: Record<string, unknown>,
   temperature = 0.7,
-  maxTokens = 1500,
+  maxTokens = MIN_JSON_COMPLETION_TOKENS,
   overrideModel?: string
 ): Promise<unknown> {
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -155,11 +156,12 @@ export async function generateStructuredJsonWithBailian(
   const { baseURL, apiKey, model } = resolveConfig();
   const finalModel = overrideModel || model;
   const normalizedSchema = schema ? (normalizeJsonSchema(schema) as Record<string, unknown>) : undefined;
+  const tokenBudget = Math.max(maxTokens, MIN_JSON_COMPLETION_TOKENS);
   const requestBody: BailianChatCompletionRequest = {
     model: finalModel,
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
     temperature,
-    max_tokens: maxTokens,
+    max_tokens: tokenBudget,
     response_format: normalizedSchema
       ? { type: "json_schema", json_schema: { name: "schema", schema: normalizedSchema, strict: true } }
       : { type: "json_object" },

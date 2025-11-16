@@ -12,6 +12,7 @@ import type {
   GenerateStructuredJsonParams,
   DescribeImageOptions,
 } from "./llmProviderTypes";
+import { MIN_JSON_COMPLETION_TOKENS } from "./llmProviderTypes";
 import type {
   ChatCompletionMessageParam,
   ChatCompletionContentPart,
@@ -271,7 +272,13 @@ export class OpenRouterProvider extends BaseLLMProvider {
   }
 
   public async generateStructuredJson(params: GenerateStructuredJsonParams): Promise<unknown> {
-    const { messages, responseFormat, temperature = 0.7, maxTokens = 1500, overrideModel } = params;
+    const {
+      messages,
+      responseFormat,
+      temperature = 0.7,
+      maxTokens = MIN_JSON_COMPLETION_TOKENS,
+      overrideModel,
+    } = params;
     
     if (!Array.isArray(messages) || messages.length === 0) {
       throw new Error("messages are required");
@@ -285,11 +292,13 @@ export class OpenRouterProvider extends BaseLLMProvider {
       const schema = responseFormat?.json_schema?.schema;
       const normalizedSchema = schema ? (this.normalizeJsonSchema(schema) as Record<string, unknown>) : undefined;
       
+      const tokenBudget = Math.max(maxTokens, MIN_JSON_COMPLETION_TOKENS);
+
       const payload = {
         model,
         messages: messages as ChatCompletionMessageParam[],
         temperature,
-        max_tokens: maxTokens,
+        max_tokens: tokenBudget,
         response_format: normalizedSchema
           ? { type: "json_schema", json_schema: { name: "schema", schema: normalizedSchema, strict: true } }
           : { type: "json_object" },
@@ -404,7 +413,7 @@ export async function generateStructuredJsonWithOpenRouter(
   messages: ChatCompletionMessageParam[],
   schema?: Record<string, unknown>,
   temperature = 0.7,
-  maxTokens = 1500,
+  maxTokens = MIN_JSON_COMPLETION_TOKENS,
   overrideModel?: string
 ): Promise<unknown> {
   return openRouterProvider.generateStructuredJson({

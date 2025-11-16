@@ -13,6 +13,7 @@ import type {
   GenerateStructuredJsonParams,
   DescribeImageOptions,
 } from "./llmProviderTypes";
+import { MIN_JSON_COMPLETION_TOKENS } from "./llmProviderTypes";
 import type {
   ChatCompletionMessageParam,
   ChatCompletionContentPart,
@@ -77,7 +78,13 @@ export class OpenAIProvider extends BaseLLMProvider {
   }
 
   public async generateStructuredJson(params: GenerateStructuredJsonParams): Promise<unknown> {
-    const { messages, responseFormat, temperature = 0.7, maxTokens = 1500, overrideModel } = params;
+    const {
+      messages,
+      responseFormat,
+      temperature = 0.7,
+      maxTokens = MIN_JSON_COMPLETION_TOKENS,
+      overrideModel,
+    } = params;
     
     if (!Array.isArray(messages) || messages.length === 0) {
       throw new Error("messages are required");
@@ -92,10 +99,12 @@ export class OpenAIProvider extends BaseLLMProvider {
       const schema = responseFormat?.json_schema?.schema;
       const normalizedSchema = schema ? (this.normalizeJsonSchema(schema) as Record<string, unknown>) : undefined;
       
+      const tokenBudget = Math.max(maxTokens, MIN_JSON_COMPLETION_TOKENS);
+
       const resp = await client.chat.completions.create({
         model,
         temperature,
-        max_tokens: maxTokens,
+        max_tokens: tokenBudget,
         messages: messages as ChatCompletionMessageParam[],
         response_format: normalizedSchema
           ? { type: "json_schema", json_schema: { name: "schema", schema: normalizedSchema, strict: true } }
@@ -165,7 +174,7 @@ export async function generateStructuredJsonWithOpenAI(
   messages: ChatCompletionMessageParam[],
   schema?: Record<string, unknown>,
   temperature = 0.7,
-  maxTokens = 1500,
+  maxTokens = MIN_JSON_COMPLETION_TOKENS,
   overrideModel?: string
 ): Promise<unknown> {
   return openAIProvider.generateStructuredJson({

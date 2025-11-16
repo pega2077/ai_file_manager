@@ -13,6 +13,7 @@ import type {
   GenerateStructuredJsonParams,
   DescribeImageOptions,
 } from "./llmProviderTypes";
+import { MIN_JSON_COMPLETION_TOKENS } from "./llmProviderTypes";
 import type { SupportedLang } from "./promptHelper";
 import { normalizeLanguage } from "./promptHelper";
 
@@ -146,7 +147,14 @@ export class OllamaProvider extends BaseLLMProvider {
   }
 
   public async generateStructuredJson(params: GenerateStructuredJsonParams): Promise<unknown> {
-    const { messages, responseFormat, temperature = 0.7, maxTokens = 3000, overrideModel, language } = params;
+    const {
+      messages,
+      responseFormat,
+      temperature = 0.7,
+      maxTokens = MIN_JSON_COMPLETION_TOKENS,
+      overrideModel,
+      language,
+    } = params;
     
     if (!Array.isArray(messages) || messages.length === 0) {
       throw new Error("messages are required");
@@ -179,12 +187,14 @@ export class OllamaProvider extends BaseLLMProvider {
     }));
 
     const prompt = this.messagesToPrompt(ollamaMessages, responseFormat?.json_schema, usedLang);
+    const tokenBudget = Math.max(maxTokens, MIN_JSON_COMPLETION_TOKENS);
+
     const payload: OllamaGeneratePayload = {
       model,
       prompt,
       stream: false,
       think: false,
-      options: { temperature, num_predict: maxTokens },
+      options: { temperature, num_predict: tokenBudget },
     };
     
     if (responseFormat?.json_schema?.schema) {
@@ -333,7 +343,7 @@ export class OllamaClient extends OllamaProvider {
     messagesOrParams: OllamaMessage[] | GenerateStructuredJsonParams,
     responseFormat?: StructuredResponseFormat,
     temperature = 0.7,
-    maxTokens = 3000,
+    maxTokens = MIN_JSON_COMPLETION_TOKENS,
     overrideModel = "",
     lang?: SupportedLang
   ): Promise<unknown> {
@@ -343,6 +353,7 @@ export class OllamaClient extends OllamaProvider {
     }
     
     // Otherwise, convert old-style arguments to params object
+    const adjustedMaxTokens = Math.max(maxTokens, MIN_JSON_COMPLETION_TOKENS);
     return super.generateStructuredJson({
       messages: messagesOrParams.map(msg => ({
         role: msg.role as "system" | "user" | "assistant",
@@ -355,7 +366,7 @@ export class OllamaClient extends OllamaProvider {
         }
       } : undefined,
       temperature,
-      maxTokens,
+      maxTokens: adjustedMaxTokens,
       overrideModel,
       language: lang,
     });
