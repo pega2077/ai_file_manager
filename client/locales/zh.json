@@ -506,17 +506,18 @@
     },
     "transformerjs": {
       "title": "Transformer.js 本地模型配置",
-      "description": "使用 Transformer.js 在本地运行大语言模型，无需外部 API。模型会自动下载到本地缓存。",
+      "description": "使用 Transformer.js 在本地运行大语言模型，无需外部 API。模型会自动下载到本地缓存。注意：请使用 Xenova 组织下的标准 Transformer.js 兼容模型，ONNX 专用模型可能不被支持。",
       "downloadModel": "下载模型",
       "downloadSuccess": "模型 {{model}} 下载成功",
       "downloadError": "模型 {{model}} 下载失败",
       "downloadComplete": "下载完成",
       "networkError": "网络错误：无法连接到模型服务器，请检查网络连接",
+      "modelCompatibilityNote": "提示：请使用 Xenova 组织的模型（如 Xenova/LaMini-Flan-T5-783M）。ONNX 专用模型（如 onnx-community/*）可能不兼容。",
       "fields": {
         "chatModel": {
           "label": "对话模型",
           "placeholder": "Xenova/LaMini-Flan-T5-783M",
-          "extra": "默认模型：Xenova/LaMini-Flan-T5-783M（小型文本生成模型）"
+          "extra": "默认模型：Xenova/LaMini-Flan-T5-783M（小型文本生成模型）。建议使用 Xenova 组织的模型"
         },
         "embedModel": {
           "label": "嵌入模型",

@@ -503,17 +503,18 @@
     },
     "transformerjs": {
       "title": "Transformer.js Local Model Configuration",
-      "description": "Use Transformer.js to run large language models locally without external APIs. Models will be automatically downloaded to local cache.",
+      "description": "Use Transformer.js to run large language models locally without external APIs. Models will be automatically downloaded to local cache. Note: Use standard Transformer.js compatible models from the Xenova organization. ONNX-specific models may not be supported.",
       "downloadModel": "Download Model",
       "downloadSuccess": "Model {{model}} downloaded successfully",
       "downloadError": "Failed to download model {{model}}",
       "downloadComplete": "Download complete",
       "networkError": "Network error: Unable to connect to model server, please check your network connection",
+      "modelCompatibilityNote": "Note: Please use models from the Xenova organization (e.g., Xenova/LaMini-Flan-T5-783M). ONNX-specific models (e.g., onnx-community/*) may not be compatible.",
       "fields": {
         "chatModel": {
           "label": "Chat model",
           "placeholder": "Xenova/LaMini-Flan-T5-783M",
-          "extra": "Default model: Xenova/LaMini-Flan-T5-783M (small text generation model)"
+          "extra": "Default model: Xenova/LaMini-Flan-T5-783M (small text generation model). Recommend using Xenova organization models"
         },
         "embedModel": {
           "label": "Embedding model",

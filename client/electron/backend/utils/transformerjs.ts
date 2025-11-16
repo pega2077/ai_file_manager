@@ -344,8 +344,19 @@ export async function downloadModel(
     
     logger.info(`Successfully downloaded ${modelType} model: ${modelName}`);
   } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
     logger.error(`Failed to download ${modelType} model ${modelName}`, e);
-    throw new Error(`Failed to download model: ${modelName}`);
+    
+    // Provide more specific error information
+    if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
+      throw new Error(`Model not found: ${modelName}. Please verify the model name is correct and exists on Hugging Face.`);
+    } else if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('ENOTFOUND')) {
+      throw new Error(`Network error while downloading ${modelName}. Please check your internet connection.`);
+    } else if (errorMessage.includes('ONNX') || errorMessage.includes('onnx')) {
+      throw new Error(`ONNX model download failed for ${modelName}. Note: ONNX models may not be fully supported by Transformer.js. Consider using standard PyTorch/GGUF models instead.`);
+    } else {
+      throw new Error(`Failed to download model ${modelName}: ${errorMessage}`);
+    }
   }
 }
 
