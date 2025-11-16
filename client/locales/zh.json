@@ -507,6 +507,10 @@
     "transformerjs": {
       "title": "Transformer.js 本地模型配置",
       "description": "使用 Transformer.js 在本地运行大语言模型，无需外部 API。模型会自动下载到本地缓存。",
+      "downloadModel": "下载模型",
+      "downloadSuccess": "模型 {{model}} 下载成功",
+      "downloadError": "模型 {{model}} 下载失败",
+      "downloadComplete": "下载完成",
       "fields": {
         "chatModel": {
           "label": "对话模型",

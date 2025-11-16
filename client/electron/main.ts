@@ -515,6 +515,27 @@ function setupIpcHandlers() {
     return nextConfig;
   });
 
+  // IPC handler for downloading transformer.js models
+  ipcMain.handle("download-transformerjs-model", async (_event, { modelType, modelName }: { modelType: 'chat' | 'embed' | 'vision'; modelName: string }) => {
+    const { downloadModel } = await import("./backend/utils/transformerjs");
+    
+    try {
+      await downloadModel(modelType, modelName, (progress, message) => {
+        // Send progress updates to renderer
+        const windows = BrowserWindow.getAllWindows();
+        for (const winItem of windows) {
+          if (!winItem.isDestroyed()) {
+            winItem.webContents.send('model-download-progress', { modelType, progress, message });
+          }
+        }
+      });
+      return { success: true };
+    } catch (error) {
+      logger.error(`Failed to download ${modelType} model ${modelName}`, error);
+      return { success: false, error: String(error) };
+    }
+  });
+
   // IPC handler for setting API base URL
   ipcMain.handle("set-api-base-url", (_event, url: string) => {
     const normalized = typeof url === 'string' ? url.replace(/\/$/, '') : 'http://localhost:8000';

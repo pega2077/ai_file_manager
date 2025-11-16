@@ -255,3 +255,60 @@ export async function describeImageWithTransformerjs(
     throw e;
   }
 }
+
+/**
+ * Download a transformer.js model with progress tracking
+ * @param modelType Type of model: 'chat', 'embed', or 'vision'
+ * @param modelName Model name (e.g., 'Xenova/all-MiniLM-L6-v2')
+ * @param progressCallback Callback function to report download progress
+ */
+export async function downloadModel(
+  modelType: 'chat' | 'embed' | 'vision',
+  modelName: string,
+  progressCallback?: (progress: number, message?: string) => void
+): Promise<void> {
+  logger.info(`Starting download for ${modelType} model: ${modelName}`);
+  
+  // Set up cache directory
+  const config = resolveConfig();
+  if (config.cacheDir) {
+    env.cacheDir = config.cacheDir;
+  }
+  
+  try {
+    let pipelineType: 'feature-extraction' | 'text2text-generation' | 'image-to-text';
+    
+    if (modelType === 'embed') {
+      pipelineType = 'feature-extraction';
+    } else if (modelType === 'chat') {
+      pipelineType = 'text2text-generation';
+    } else {
+      pipelineType = 'image-to-text';
+    }
+    
+    // Download the model by creating a pipeline
+    await pipeline(pipelineType, modelName, {
+      progress_callback: (progress: { status: string; file?: string; loaded?: number; total?: number }) => {
+        if (progress.status === "progress" && progress.file && progress.loaded && progress.total) {
+          const percent = (progress.loaded / progress.total) * 100;
+          const message = `Downloading ${progress.file}: ${Math.round(percent)}%`;
+          logger.info(message);
+          if (progressCallback) {
+            progressCallback(percent, message);
+          }
+        } else if (progress.status === "done") {
+          logger.info(`Download complete for ${modelName}`);
+          if (progressCallback) {
+            progressCallback(100, "Download complete");
+          }
+        }
+      },
+    });
+    
+    logger.info(`Successfully downloaded ${modelType} model: ${modelName}`);
+  } catch (e) {
+    logger.error(`Failed to download ${modelType} model ${modelName}`, e);
+    throw new Error(`Failed to download model: ${modelName}`);
+  }
+}
+

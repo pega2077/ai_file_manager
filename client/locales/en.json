@@ -504,6 +504,10 @@
     "transformerjs": {
       "title": "Transformer.js Local Model Configuration",
       "description": "Use Transformer.js to run large language models locally without external APIs. Models will be automatically downloaded to local cache.",
+      "downloadModel": "Download Model",
+      "downloadSuccess": "Model {{model}} downloaded successfully",
+      "downloadError": "Failed to download model {{model}}",
+      "downloadComplete": "Download complete",
       "fields": {
         "chatModel": {
           "label": "Chat model",
