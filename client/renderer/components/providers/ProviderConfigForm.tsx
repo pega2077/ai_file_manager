@@ -4,7 +4,7 @@ import type { FormInstance } from 'antd/es/form';
 import { useTranslation } from '../../shared/i18n/I18nProvider';
 import type { AppConfig } from '../../shared/types';
 
-type ProviderKey = 'ollama' | 'openai' | 'openrouter' | 'bailian';
+type ProviderKey = 'ollama' | 'openai' | 'openrouter' | 'bailian' | 'transformerjs';
 
 type ProviderRecord = Record<string, string | undefined>;
 

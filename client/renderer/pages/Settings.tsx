@@ -39,7 +39,8 @@ type LlmProvider =
   | "azure-openai"
   | "openrouter"
   | "bailian"
-  | "pega";
+  | "pega"
+  | "transformerjs";
 
 interface SettingsState {
   language: SupportedLocale;
@@ -141,6 +142,10 @@ const Settings = () => {
       {
         value: "azure-openai",
         label: t("settings.options.llmProviders.azureOpenai"),
+      },
+      {
+        value: "transformerjs",
+        label: t("settings.options.llmProviders.transformerjs"),
       },
     ],
     [t]
@@ -955,6 +960,9 @@ const Settings = () => {
                   </Button>
                   <Button onClick={() => navigate("/settings/providers/bailian")}>
                     {t("settings.actions.configureBailian")}
+                  </Button>
+                  <Button onClick={() => navigate("/settings/providers/transformerjs")}>
+                    {t("settings.actions.configureTransformerjs")}
                   </Button>
                 </div>
                 <Text

@@ -45,8 +45,20 @@ export interface AppConfig {
     /** Default multimodal/vision model */
     bailianVisionModel?: string;
   };
-  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' */
-  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega';
+  transformerjs?: {
+    /** Default chat/completion model for Transformer.js */
+    transformerjsChatModel?: string;
+    /** Default embedding model for Transformer.js */
+    transformerjsEmbedModel?: string;
+    /** Default vision-capable model for Transformer.js */
+    transformerjsVisionModel?: string;
+    /** Optional cache directory for Transformer.js models */
+    transformerjsCacheDir?: string;
+    /** Quantization level: fp32, fp16, q8, q4 */
+    transformerjsQuantization?: string;
+  };
+  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'transformerjs' */
+  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'transformerjs';
   openai?: {
     /** OpenAI compatible endpoint (e.g., https://api.openai.com/v1 or custom) */
     openaiEndpoint?: string;
@@ -112,6 +124,11 @@ export interface AppConfig {
   bailianModel?: string;
   bailianEmbedModel?: string;
   bailianVisionModel?: string;
+  transformerjsChatModel?: string;
+  transformerjsEmbedModel?: string;
+  transformerjsVisionModel?: string;
+  transformerjsCacheDir?: string;
+  transformerjsQuantization?: string;
   /** Optional HTTP endpoint for third-party file conversion service */
   fileConvertEndpoint?: string;
   /** Relative or absolute path to the local SQLite database file */

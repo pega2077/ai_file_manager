@@ -46,6 +46,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setApiBaseUrl: (url: string) => ipcRenderer.invoke('set-api-base-url', url),
   getAppConfig: () => ipcRenderer.invoke('get-app-config'),
   updateAppConfig: (updates: unknown) => ipcRenderer.invoke('update-app-config', updates),
+  downloadTransformerjsModel: (params: { modelType: 'chat' | 'embed' | 'vision'; modelName: string }) =>
+    ipcRenderer.invoke('download-transformerjs-model', params),
+  onModelDownloadProgress: (callback: (data: { modelType: string; progress: number; message?: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: { modelType: string; progress: number; message?: string }) => {
+      callback(data);
+    };
+    ipcRenderer.on('model-download-progress', listener);
+    return () => {
+      ipcRenderer.removeListener('model-download-progress', listener);
+    };
+  },
   showMainWindow: (options?: { route?: string; refreshFiles?: boolean }) =>
     ipcRenderer.invoke('show-main-window', options),
   showBotWindow: () => ipcRenderer.invoke('show-bot-window'),

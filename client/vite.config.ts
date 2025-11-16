@@ -34,7 +34,12 @@ export default defineConfig({
                 'sharp',
                 '@img/sharp-win32-x64',
                 '@img/sharp-wasm32',
-                'jsdom'
+                'jsdom',
+                // Leave ONNX runtime native bindings external so dynamic require resolves correctly
+                'onnxruntime-node',
+                'onnxruntime-common',
+                'onnxruntime-web',
+                '@xenova/transformers'
               ],
             },
           },

@@ -22,7 +22,8 @@ A smart file manager powered by AI. It automatically classifies your imported fi
 - **Local Service Layer**: Embedded Node.js (Express) server inside the Electron main process
 - **Document Processing**: Remote file conversion via the configurable `fileConvertEndpoint` service (with Node orchestration)
 - **Data Storage**: SQLite (document metadata via Sequelize) + Faiss vector index (faiss-node)
-- **AI Models**: Pluggable LLM / embedding providers (OpenAI, Azure, OpenRouter, Bailian, Ollama, etc.)
+- **AI Models**: Pluggable LLM / embedding providers (OpenAI, Azure, OpenRouter, Bailian, Ollama, Transformer.js, etc.)
+  - **Transformer.js**: Run large language models locally without external APIs, protecting data privacy
 
 ## Project Structure
 
