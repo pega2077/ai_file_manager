@@ -62,14 +62,20 @@ async function getEmbeddingPipeline(model?: string) {
   logger.info(`Loading transformerjs embedding model: ${modelName} with quantization: ${config.quantization}`);
   
   try {
-    embeddingPipeline = await pipeline("feature-extraction", modelName, {
-      dtype: config.quantization as 'fp32' | 'fp16' | 'q8' | 'q4',
+    const pipelineOptions: Record<string, unknown> = {
       progress_callback: (progress: { status: string; file?: string; loaded?: number; total?: number }) => {
         if (progress.status === "progress" && progress.file && progress.loaded && progress.total) {
           logger.info(`Model download: ${progress.file} - ${Math.round((progress.loaded / progress.total) * 100)}%`);
         }
       },
-    });
+    };
+    
+    // Only add dtype if it's not fp32 (default)
+    if (config.quantization && config.quantization !== 'fp32') {
+      pipelineOptions.dtype = config.quantization;
+    }
+    
+    embeddingPipeline = await pipeline("feature-extraction", modelName, pipelineOptions);
     (embeddingPipeline as { model?: { name: string } }).model = { name: modelName };
     return embeddingPipeline;
   } catch (e) {
@@ -89,19 +95,32 @@ async function getTextGenerationPipeline(model?: string) {
   logger.info(`Loading transformerjs text generation model: ${modelName} with quantization: ${config.quantization}`);
   
   try {
-    textGenerationPipeline = await pipeline("text2text-generation", modelName, {
-      dtype: config.quantization as 'fp32' | 'fp16' | 'q8' | 'q4',
+    const pipelineOptions: Record<string, unknown> = {
       progress_callback: (progress: { status: string; file?: string; loaded?: number; total?: number }) => {
         if (progress.status === "progress" && progress.file && progress.loaded && progress.total) {
           logger.info(`Model download: ${progress.file} - ${Math.round((progress.loaded / progress.total) * 100)}%`);
         }
       },
-    });
+    };
+    
+    // Only add dtype if it's not fp32 (default), as some models may not support all dtypes
+    if (config.quantization && config.quantization !== 'fp32') {
+      pipelineOptions.dtype = config.quantization;
+    }
+    
+    textGenerationPipeline = await pipeline("text2text-generation", modelName, pipelineOptions);
+    
+    // Verify tokenizer is loaded
+    const pipelineObj = textGenerationPipeline as { tokenizer?: unknown };
+    if (!pipelineObj.tokenizer) {
+      throw new Error(`Tokenizer not loaded for model ${modelName}. The model may not be compatible with text2text-generation pipeline.`);
+    }
+    
     (textGenerationPipeline as { model?: { name: string } }).model = { name: modelName };
     return textGenerationPipeline;
   } catch (e) {
     logger.error(`Failed to load text generation model ${modelName}`, e);
-    throw new Error(`Failed to load transformerjs text generation model: ${modelName}`);
+    throw new Error(`Failed to load transformerjs text generation model: ${modelName}. ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
@@ -116,14 +135,20 @@ async function getImageToTextPipeline(model?: string) {
   logger.info(`Loading transformerjs image-to-text model: ${modelName} with quantization: ${config.quantization}`);
   
   try {
-    imageToTextPipeline = await pipeline("image-to-text", modelName, {
-      dtype: config.quantization as 'fp32' | 'fp16' | 'q8' | 'q4',
+    const pipelineOptions: Record<string, unknown> = {
       progress_callback: (progress: { status: string; file?: string; loaded?: number; total?: number }) => {
         if (progress.status === "progress" && progress.file && progress.loaded && progress.total) {
           logger.info(`Model download: ${progress.file} - ${Math.round((progress.loaded / progress.total) * 100)}%`);
         }
       },
-    });
+    };
+    
+    // Only add dtype if it's not fp32 (default)
+    if (config.quantization && config.quantization !== 'fp32') {
+      pipelineOptions.dtype = config.quantization;
+    }
+    
+    imageToTextPipeline = await pipeline("image-to-text", modelName, pipelineOptions);
     (imageToTextPipeline as { model?: { name: string } }).model = { name: modelName };
     return imageToTextPipeline;
   } catch (e) {
@@ -291,9 +316,7 @@ export async function downloadModel(
       pipelineType = 'image-to-text';
     }
     
-    // Download the model by creating a pipeline with quantization
-    await pipeline(pipelineType, modelName, {
-      dtype: config.quantization as 'fp32' | 'fp16' | 'q8' | 'q4',
+    const pipelineOptions: Record<string, unknown> = {
       progress_callback: (progress: { status: string; file?: string; loaded?: number; total?: number }) => {
         if (progress.status === "progress" && progress.file && progress.loaded && progress.total) {
           const percent = (progress.loaded / progress.total) * 100;
@@ -309,7 +332,15 @@ export async function downloadModel(
           }
         }
       },
-    });
+    };
+    
+    // Only add dtype if it's not fp32 (default)
+    if (config.quantization && config.quantization !== 'fp32') {
+      pipelineOptions.dtype = config.quantization;
+    }
+    
+    // Download the model by creating a pipeline with quantization
+    await pipeline(pipelineType, modelName, pipelineOptions);
     
     logger.info(`Successfully downloaded ${modelType} model: ${modelName}`);
   } catch (e) {
