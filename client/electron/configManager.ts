@@ -45,8 +45,22 @@ export interface AppConfig {
     /** Default multimodal/vision model */
     bailianVisionModel?: string;
   };
-  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' */
-  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega';
+  llamaServer?: {
+    /** llama_server OpenAI-compatible endpoint (e.g., http://localhost:8080) */
+    llamaServerEndpoint?: string;
+    /** Optional API key if llama_server requires authentication */
+    llamaServerApiKey?: string;
+    /** Default chat/completion model */
+    llamaServerModel?: string;
+    /** Default embedding model */
+    llamaServerEmbedModel?: string;
+    /** Default multimodal/vision model */
+    llamaServerVisionModel?: string;
+    /** Request timeout in milliseconds */
+    llamaServerTimeoutMs?: number;
+  };
+  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'llama-server' */
+  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'llama-server';
   openai?: {
     /** OpenAI compatible endpoint (e.g., https://api.openai.com/v1 or custom) */
     openaiEndpoint?: string;
@@ -112,6 +126,12 @@ export interface AppConfig {
   bailianModel?: string;
   bailianEmbedModel?: string;
   bailianVisionModel?: string;
+  llamaServerEndpoint?: string;
+  llamaServerApiKey?: string;
+  llamaServerModel?: string;
+  llamaServerEmbedModel?: string;
+  llamaServerVisionModel?: string;
+  llamaServerTimeoutMs?: number;
   /** Optional HTTP endpoint for third-party file conversion service */
   fileConvertEndpoint?: string;
   /** Relative or absolute path to the local SQLite database file */
