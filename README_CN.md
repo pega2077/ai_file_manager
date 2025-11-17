@@ -22,7 +22,9 @@
 - **本地服务层**: 嵌入在 Electron 主进程中的 Node.js（Express）本地服务
 - **文档处理**: 基于可配置的 `fileConvertEndpoint` 远程转换服务，由 Node 统一调度
 - **数据存储**: SQLite（通过 Sequelize 维护元信息）+ Faiss 向量索引（faiss-node）
-- **AI 模型**: 可插拔的 LLM / Embedding 提供方（OpenAI、Azure、OpenRouter、百炼、Ollama 等）
+- **AI 模型**: 可插拔的 LLM / Embedding 提供方（OpenAI、Azure、OpenRouter、百炼、Ollama、llama.cpp 等）
+  - 详细文档请参考 [LLM Provider Architecture](docs/LLM_PROVIDER_ARCHITECTURE.md)
+  - llama.cpp 配置请参考 [llama_server Configuration](docs/LLAMA_SERVER_CONFIGURATION.md)
 
 ## 项目结构
 
