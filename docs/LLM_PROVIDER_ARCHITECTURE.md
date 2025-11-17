@@ -26,18 +26,20 @@ The LLM provider system has been refactored to use an object-oriented architectu
 └─────────────────────────────────────────┘
               ▲
               │
-    ┌─────────┼─────────┐
-    │         │         │
-┌───┴───┐ ┌───┴───┐ ┌───┴───────┐
-│OpenAI │ │OpenRouter│OllamaProvider│
-│Provider│ │Provider│             │
-└───────┘ └───────┘ └─────────────┘
-                          ▲
-                          │
-                    ┌─────┴──────┐
-                    │PegaOllama  │
-                    │   Client   │
-                    └────────────┘
+    ┌─────────┼─────────┬─────────┐
+    │         │         │         │
+┌───┴───┐ ┌───┴───┐ ┌───┴───┐ ┌───┴───────┐
+│OpenAI │ │OpenRouter│Bailian│OllamaProvider│
+│Provider│ │Provider│Provider│             │
+└───────┘ └───────┘ └───────┘ └─────────────┘
+                           ▲         ▲
+                           │         │
+              ┌────────────┘         └────────────┐
+              │                                   │
+      ┌───────┴────────┐                 ┌────────┴──────┐
+      │LlamaServer     │                 │PegaOllama     │
+      │Provider        │                 │Client         │
+      └────────────────┘                 └───────────────┘
 ```
 
 ## Core Components
@@ -150,6 +152,35 @@ The LLM provider system has been refactored to use an object-oriented architectu
 }
 ```
 
+#### LlamaServerProvider
+
+**Location**: `client/electron/backend/utils/LlamaServerProvider.ts`
+
+**Features**:
+- Connects to llama.cpp's llama_server OpenAI-compatible REST API
+- Uses OpenAI SDK with custom base URL
+- Supports embedding, chat completion, and vision tasks
+- Default models: `text-embedding-3-small`, `gpt-3.5-turbo`, `gpt-4o-mini`
+
+**Configuration**:
+```json
+{
+  "llamaServer": {
+    "llamaServerEndpoint": "http://localhost:8080",
+    "llamaServerApiKey": "optional-api-key",
+    "llamaServerModel": "gpt-3.5-turbo",
+    "llamaServerEmbedModel": "text-embedding-3-small",
+    "llamaServerVisionModel": "gpt-4o-mini",
+    "llamaServerTimeoutMs": 60000
+  }
+}
+```
+
+**Notes**:
+- llama_server provides OpenAI-compatible endpoints at `/v1/chat/completions`, `/v1/embeddings`, etc.
+- Model names in configuration are symbolic - they're passed to llama_server which uses the loaded model
+- API key is optional and only needed if your llama_server instance requires authentication
+
 ### 3. Shared Types
 
 **Location**: `client/electron/backend/utils/llmProviderTypes.ts`
@@ -213,8 +244,9 @@ const embeddings = await provider.embed(['Hello world']);
 - `'azure-openai'` - Alias for OpenAI (uses same provider)
 - `'openrouter'` - OpenRouter
 - `'ollama'` - Ollama
-- `'bailian'` - Bailian (future)
-- `'pega'` - Pega (future)
+- `'bailian'` - Bailian
+- `'pega'` - Pega
+- `'llama-server'` - llama.cpp llama_server
 
 ## Usage Examples
 
