@@ -398,6 +398,43 @@ export class OpenRouterProvider extends BaseLLMProvider {
       throw e;
     }
   }
+
+  public async checkServiceHealth(): Promise<boolean> {
+    try {
+      const config = this.resolveConfig(configManager.getConfig()) as OpenRouterResolvedConfig;
+      const url = `${config.baseUrl}/models`;
+      
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${config.apiKey}`,
+            ...config.headers,
+          },
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeout);
+        
+        if (!response.ok) {
+          logger.warn("OpenRouter health check failed", { status: response.status });
+          return false;
+        }
+        
+        const data = await response.json() as { data?: Array<{ id: string }> };
+        return Array.isArray(data.data) && data.data.length > 0;
+      } catch (error) {
+        clearTimeout(timeout);
+        throw error;
+      }
+    } catch (e) {
+      logger.warn("OpenRouter service health check failed", e as unknown);
+      return false;
+    }
+  }
 }
 
 // Export singleton instance

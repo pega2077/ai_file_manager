@@ -54,6 +54,12 @@ export abstract class BaseLLMProvider {
   public abstract describeImage(images: string[], options?: DescribeImageOptions): Promise<string>;
 
   /**
+   * Check service health by attempting to list available models
+   * @returns Promise<boolean> true if service is healthy, false otherwise
+   */
+  public abstract checkServiceHealth(): Promise<boolean>;
+
+  /**
    * Validate inputs are non-empty
    */
   protected validateInputs(inputs: string[], operation: string): void {

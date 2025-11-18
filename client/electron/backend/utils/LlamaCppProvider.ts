@@ -264,6 +264,42 @@ export class LlamaCppProvider extends BaseLLMProvider {
       throw error;
     }
   }
+
+  public async checkServiceHealth(): Promise<boolean> {
+    try {
+      const cfg = configManager.getConfig();
+      const config = this.resolveConfig(cfg);
+      
+      if (!config.endpoint) {
+        logger.warn("LlamaCpp endpoint not configured");
+        return false;
+      }
+      
+      // LlamaCpp server has a /health endpoint
+      const url = `${config.endpoint}/health`;
+      
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeout);
+        
+        // If the health endpoint returns OK, service is healthy
+        return response.ok;
+      } catch (error) {
+        clearTimeout(timeout);
+        throw error;
+      }
+    } catch (e) {
+      logger.warn("LlamaCpp service health check failed", e as unknown);
+      return false;
+    }
+  }
 }
 
 // Export singleton instance
