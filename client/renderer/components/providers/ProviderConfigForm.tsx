@@ -120,6 +120,7 @@ const ProviderConfigForm = ({
 
   useEffect(() => {
     void loadConfig(form);
+    handleCheckHealth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providerKey]);
 
