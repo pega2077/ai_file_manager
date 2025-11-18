@@ -100,7 +100,8 @@ const Settings = () => {
   const [pegaStatusLoading, setPegaStatusLoading] = useState(false);
   const [pegaStatusError, setPegaStatusError] = useState<string | null>(null);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
-  const [feedbackIncludeLogsDefault, setFeedbackIncludeLogsDefault] = useState(false);
+  const [feedbackIncludeLogsDefault, setFeedbackIncludeLogsDefault] =
+    useState(false);
 
   const layoutStyle = useMemo(
     () => ({
@@ -151,7 +152,10 @@ const Settings = () => {
   const pegaModeOptions = useMemo(
     () => [
       { value: "ollama", label: t("settings.options.pegaModes.ollama") },
-      { value: "openrouter", label: t("settings.options.pegaModes.openrouter") },
+      {
+        value: "openrouter",
+        label: t("settings.options.pegaModes.openrouter"),
+      },
     ],
     [t]
   );
@@ -173,7 +177,8 @@ const Settings = () => {
   );
 
   const hasPegaCredential = useMemo(
-    () => settings.pegaApiKey.trim().length > 0 || pegaAuthToken.trim().length > 0,
+    () =>
+      settings.pegaApiKey.trim().length > 0 || pegaAuthToken.trim().length > 0,
     [settings.pegaApiKey, pegaAuthToken]
   );
 
@@ -190,7 +195,9 @@ const Settings = () => {
       return pegaNumberFormatter.format(value);
     }
     const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : t("settings.messages.pegaValueUnavailable");
+    return trimmed.length > 0
+      ? trimmed
+      : t("settings.messages.pegaValueUnavailable");
   };
 
   const formatPegaDate = (value: string | null) => {
@@ -211,7 +218,9 @@ const Settings = () => {
       try {
         const appConfig =
           (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
-        setFeedbackIncludeLogsDefault(Boolean(appConfig?.sentry?.sendLogsByDefault));
+        setFeedbackIncludeLogsDefault(
+          Boolean(appConfig?.sentry?.sendLogsByDefault)
+        );
         if (appConfig) {
           const normalizedLanguage = normalizeLocale(
             appConfig.language ?? defaultLocale
@@ -226,8 +235,11 @@ const Settings = () => {
             typeof appConfig.pega?.pegaAuthToken === "string"
               ? appConfig.pega.pegaAuthToken
               : "";
-          const rawPegaMode = appConfig.pega?.pegaMode as SettingsState['pegaMode'] | undefined;
-          const pegaMode = rawPegaMode === "openrouter" ? "openrouter" : "ollama";
+          const rawPegaMode = appConfig.pega?.pegaMode as
+            | SettingsState["pegaMode"]
+            | undefined;
+          const pegaMode =
+            rawPegaMode === "openrouter" ? "openrouter" : "ollama";
           nextState = {
             ...nextState,
             language: normalizedLanguage,
@@ -271,7 +283,10 @@ const Settings = () => {
           try {
             if (appConfig.themeFollowSystem) {
               await setFollowSystem(true, { persist: false });
-            } else if (appConfig.theme === "dark" || appConfig.theme === "light") {
+            } else if (
+              appConfig.theme === "dark" ||
+              appConfig.theme === "light"
+            ) {
               await setMode(appConfig.theme, {
                 persist: false,
                 followSystem: false,
@@ -313,7 +328,11 @@ const Settings = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const feedbackRequested = params.get("feedback");
-    if (feedbackRequested && feedbackRequested !== "0" && feedbackRequested !== "false") {
+    if (
+      feedbackRequested &&
+      feedbackRequested !== "0" &&
+      feedbackRequested !== "false"
+    ) {
       setFeedbackModalOpen(true);
     }
   }, [location.key, location.search]);
@@ -522,7 +541,11 @@ const Settings = () => {
   const renderPegaAvailability = useCallback(
     (status: PegaStatusResponse[keyof PegaStatusResponse]) => {
       if (!status) {
-        return <Text type="secondary">{t("settings.messages.pegaStatusNoData")}</Text>;
+        return (
+          <Text type="secondary">
+            {t("settings.messages.pegaStatusNoData")}
+          </Text>
+        );
       }
       if (status.available) {
         const modelsPreview = Array.isArray(status.models)
@@ -530,10 +553,21 @@ const Settings = () => {
           : "";
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <Tag color="green" style={{ maxWidth: '40px', textAlign: 'center', display: 'inline-block' }}>{t("settings.messages.pegaStatusAvailable")}</Tag>
+            <Tag
+              color="green"
+              style={{
+                maxWidth: "40px",
+                textAlign: "center",
+                display: "inline-block",
+              }}
+            >
+              {t("settings.messages.pegaStatusAvailable")}
+            </Tag>
             {modelsPreview && (
               <Text type="secondary">
-                {t("settings.messages.pegaStatusModels", { models: modelsPreview })}
+                {t("settings.messages.pegaStatusModels", {
+                  models: modelsPreview,
+                })}
               </Text>
             )}
           </div>
@@ -541,7 +575,12 @@ const Settings = () => {
       }
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <Tag color="red" style={{ maxWidth: '120px', display: 'inline-block' }}>{t("settings.messages.pegaStatusUnavailable")}</Tag>
+          <Tag
+            color="red"
+            style={{ maxWidth: "120px", display: "inline-block" }}
+          >
+            {t("settings.messages.pegaStatusUnavailable")}
+          </Tag>
           {status.error && <Text type="secondary">{status.error}</Text>}
         </div>
       );
@@ -585,7 +624,9 @@ const Settings = () => {
       pegaMode: nextMode,
     }));
     try {
-      const appConfig = (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig | undefined;
+      const appConfig = (await window.electronAPI.getAppConfig()) as
+        | import("../shared/types").AppConfig
+        | undefined;
       const nextPegaConfig = {
         ...(appConfig?.pega ?? {}),
         pegaMode: nextMode,
@@ -661,7 +702,7 @@ const Settings = () => {
     setPegaStatusError(null);
     setPegaStatusLoading(false);
     try {
-  await setMode("light", { persist: true, followSystem: false });
+      await setMode("light", { persist: true, followSystem: false });
     } catch (error) {
       console.error("Failed to reset theme during reset:", error);
       message.error(t("settings.messages.themeUpdateFailed"));
@@ -712,6 +753,29 @@ const Settings = () => {
           <Title level={2}>{t("settings.pageTitle")}</Title>
 
           <Card
+            title={t("settings.sections.actions")}
+            style={{ marginBottom: 24 }}
+          >
+            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+              <Button type="primary" onClick={handleSaveSettings}>
+                {t("settings.actions.save")}
+              </Button>
+              <Button onClick={handleResetSettings}>
+                {t("settings.actions.reset")}
+              </Button>
+              <Button danger onClick={handleClearAllData}>
+                {t("settings.actions.clear")}
+              </Button>
+              <Button onClick={() => navigate("/files")}>
+                {t("settings.actions.back")}
+              </Button>
+              <Button onClick={() => setFeedbackModalOpen(true)}>
+                {t("settings.actions.feedback")}
+              </Button>
+            </div>
+          </Card>
+
+          <Card
             title={t("settings.sections.general")}
             style={{ marginBottom: 24 }}
           >
@@ -749,7 +813,10 @@ const Settings = () => {
                   style={{ marginLeft: 16 }}
                 />
                 {followSystem && (
-                  <Text type="secondary" style={{ display: "block", marginTop: 8 }}>
+                  <Text
+                    type="secondary"
+                    style={{ display: "block", marginTop: 8 }}
+                  >
                     {t("settings.messages.themeControlledBySystem")}
                   </Text>
                 )}
@@ -897,7 +964,9 @@ const Settings = () => {
               </div>
 
               <div>
-                <Text strong>{t("settings.labels.enableDirectoryWatcher")}</Text>
+                <Text strong>
+                  {t("settings.labels.enableDirectoryWatcher")}
+                </Text>
                 <Switch
                   checkedChildren={t("settings.common.enabled")}
                   unCheckedChildren={t("settings.common.disabled")}
@@ -946,19 +1015,29 @@ const Settings = () => {
                     marginTop: 8,
                   }}
                 >
-                  <Button onClick={() => navigate("/settings/providers/ollama")}>
+                  <Button
+                    onClick={() => navigate("/settings/providers/ollama")}
+                  >
                     {t("settings.actions.configureOllama")}
                   </Button>
-                  <Button onClick={() => navigate("/settings/providers/openai")}>
+                  <Button
+                    onClick={() => navigate("/settings/providers/openai")}
+                  >
                     {t("settings.actions.configureOpenai")}
                   </Button>
-                  <Button onClick={() => navigate("/settings/providers/openrouter")}>
+                  <Button
+                    onClick={() => navigate("/settings/providers/openrouter")}
+                  >
                     {t("settings.actions.configureOpenrouter")}
                   </Button>
-                  <Button onClick={() => navigate("/settings/providers/bailian")}>
+                  <Button
+                    onClick={() => navigate("/settings/providers/bailian")}
+                  >
                     {t("settings.actions.configureBailian")}
                   </Button>
-                  <Button onClick={() => navigate("/settings/providers/llamacpp")}>
+                  <Button
+                    onClick={() => navigate("/settings/providers/llamacpp")}
+                  >
                     {t("settings.actions.configureLlamacpp")}
                   </Button>
                 </div>
@@ -997,7 +1076,9 @@ const Settings = () => {
                       style={{ marginLeft: 16, minWidth: 200 }}
                       value={settings.pegaMode}
                       options={pegaModeOptions}
-                      onChange={(value) => handlePegaModeChange(value as "ollama" | "openrouter")}
+                      onChange={(value) =>
+                        handlePegaModeChange(value as "ollama" | "openrouter")
+                      }
                     />
                     <Text
                       type="secondary"
@@ -1072,7 +1153,9 @@ const Settings = () => {
                         <Descriptions.Item
                           label={t("settings.labels.pegaOpenrouterStatus")}
                         >
-                          {renderPegaAvailability(pegaStatus.openrouter ?? null)}
+                          {renderPegaAvailability(
+                            pegaStatus.openrouter ?? null
+                          )}
                         </Descriptions.Item>
                       </Descriptions>
                     )}
@@ -1127,7 +1210,9 @@ const Settings = () => {
                             {formatPegaValue(pegaUser.tokenBalance)}
                           </Descriptions.Item>
                           <Descriptions.Item
-                            label={t("settings.labels.pegaUserMonthlyTokenQuota")}
+                            label={t(
+                              "settings.labels.pegaUserMonthlyTokenQuota"
+                            )}
                           >
                             {formatPegaValue(pegaUser.monthlyTokenQuota)}
                           </Descriptions.Item>
@@ -1219,31 +1304,12 @@ const Settings = () => {
             </div>
           </Card>
 
-          <Card title={t("settings.sections.actions")}>
-            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-              <Button type="primary" onClick={handleSaveSettings}>
-                {t("settings.actions.save")}
-              </Button>
-              <Button onClick={handleResetSettings}>
-                {t("settings.actions.reset")}
-              </Button>
-              <Button danger onClick={handleClearAllData}>
-                {t("settings.actions.clear")}
-              </Button>
-              <Button onClick={() => navigate("/files")}>
-                {t("settings.actions.back")}
-              </Button>
-              <Button onClick={() => setFeedbackModalOpen(true)}>
-                {t("settings.actions.feedback")}
-              </Button>
-            </div>
-          </Card>
-              <FeedbackModal
-                open={feedbackModalOpen}
-                onClose={() => setFeedbackModalOpen(false)}
-                t={t}
-                defaultIncludeLogs={feedbackIncludeLogsDefault}
-              />
+          <FeedbackModal
+            open={feedbackModalOpen}
+            onClose={() => setFeedbackModalOpen(false)}
+            t={t}
+            defaultIncludeLogs={feedbackIncludeLogsDefault}
+          />
         </div>
       </Content>
     </Layout>
