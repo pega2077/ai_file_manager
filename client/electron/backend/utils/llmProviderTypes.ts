@@ -39,7 +39,7 @@ export interface GenerateStructuredJsonParams {
   responseFormat?: {
     json_schema?: {
       name?: string;
-      schema: Record<string, unknown>;
+      schema: unknown;
       strict?: boolean;
     };
   };

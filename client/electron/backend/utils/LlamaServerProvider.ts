@@ -21,7 +21,7 @@ import type {
 } from "./llmProviderTypes";
 import { MIN_JSON_COMPLETION_TOKENS } from "./llmProviderTypes";
 import OpenAI from "openai";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import type { ChatCompletionMessageParam, ChatCompletionContentPart } from "openai/resources/chat/completions";
 
 export interface LlamaServerResolvedConfig extends ProviderResolvedConfig {
   endpoint: string;
@@ -167,7 +167,7 @@ export class LlamaServerProvider extends BaseLLMProvider {
 
       // Add response format if schema is provided
       if (responseFormat?.json_schema?.schema) {
-        const normalizedSchema = this.normalizeJsonSchema(responseFormat.json_schema.schema);
+        const normalizedSchema = this.normalizeJsonSchema(responseFormat.json_schema.schema) as Record<string, unknown>;
         completionParams.response_format = {
           type: "json_schema",
           json_schema: {
@@ -226,7 +226,7 @@ export class LlamaServerProvider extends BaseLLMProvider {
 
     try {
       // Build message with images
-      const content: Array<{type: "text" | "image_url", text?: string, image_url?: {url: string}}> = [
+      const content: ChatCompletionContentPart[] = [
         { type: "text", text: prompt },
       ];
 

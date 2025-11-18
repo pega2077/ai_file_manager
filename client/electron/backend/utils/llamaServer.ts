@@ -17,6 +17,6 @@ export type {
 export type { DescribeImageOptions } from "./llmProviderTypes";
 
 // Export client as alias for backward compatibility
-import { LlamaServerProvider } from "./LlamaServerProvider";
+import { LlamaServerProvider, llamaServerProvider } from "./LlamaServerProvider";
 export const LlamaServerClient = LlamaServerProvider;
 export const llamaServerClient = llamaServerProvider;
