@@ -1497,6 +1497,63 @@ class ApiService {
       raw: response,
     };
   }
+
+  /**
+   * List all system tags
+   */
+  async listSystemTags(): Promise<ApiResponse<{ tags: string[] }>> {
+    const response = await fetch(`${API_BASE_URL}/system-tags/list`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to list system tags: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Save system tags (replaces all existing tags)
+   */
+  async saveSystemTags(tags: string[]): Promise<ApiResponse<{ tags: string[]; saved_count: number }>> {
+    const response = await fetch(`${API_BASE_URL}/system-tags/save`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ tags }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to save system tags: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Optimize tags by comparing with system tags using LLM
+   */
+  async optimizeTags(tags: string[], language?: string, provider?: string): Promise<ApiResponse<{ optimized_tags: string[]; original_tags: string[] }>> {
+    const response = await fetch(`${API_BASE_URL}/tags/optimize`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ tags, language, provider }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to optimize tags: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
 }
 
 export const apiService = new ApiService();

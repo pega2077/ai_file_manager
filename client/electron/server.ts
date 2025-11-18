@@ -5,6 +5,7 @@ import { logger } from "./logger";
 import { registerSystemRoutes } from "./backend/systemController";
 import { registerFilesRoutes } from "./backend/filesController";
 import { registerFilesOpRoutes } from "./backend/filesOpController";
+import { registerSystemTagsRoutes } from "./backend/systemTagsController";
 import { authenticateDB, initializeDB } from "./backend/db";
 import {getGlobalIndexPath} from "./backend/utils/vectorStore";
 import { registerChatRoutes } from "./backend/chatController";
@@ -62,6 +63,7 @@ export const startServer = async (): Promise<void> => {
   registerFilesOpRoutes(app);
   registerChatRoutes(app);
   registerConversionRoutes(app);
+  registerSystemTagsRoutes(app);
 
     // Generic error handler (last middleware)
     app.use(

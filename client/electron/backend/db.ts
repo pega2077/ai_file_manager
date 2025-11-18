@@ -6,6 +6,7 @@ import { configManager } from "../configManager";
 import { logger } from "../logger";
 import { initializeFileModel } from "./models/file";
 import { initializeChunkModel } from "./models/chunk";
+import { initializeSystemTagModel } from "./models/systemTag";
 
 let sequelizeInstance: Sequelize | null = null;
 let ensuredDirectoryFor: string | null = null;
@@ -150,6 +151,19 @@ export async function initializeDB(): Promise<void> {
       `CREATE INDEX IF NOT EXISTS idx_chunks_embedding_id ON chunks(embedding_id);`
     );
 
+    await sequelize.query(
+      `CREATE TABLE IF NOT EXISTS system_tags (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tag_name TEXT UNIQUE NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT
+      );`
+    );
+
+    await sequelize.query(
+      `CREATE INDEX IF NOT EXISTS idx_system_tags_name ON system_tags(tag_name);`
+    );
+
     try {
       const filesTableInfo = await sequelize.query<{ name: string }>("PRAGMA table_info(files);", {
         type: QueryTypes.SELECT,
@@ -166,6 +180,7 @@ export async function initializeDB(): Promise<void> {
 
     initializeFileModel(sequelize);
     initializeChunkModel(sequelize);
+    initializeSystemTagModel(sequelize);
 
     logger.info("SQLite schema verified/initialized successfully");
     logger.info(

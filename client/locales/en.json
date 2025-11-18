@@ -208,6 +208,7 @@
       "autoSaveRAG": "Auto-save to RAG",
       "autoTagEnabled": "Auto tagging",
       "tagSummaryMaxLength": "Tag summary max length",
+      "manageSystemTags": "System tags",
       "autoClassify": "Auto classify without confirmation",
     "checkFileNameOnImport": "Validate filename on import",
   "enableDirectoryWatcher": "Monitor workspace directory",
@@ -237,6 +238,7 @@
       "autoSaveRAG": "Automatically add imported files to the RAG knowledge base.",
       "autoTagEnabled": "Automatically extract tags for files during import or processing.",
       "tagSummaryMaxLength": "Maximum characters used when generating tag summaries (affects auto-tagging).",
+      "manageSystemTags": "Manage predefined tags used to standardize file tags across the system.",
       "autoClassify": "Skip confirmation dialogs when saving files to recommended directories.",
     "checkFileNameOnImport": "Validate file names during import and block the process when they contain invalid patterns or unclear naming.",
   "enableDirectoryWatcher": "Watch the workspace folder for new files and queue them for automatic import.",
@@ -277,6 +279,7 @@
       "back": "Back to files",
       "saveApiBaseUrl": "Save API URL",
       "managePegaAccount": "Manage Pega account",
+      "manageSystemTags": "Manage System Tags",
       "configureOllama": "Configure Ollama",
       "configureOpenai": "Configure OpenAI",
       "configureOpenrouter": "Configure OpenRouter",
@@ -1081,6 +1084,20 @@
       "contentType": "Content Type:",
       "charCount": "Character Count:",
       "tokenCount": "Token Count:"
+    }
+  },
+  "systemTags": {
+    "title": "Manage System Tags",
+    "description": "System tags are used to standardize file tags. When auto-tagging generates tags, they will be compared with system tags and normalized for consistency.",
+    "inputPlaceholder": "Enter a tag name",
+    "addButton": "Add",
+    "emptyMessage": "No system tags yet. Add tags to get started.",
+    "count": "Total tags: {{count}}",
+    "messages": {
+      "loadFailed": "Failed to load system tags",
+      "saveFailed": "Failed to save system tags",
+      "saveSuccess": "System tags saved successfully",
+      "tagExists": "This tag already exists"
     }
   }
 }

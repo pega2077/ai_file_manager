@@ -1997,6 +1997,78 @@ export async function saveFileHandler(req: Request, res: Response): Promise<void
       logger.warn("Auto-tag pipeline failed", e as unknown);
     }
 
+    // Step 3: Optimize tags using system tags (if auto-tagging generated tags)
+    if (Array.isArray(autoTags) && autoTags.length > 0) {
+      try {
+        const SystemTagModel = (await import("./models/systemTag")).default;
+        const systemTagRecords = await SystemTagModel.findAll({
+          order: [["tag_name", "ASC"]],
+        });
+        const systemTags = systemTagRecords.map((tag) => tag.tag_name);
+
+        // Only optimize if we have system tags
+        if (systemTags.length > 0) {
+          const cfg = configManager.getConfig();
+          const language = normalizeLanguage(cfg.language ?? "zh", "zh");
+          const messages: LlmMessage[] = [
+            {
+              role: "system",
+              content:
+                language === "zh"
+                  ? "你是一名标签优化助手。请将输入的标签与系统标签进行比较，将输入标签中与系统标签相同或相似含义的词进行替换，确保标签的一致性。严格输出 JSON 格式。"
+                  : "You are a tag optimization assistant. Compare input tags with system tags, and replace input tags that have the same or similar meaning with corresponding system tags to ensure consistency. Output JSON only.",
+            },
+            {
+              role: "user",
+              content:
+                language === "zh"
+                  ? `系统标签（参考标准）：${systemTags.join(", ")}\n\n输入标签：${autoTags.join(", ")}\n\n请返回优化后的标签列表。规则：\n1. 如果输入标签与某个系统标签完全相同或含义相似，则使用系统标签替换\n2. 如果输入标签在系统标签中找不到对应项，则保留原标签\n3. 去除重复标签\n4. 保持标签简洁明了\n\n仅返回 JSON，格式如下：\n{\n  "optimized_tags": ["标签1", "标签2", ...]\n}`
+                  : `System tags (reference standard): ${systemTags.join(", ")}\n\nInput tags: ${autoTags.join(", ")}\n\nReturn optimized tag list. Rules:\n1. If an input tag matches or has similar meaning to a system tag, replace it with the system tag\n2. If an input tag has no corresponding system tag, keep it as is\n3. Remove duplicates\n4. Keep tags concise and clear\n\nReturn JSON only in this format:\n{\n  "optimized_tags": ["tag1", "tag2", ...]\n}`,
+            },
+          ];
+
+          const responseFormat: StructuredResponseFormat = {
+            json_schema: {
+              name: "optimize_tags_schema",
+              schema: {
+                type: "object",
+                properties: {
+                  optimized_tags: { type: "array", items: { type: "string" } },
+                },
+                required: ["optimized_tags"],
+                additionalProperties: false,
+              },
+              strict: true,
+            },
+          } as const;
+
+          try {
+            const result = await generateStructuredJson(messages, responseFormat, 0.2, 800, "", language);
+            const obj = (result || {}) as Record<string, unknown>;
+            const optimizedTags = Array.isArray(obj.optimized_tags)
+              ? (obj.optimized_tags as unknown[])
+                  .filter((t: unknown): t is string => typeof t === "string" && t.trim().length > 0)
+                  .map((t) => t.trim())
+              : autoTags;
+
+            // Use optimized tags if successful
+            if (optimizedTags.length > 0) {
+              autoTags = Array.from(new Set(optimizedTags)); // Remove duplicates
+              logger.info("Tags optimized using system tags", {
+                original: autoTags.length,
+                optimized: optimizedTags.length,
+              });
+            }
+          } catch (optimizeErr) {
+            logger.warn("Tag optimization failed, using original tags", optimizeErr as unknown);
+            // Keep original autoTags on error
+          }
+        }
+      } catch (e) {
+        logger.warn("Failed to load system tags for optimization", e as unknown);
+      }
+    }
+
     const hasSummaryUpdate = typeof autoSummary === "string" && autoSummary.length > 0;
     const hasTagUpdate = Array.isArray(autoTags) && autoTags.length > 0;
     const importStatusUpdate: { imported: boolean; updated_at: string; summary?: string | null; tags?: string | null } = {
