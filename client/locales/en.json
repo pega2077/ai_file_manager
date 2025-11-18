@@ -385,7 +385,15 @@
       "loadError": "Failed to load provider settings.",
       "saveSuccess": "Provider settings saved.",
       "saveError": "Failed to save provider settings.",
-      "loading": "Loading configuration..."
+      "loading": "Loading configuration...",
+      "checkHealth": "Check Connection",
+      "checking": "Checking...",
+      "healthCheckSuccess": "Service is reachable",
+      "healthCheckFailed": "Service is unreachable",
+      "healthCheckError": "Health check error",
+      "statusHealthy": "Service healthy",
+      "statusUnhealthy": "Service unhealthy",
+      "statusUnknown": "Not checked"
     },
     "ollama": {
       "title": "Ollama configuration",

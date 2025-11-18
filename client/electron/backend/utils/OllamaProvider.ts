@@ -332,6 +332,53 @@ export class OllamaProvider extends BaseLLMProvider {
       : `SYSTEM: Strictly conform to this JSON Schema: ${schemaStr}`;
     return `${base}\n${extra}`;
   }
+
+  public async checkServiceHealth(): Promise<boolean> {
+    try {
+      const cfg = configManager.getConfig();
+      const resolved = this.resolveConfig(cfg);
+      
+      if (!resolved.endpoint) {
+        logger.warn("Ollama endpoint not configured");
+        return false;
+      }
+      
+      // Ollama uses /api/tags endpoint to list available models (GET request)
+      const url = `${resolved.endpoint}/api/tags`;
+      
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      
+      try {
+        const headers: Record<string, string> = { "Accept": "application/json" };
+        if (resolved.apiKey) {
+          headers.Authorization = `Bearer ${resolved.apiKey}`;
+        }
+        
+        const response = await fetch(url, {
+          method: "GET",
+          headers,
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeout);
+        
+        if (!response.ok) {
+          logger.warn("Ollama health check failed", { status: response.status });
+          return false;
+        }
+        
+        const data = await response.json() as { models?: Array<{ name: string }> };
+        return Array.isArray(data.models);
+      } catch (error) {
+        clearTimeout(timeout);
+        throw error;
+      }
+    } catch (e) {
+      logger.warn("Ollama service health check failed", e as unknown);
+      return false;
+    }
+  }
 }
 
 /**

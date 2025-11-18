@@ -160,6 +160,18 @@ export class OpenAIProvider extends BaseLLMProvider {
       throw e;
     }
   }
+
+  public async checkServiceHealth(): Promise<boolean> {
+    try {
+      const client = this.getClient();
+      const models = await client.models.list();
+      // If we can successfully list models, the service is healthy
+      return models.data.length > 0;
+    } catch (e) {
+      logger.warn("OpenAI service health check failed", e as unknown);
+      return false;
+    }
+  }
 }
 
 // Export singleton instance

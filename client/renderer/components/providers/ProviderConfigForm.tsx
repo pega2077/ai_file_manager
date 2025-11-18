@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, Form, Input, Button, Space, Spin, Typography, message } from 'antd';
+import { Card, Form, Input, Button, Space, Spin, Typography, message, Badge, Tag } from 'antd';
+import { CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, ApiOutlined } from '@ant-design/icons';
 import type { FormInstance } from 'antd/es/form';
 import { useTranslation } from '../../shared/i18n/I18nProvider';
 import type { AppConfig } from '../../shared/types';
@@ -29,6 +30,8 @@ interface ProviderConfigFormProps {
 }
 
 type FormValues = Record<string, string>;
+
+type HealthStatus = 'unknown' | 'healthy' | 'unhealthy' | 'checking';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -86,6 +89,7 @@ const ProviderConfigForm = ({
   const [form] = Form.useForm<FormValues>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [healthStatus, setHealthStatus] = useState<HealthStatus>('unknown');
   const [initialValues, setInitialValues] = useState<FormValues>({});
   const providerSnapshotRef = useRef<ProviderConfigResponse>({});
 
@@ -116,6 +120,7 @@ const ProviderConfigForm = ({
 
   useEffect(() => {
     void loadConfig(form);
+    handleCheckHealth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providerKey]);
 
@@ -147,6 +152,54 @@ const ProviderConfigForm = ({
     message.info(t('providerConfig.common.restoredDefaults'));
   };
 
+  const handleCheckHealth = async () => {
+    setHealthStatus('checking');
+    try {
+      const apiBaseUrl = await window.electronAPI.getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/api/providers/health`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ provider: providerKey }),
+      });
+
+      const result = await response.json() as {
+        success: boolean;
+        data?: { healthy: boolean };
+        error?: { message: string };
+      };
+
+      if (result.success && result.data) {
+        const isHealthy = result.data.healthy;
+        setHealthStatus(isHealthy ? 'healthy' : 'unhealthy');
+        message[isHealthy ? 'success' : 'warning'](
+          t(isHealthy ? 'providerConfig.common.healthCheckSuccess' : 'providerConfig.common.healthCheckFailed')
+        );
+      } else {
+        setHealthStatus('unhealthy');
+        message.error(result.error?.message || t('providerConfig.common.healthCheckError'));
+      }
+    } catch (error) {
+      console.error('Health check failed:', error);
+      setHealthStatus('unhealthy');
+      message.error(t('providerConfig.common.healthCheckError'));
+    }
+  };
+
+  const renderHealthStatus = () => {
+    if (healthStatus === 'checking') {
+      return <Tag icon={<Spin size="small" />} color="processing">{t('providerConfig.common.checking')}</Tag>;
+    }
+    if (healthStatus === 'healthy') {
+      return <Tag icon={<CheckCircleOutlined />} color="success">{t('providerConfig.common.statusHealthy')}</Tag>;
+    }
+    if (healthStatus === 'unhealthy') {
+      return <Tag icon={<CloseCircleOutlined />} color="error">{t('providerConfig.common.statusUnhealthy')}</Tag>;
+    }
+    return <Tag icon={<QuestionCircleOutlined />} color="default">{t('providerConfig.common.statusUnknown')}</Tag>;
+  };
+
   return (
     <Card>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -156,9 +209,12 @@ const ProviderConfigForm = ({
           </Button>
         </Space>
         <div>
-          <Title level={3} style={{ marginBottom: 0 }}>
-            {t(titleKey)}
-          </Title>
+          <Space direction="horizontal" size="middle" align="center">
+            <Title level={3} style={{ marginBottom: 0 }}>
+              {t(titleKey)}
+            </Title>
+            {renderHealthStatus()}
+          </Space>
           {descriptionKey ? (
             <Paragraph type="secondary" style={{ marginTop: 8 }}>
               {t(descriptionKey)}
@@ -203,6 +259,14 @@ const ProviderConfigForm = ({
                 </Button>
                 <Button onClick={handleRestoreDefaults}>
                   {t('providerConfig.common.restoreDefaults')}
+                </Button>
+                <Button
+                  icon={<ApiOutlined />}
+                  onClick={handleCheckHealth}
+                  loading={healthStatus === 'checking'}
+                  disabled={loading || saving}
+                >
+                  {t('providerConfig.common.checkHealth')}
                 </Button>
               </Space>
             </Form.Item>

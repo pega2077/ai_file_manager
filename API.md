@@ -1512,6 +1512,55 @@
 }
 ```
 
+### 5.4 检查 LLM 提供商健康状态
+
+**接口**: `/api/providers/health`
+
+**方法**: `POST`
+
+**请求参数**:
+```json
+{
+  "provider": "string"  // 可选，指定要检查的提供商；不提供则检查所有
+}
+```
+
+参数说明：
+- `provider`: 可选，指定要检查的LLM提供商，可选值：`openai` | `azure-openai` | `openrouter` | `ollama` | `llamacpp` | `bailian`
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "message": "Provider health check completed",
+  "data": {
+    "openai": true,
+    "openrouter": false,
+    "ollama": true,
+    "llamacpp": false,
+    "bailian": true
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "request_id": "req_xxx"
+}
+```
+
+或单个提供商检查：
+```json
+{
+  "success": true,
+  "message": "Provider health check completed",
+  "data": {
+    "provider": "openai",
+    "healthy": true
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "request_id": "req_xxx"
+}
+```
+
+用途：检查配置的LLM提供商服务是否可用。健康检查通过调用提供商的模型列表API来验证服务状态。
+
 ## 错误代码规范
 
 ### 通用错误代码
