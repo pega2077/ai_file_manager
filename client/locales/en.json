@@ -160,7 +160,8 @@
         "openai": "OpenAI",
         "openrouter": "OpenRouter",
         "bailian": "Alibaba Bailian",
-        "azureOpenai": "Azure OpenAI"
+        "azureOpenai": "Azure OpenAI",
+        "llamacpp": "Llama.cpp (local)"
         },
         "pegaModes": {
           "ollama": "Pega Ollama gateway",
@@ -261,7 +262,8 @@
         "openai": "OpenAI",
         "openrouter": "OpenRouter",
         "bailian": "Alibaba Bailian",
-        "azureOpenai": "Azure OpenAI"
+        "azureOpenai": "Azure OpenAI",
+        "llamacpp": "Llama.cpp (local)"
       }
     },
     "common": {
@@ -279,6 +281,7 @@
       "configureOpenai": "Configure OpenAI",
       "configureOpenrouter": "Configure OpenRouter",
       "configureBailian": "Configure Bailian",
+      "configureLlamacpp": "Configure Llama.cpp",
       "refreshPegaStatus": "Check status",
       "feedback": "Send feedback"
     },
@@ -495,6 +498,40 @@
           "label": "Embedding model",
           "placeholder": "text-embedding-v1",
           "extra": "Default embedding model: text-embedding-v1"
+        }
+      }
+    },
+    "llamacpp": {
+      "title": "Llama.cpp configuration",
+      "description": "Configure local llama-server paths and settings.",
+      "fields": {
+        "textModelPath": {
+          "label": "Text generation model path",
+          "placeholder": "/path/to/text-model.gguf",
+          "extra": "Path to the GGUF model file for text generation"
+        },
+        "visionModelPath": {
+          "label": "Vision model path",
+          "placeholder": "/path/to/vision-model.gguf",
+          "extra": "Path to the GGUF model file for vision/multimodal tasks"
+        },
+        "visionDecoderPath": {
+          "label": "Vision decoder/projector path",
+          "placeholder": "/path/to/mmproj.gguf",
+          "extra": "Path to the vision model projector/decoder file (mmproj)"
+        },
+        "installDir": {
+          "label": "Llama.cpp installation directory",
+          "placeholder": "/path/to/llama.cpp",
+          "extra": "Optional: Leave blank if llama-server is in system PATH"
+        },
+        "host": {
+          "label": "Server host",
+          "placeholder": "127.0.0.1"
+        },
+        "port": {
+          "label": "Server port",
+          "placeholder": "8080"
         }
       }
     }
