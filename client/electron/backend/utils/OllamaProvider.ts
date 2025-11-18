@@ -343,18 +343,37 @@ export class OllamaProvider extends BaseLLMProvider {
         return false;
       }
       
-      // Ollama uses /api/tags endpoint to list available models
+      // Ollama uses /api/tags endpoint to list available models (GET request)
       const url = `${resolved.endpoint}/api/tags`;
-      const response = await httpPostJson<{ models?: Array<{ name: string }> }>(
-        url,
-        {},
-        { Accept: "application/json" },
-        5000, // Short timeout for health checks
-        resolved.apiKey
-      );
       
-      // If we can successfully list models, the service is healthy
-      return response.ok && Array.isArray(response.data?.models);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      
+      try {
+        const headers: Record<string, string> = { "Accept": "application/json" };
+        if (resolved.apiKey) {
+          headers.Authorization = `Bearer ${resolved.apiKey}`;
+        }
+        
+        const response = await fetch(url, {
+          method: "GET",
+          headers,
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeout);
+        
+        if (!response.ok) {
+          logger.warn("Ollama health check failed", { status: response.status });
+          return false;
+        }
+        
+        const data = await response.json() as { models?: Array<{ name: string }> };
+        return Array.isArray(data.models);
+      } catch (error) {
+        clearTimeout(timeout);
+        throw error;
+      }
     } catch (e) {
       logger.warn("Ollama service health check failed", e as unknown);
       return false;
