@@ -98,7 +98,7 @@ export class LlamaCppProvider extends BaseLLMProvider {
   /**
    * Generate text embeddings
    */
-  public async embed(inputs: string[], overrideModel?: string): Promise<number[][]> {
+  public async embed(inputs: string[], _overrideModel?: string): Promise<number[][]> {
     this.validateInputs(inputs, "embed");
 
     const cfg = configManager.getConfig();
@@ -120,16 +120,18 @@ export class LlamaCppProvider extends BaseLLMProvider {
     for (const input of inputs) {
       try {
         const payload: LlamaCppEmbedRequest = { content: input };
-        const response = await httpPostJson<LlamaCppEmbedResponse>(url, payload, {
-          headers: { "Content-Type": "application/json" },
-          timeout: 30000,
-        });
+        const response = await httpPostJson<LlamaCppEmbedResponse>(
+          url,
+          payload,
+          { Accept: "application/json" },
+          30000
+        );
 
-        if (!response.embedding || !Array.isArray(response.embedding)) {
+        if (!response.ok || !response.data?.embedding || !Array.isArray(response.data.embedding)) {
           throw new Error("Invalid embedding response from llama-server");
         }
 
-        embeddings.push(response.embedding);
+        embeddings.push(response.data.embedding);
       } catch (error) {
         logger.error(`Failed to generate embedding for input: ${error}`);
         throw error;
@@ -144,7 +146,7 @@ export class LlamaCppProvider extends BaseLLMProvider {
    * Generate structured JSON response
    */
   public async generateStructuredJson(params: GenerateStructuredJsonParams): Promise<unknown> {
-    const { userPrompt, systemPrompt, responseFormat, language = "en", timeoutMs } = params;
+    const { messages, responseFormat, language = "en", maxTokens } = params;
 
     const cfg = configManager.getConfig();
     const llamaCppConfig = cfg.llamacpp;
@@ -160,12 +162,15 @@ export class LlamaCppProvider extends BaseLLMProvider {
 
     const lang: SupportedLang = normalizeLanguage(language);
 
-    // Build prompt
+    // Build prompt from messages
     let fullPrompt = "";
-    if (systemPrompt) {
-      fullPrompt += `${systemPrompt}\n\n`;
+    for (const msg of messages) {
+      if (msg.role === 'system') {
+        fullPrompt += `${msg.content}\n\n`;
+      } else if (msg.role === 'user') {
+        fullPrompt += msg.content;
+      }
     }
-    fullPrompt += userPrompt;
 
     // Append JSON format instruction
     if (responseFormat?.json_schema) {
@@ -175,25 +180,27 @@ export class LlamaCppProvider extends BaseLLMProvider {
 
     const payload: LlamaCppCompletionRequest = {
       prompt: fullPrompt,
-      temperature: 0.1,
-      n_predict: MIN_JSON_COMPLETION_TOKENS,
+      temperature: params.temperature ?? 0.1,
+      n_predict: maxTokens ?? MIN_JSON_COMPLETION_TOKENS,
       stream: false,
     };
 
     logger.info(`Generating structured JSON with llama-server`);
 
     try {
-      const response = await httpPostJson<LlamaCppCompletionResponse>(url, payload, {
-        headers: { "Content-Type": "application/json" },
-        timeout: timeoutMs ?? DEFAULT_JSON_TIMEOUT_MS,
-      });
+      const response = await httpPostJson<LlamaCppCompletionResponse>(
+        url,
+        payload,
+        { Accept: "application/json" },
+        config.timeoutMs ?? 60000
+      );
 
-      if (!response.content) {
+      if (!response.ok || !response.data?.content) {
         throw new Error("Empty response from llama-server");
       }
 
       // Try to parse JSON from response
-      const parsed = this.tryParseJson(response.content);
+      const parsed = this.tryParseJson(response.data.content);
       return parsed;
     } catch (error) {
       logger.error("Failed to generate structured JSON:", error);
@@ -218,15 +225,9 @@ export class LlamaCppProvider extends BaseLLMProvider {
 
     const config = this.resolveConfig(cfg);
     const url = `${config.endpoint}/completion`;
-
-    const lang: SupportedLang = normalizeLanguage(options?.language ?? "en");
     
     // Build prompt
-    let prompt = options?.prompt ?? "Describe this image in detail.";
-    
-    if (options?.extractText) {
-      prompt = "Extract and return all text visible in this image.";
-    }
+    const prompt = options?.prompt ?? "Describe this image in detail.";
 
     // Convert base64 images to llama-server format
     const imageData = images.map((base64, index) => ({
@@ -237,7 +238,7 @@ export class LlamaCppProvider extends BaseLLMProvider {
     const payload: LlamaCppCompletionRequest = {
       prompt,
       temperature: 0.3,
-      n_predict: 500,
+      n_predict: options?.maxTokens ?? 500,
       stream: false,
       image_data: imageData,
     };
@@ -245,17 +246,19 @@ export class LlamaCppProvider extends BaseLLMProvider {
     logger.info(`Describing ${images.length} images with llama-server vision model`);
 
     try {
-      const response = await httpPostJson<LlamaCppCompletionResponse>(url, payload, {
-        headers: { "Content-Type": "application/json" },
-        timeout: options?.timeoutMs ?? 60000,
-      });
+      const response = await httpPostJson<LlamaCppCompletionResponse>(
+        url,
+        payload,
+        { Accept: "application/json" },
+        options?.timeoutMs ?? 60000
+      );
 
-      if (!response.content) {
+      if (!response.ok || !response.data?.content) {
         throw new Error("Empty response from llama-server");
       }
 
       logger.info("Image description completed");
-      return response.content;
+      return response.data.content;
     } catch (error) {
       logger.error("Failed to describe image:", error);
       throw error;

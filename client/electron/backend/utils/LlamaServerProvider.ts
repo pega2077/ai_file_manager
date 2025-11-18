@@ -6,7 +6,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import { logger } from '../../logger';
 import type { AppConfig } from '../../configManager';
-import axios from 'axios';
 import path from 'path';
 
 type ModelType = 'text' | 'vision';
@@ -56,8 +55,16 @@ export class LlamaServerProvider {
     // Try to ping the server health endpoint
     try {
       const endpoint = `http://${this.config?.llamacppHost || '127.0.0.1'}:${this.config?.llamacppPort || 8080}/health`;
-      const response = await axios.get(endpoint, { timeout: 2000 });
-      return response.status === 200;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2000);
+      
+      const response = await fetch(endpoint, { 
+        signal: controller.signal,
+        method: 'GET',
+      });
+      
+      clearTimeout(timeout);
+      return response.ok;
     } catch (error) {
       logger.warn('Llama server health check failed:', error);
       return false;
@@ -252,8 +259,17 @@ export class LlamaServerProvider {
     
     for (let i = 0; i < maxRetries; i++) {
       try {
-        const response = await axios.get(endpoint, { timeout: 2000 });
-        if (response.status === 200) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2000);
+        
+        const response = await fetch(endpoint, { 
+          signal: controller.signal,
+          method: 'GET',
+        });
+        
+        clearTimeout(timeout);
+        
+        if (response.ok) {
           logger.info('llama-server is ready');
           return;
         }
