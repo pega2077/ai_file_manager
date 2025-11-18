@@ -330,7 +330,7 @@ interface SystemConfigUpdate {
   workdir_path?: string;
 }
 
-type ProviderName = 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega';
+type ProviderName = 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'llamacpp';
 
 export interface PegaUser {
   id: number;

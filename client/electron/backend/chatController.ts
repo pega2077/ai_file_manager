@@ -1206,6 +1206,10 @@ function normalizeProviderName(raw: unknown): ProviderName | undefined {
       return "bailian";
     case "ollama":
       return "ollama";
+    case "llamacpp":
+    case "llama-cpp":
+    case "llama_cpp":
+      return "llamacpp";
     default:
       return undefined;
   }

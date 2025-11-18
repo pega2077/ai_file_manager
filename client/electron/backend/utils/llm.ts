@@ -27,6 +27,7 @@ import {
   generateStructuredJsonWithBailian,
   describeImageWithBailian,
 } from "./bailian";
+import { llamaCppProvider } from "./LlamaCppProvider";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { MIN_JSON_COMPLETION_TOKENS } from "./llmProviderTypes";
 
@@ -34,7 +35,7 @@ export type LlmMessage = OllamaMessage; // role + string content
 
 export type LlmTask = "chat" | "embed" | "vision";
 
-export type ProviderName = "ollama" | "openai" | "azure-openai" | "openrouter" | "bailian" | "pega";
+export type ProviderName = "ollama" | "openai" | "azure-openai" | "openrouter" | "bailian" | "pega" | "llamacpp";
 
 function getPegaMode(): "ollama" | "openrouter" {
   const cfg = configManager.getConfig();
@@ -45,7 +46,7 @@ function getPegaMode(): "ollama" | "openrouter" {
 export function getActiveProvider(): ProviderName {
   const cfg = configManager.getConfig();
   const p = cfg.llmProvider || "ollama";
-  if (p === "openai" || p === "azure-openai" || p === "openrouter" || p === "bailian" || p === "pega") {
+  if (p === "openai" || p === "azure-openai" || p === "openrouter" || p === "bailian" || p === "pega" || p === "llamacpp") {
     return p;
   }
   return "ollama";
@@ -106,6 +107,12 @@ export function getActiveModelName(task: LlmTask, providerOverride?: ProviderNam
     }
     return pc.pegaModel || cfg.pegaModel || "";
   }
+  if (provider === "llamacpp") {
+    const lc = cfg.llamacpp || {};
+    if (task === "embed") return lc.llamacppTextModelPath || "";
+    if (task === "vision") return lc.llamacppVisionModelPath || "";
+    return lc.llamacppTextModelPath || "";
+  }
   // default to ollama
   const oc = cfg.ollama || {};
   if (task === "embed") return oc.ollamaEmbedModel || cfg.ollamaEmbedModel || "";
@@ -128,6 +135,9 @@ export async function embedText(inputs: string[], overrideModel?: string): Promi
     return getPegaMode() === "openrouter"
       ? embedWithPegaOpenRouter(inputs, overrideModel)
       : pegaOllamaClient.embed(inputs, overrideModel);
+  }
+  if (provider === "llamacpp") {
+    return llamaCppProvider.embed(inputs, overrideModel);
   }
   return ollamaClient.embed(inputs, overrideModel);
 }
@@ -182,6 +192,17 @@ export async function generateStructuredJson(
       lang
     );
   }
+  if (provider === "llamacpp") {
+    const oaMessages: ChatCompletionMessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
+    return llamaCppProvider.generateStructuredJson({
+      messages: oaMessages,
+      responseFormat,
+      temperature,
+      maxTokens: tokenBudget,
+      overrideModel: overrideModel || undefined,
+      language: lang,
+    });
+  }
   return ollamaClient.generateStructuredJson(
     messages,
     responseFormat,
@@ -235,6 +256,9 @@ export async function describeImage(
       );
     }
     return pegaOllamaClient.describeImage(imgs, describeOptions);
+  }
+  if (provider === "llamacpp") {
+    return llamaCppProvider.describeImage(imgs, describeOptions);
   }
   return ollamaClient.describeImage(imgs, describeOptions);
 }

@@ -4,15 +4,15 @@ import type { FormInstance } from 'antd/es/form';
 import { useTranslation } from '../../shared/i18n/I18nProvider';
 import type { AppConfig } from '../../shared/types';
 
-type ProviderKey = 'ollama' | 'openai' | 'openrouter' | 'bailian';
+type ProviderKey = 'ollama' | 'openai' | 'openrouter' | 'bailian' | 'llamacpp';
 
-type ProviderRecord = Record<string, string | undefined>;
+type ProviderRecord = Record<string, string | number | undefined>;
 
 type ProviderConfigResponse = NonNullable<AppConfig[ProviderKey]> | Record<string, unknown>;
 
 export interface FieldDefinition {
   name: string;
-  inputType?: 'text' | 'password';
+  inputType?: 'text' | 'password' | 'number';
   labelKey: string;
   placeholderKey?: string;
   extraKey?: string;
@@ -168,7 +168,15 @@ const ProviderConfigForm = ({
         <Spin spinning={loading || saving} tip={loading ? t('providerConfig.common.loading') : undefined}>
           <Form<FormValues> form={form} layout="vertical" onFinish={handleSubmit} disabled={loading || saving}>
             {fields.map((field) => {
-              const InputComponent = field.inputType === 'password' ? Input.Password : Input;
+              let InputComponent;
+              if (field.inputType === 'password') {
+                InputComponent = Input.Password;
+              } else if (field.inputType === 'number') {
+                InputComponent = Input;
+              } else {
+                InputComponent = Input;
+              }
+              
               return (
                 <Form.Item
                   key={field.name}
@@ -177,6 +185,7 @@ const ProviderConfigForm = ({
                   extra={field.extraKey ? t(field.extraKey) : undefined}
                 >
                   <InputComponent
+                    type={field.inputType === 'number' ? 'number' : undefined}
                     placeholder={field.placeholderKey ? t(field.placeholderKey) : undefined}
                     allowClear={field.inputType !== 'password'}
                     autoComplete={field.inputType === 'password' ? 'new-password' : 'off'}

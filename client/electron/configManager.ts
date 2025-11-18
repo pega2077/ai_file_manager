@@ -45,8 +45,22 @@ export interface AppConfig {
     /** Default multimodal/vision model */
     bailianVisionModel?: string;
   };
-  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' */
-  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega';
+  llamacpp?: {
+    /** Path to text generation model file */
+    llamacppTextModelPath?: string;
+    /** Path to vision model file */
+    llamacppVisionModelPath?: string;
+    /** Path to vision model decoder/projector file */
+    llamacppVisionDecoderPath?: string;
+    /** Path to llama-cpp installation directory (optional if in system PATH) */
+    llamacppInstallDir?: string;
+    /** Port for llama-server */
+    llamacppPort?: number;
+    /** Host for llama-server */
+    llamacppHost?: string;
+  };
+  /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'llamacpp' */
+  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'llamacpp';
   openai?: {
     /** OpenAI compatible endpoint (e.g., https://api.openai.com/v1 or custom) */
     openaiEndpoint?: string;
@@ -215,6 +229,14 @@ const DEFAULT_CONFIG: AppConfig = {
     bailianEmbedModel: "text-embedding-v4",
     bailianVisionModel: "qwen3-vl-plus",//
   },
+  llamacpp: {
+    llamacppTextModelPath: undefined,
+    llamacppVisionModelPath: undefined,
+    llamacppVisionDecoderPath: undefined,
+    llamacppInstallDir: undefined,
+    llamacppPort: 8080,
+    llamacppHost: "127.0.0.1",
+  },
   fileConvertEndpoint: "https://converter.pegamob.com",
   // Default to repository-standard SQLite location; can be overridden in config.json
   sqliteDbPath: "database/files.db",
@@ -306,6 +328,7 @@ export class ConfigManager {
           openai: { ...(DEFAULT_CONFIG.openai || {}), ...(userConfig.openai || {}) },
           openrouter: { ...(DEFAULT_CONFIG.openrouter || {}), ...(userConfig.openrouter || {}) },
           bailian: { ...(DEFAULT_CONFIG.bailian || {}), ...(userConfig.bailian || {}) },
+          llamacpp: { ...(DEFAULT_CONFIG.llamacpp || {}), ...(userConfig.llamacpp || {}) },
         };
 
         // Backward compatibility: map legacy flat fields into grouped blocks

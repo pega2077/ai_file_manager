@@ -296,6 +296,7 @@ const Setup = () => {
       { value: 'openrouter', label: t('setup.options.llmProviders.openrouter') },
       { value: 'bailian', label: t('setup.options.llmProviders.bailian') },
       { value: 'azure-openai', label: t('setup.options.llmProviders.azureOpenai') },
+      { value: 'llamacpp', label: t('setup.options.llmProviders.llamacpp') },
     ],
     [t],
   );

@@ -170,16 +170,26 @@ export interface BailianConfig {
   bailianVisionModel?: string;
 }
 
+export interface LlamaCppConfig {
+  llamacppTextModelPath?: string;
+  llamacppVisionModelPath?: string;
+  llamacppVisionDecoderPath?: string;
+  llamacppInstallDir?: string;
+  llamacppPort?: number;
+  llamacppHost?: string;
+}
+
 export interface AppConfig {
   useLocalService: boolean;
   localServicePort: number;
   localServiceHost: string;
   /** Selected LLM provider for chat/completions */
-  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega';
+  llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'llamacpp';
   ollama?: OllamaConfig;
   openai?: OpenAIConfig;
   openrouter?: OpenRouterConfig;
   bailian?: BailianConfig;
+  llamacpp?: LlamaCppConfig;
   ollamaEndpoint?: string;
   ollamaModel?: string;
   ollamaEmbedModel?: string;

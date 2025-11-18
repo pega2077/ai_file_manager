@@ -159,7 +159,8 @@
         "openai": "OpenAI",
         "openrouter": "OpenRouter",
         "bailian": "阿里百炼",
-        "azureOpenai": "Azure OpenAI"
+        "azureOpenai": "Azure OpenAI",
+        "llamacpp": "Llama.cpp（本地）"
         },
         "pegaModes": {
           "ollama": "Pega Ollama 网关",
@@ -260,7 +261,8 @@
         "openai": "OpenAI",
         "openrouter": "OpenRouter",
         "bailian": "阿里百炼",
-        "azureOpenai": "Azure OpenAI"
+        "azureOpenai": "Azure OpenAI",
+        "llamacpp": "Llama.cpp（本地）"
       },
       "pegaModes": {
         "ollama": "Pega Ollama 网关",
@@ -282,6 +284,7 @@
       "configureOpenai": "配置 OpenAI",
       "configureOpenrouter": "配置 OpenRouter",
       "configureBailian": "配置百炼",
+      "configureLlamacpp": "配置 Llama.cpp",
       "refreshPegaStatus": "检查状态",
       "feedback": "反馈问题"
     },
@@ -498,6 +501,40 @@
           "label": "嵌入模型",
           "placeholder": "text-embedding-v1",
           "extra": "默认嵌入模型：text-embedding-v1"
+        }
+      }
+    },
+    "llamacpp": {
+      "title": "Llama.cpp 配置",
+      "description": "配置本地 llama-server 路径和设置。",
+      "fields": {
+        "textModelPath": {
+          "label": "文字生成模型路径",
+          "placeholder": "/path/to/text-model.gguf",
+          "extra": "文字生成模型的 GGUF 文件路径"
+        },
+        "visionModelPath": {
+          "label": "视觉模型路径",
+          "placeholder": "/path/to/vision-model.gguf",
+          "extra": "视觉/多模态任务的 GGUF 模型文件路径"
+        },
+        "visionDecoderPath": {
+          "label": "视觉模型解码器路径",
+          "placeholder": "/path/to/mmproj.gguf",
+          "extra": "视觉模型投影器/解码器文件路径（mmproj）"
+        },
+        "installDir": {
+          "label": "Llama.cpp 安装目录",
+          "placeholder": "/path/to/llama.cpp",
+          "extra": "可选：如果 llama-server 已在系统 PATH 中则留空"
+        },
+        "host": {
+          "label": "服务器地址",
+          "placeholder": "127.0.0.1"
+        },
+        "port": {
+          "label": "服务器端口",
+          "placeholder": "8080"
         }
       }
     }
