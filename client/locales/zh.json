@@ -546,6 +546,11 @@
         "port": {
           "label": "服务器端口",
           "placeholder": "8080"
+        },
+        "serverArgs": {
+          "label": "自定义启动参数",
+          "placeholder": "--gpu-layers 60 --parallel 4",
+          "extra": "可选：追加到 llama-server 的命令行参数（支持空格和引号）。"
         }
       }
     }

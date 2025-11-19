@@ -58,6 +58,8 @@ export interface AppConfig {
     llamacppPort?: number;
     /** Host for llama-server */
     llamacppHost?: string;
+    /** Additional custom arguments appended when starting llama-server */
+    llamacppServerArgs?: string;
   };
   /** LLM provider selection: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'llamacpp' */
   llmProvider?: 'ollama' | 'openai' | 'azure-openai' | 'openrouter' | 'bailian' | 'pega' | 'llamacpp';
@@ -236,6 +238,7 @@ const DEFAULT_CONFIG: AppConfig = {
     llamacppInstallDir: undefined,
     llamacppPort: 8080,
     llamacppHost: "127.0.0.1",
+    llamacppServerArgs: undefined,
   },
   fileConvertEndpoint: "https://converter.pegamob.com",
   // Default to repository-standard SQLite location; can be overridden in config.json

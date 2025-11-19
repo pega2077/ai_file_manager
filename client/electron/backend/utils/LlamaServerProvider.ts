@@ -10,6 +10,9 @@ import path from 'path';
 
 type ModelType = 'text' | 'vision';
 
+const CUSTOM_ARG_MAX_LENGTH = 2000;
+const CUSTOM_ARG_MAX_COUNT = 32;
+
 interface ServerStatus {
   running: boolean;
   modelType: ModelType | null;
@@ -248,7 +251,94 @@ export class LlamaServerProvider {
       args.push('--mmproj', this.config.llamacppVisionDecoderPath);
     }
 
+    const extraArgs = this.parseCustomArgs(this.config?.llamacppServerArgs);
+    if (extraArgs.length > 0) {
+      args.push(...extraArgs);
+    }
+
     return [serverExecutable, ...args];
+  }
+
+  /**
+   * Parse user-provided custom args string into a sanitized argv list
+   */
+  private parseCustomArgs(raw?: string): string[] {
+    if (!raw || typeof raw !== 'string') {
+      return [];
+    }
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    const limited = trimmed.length > CUSTOM_ARG_MAX_LENGTH ? trimmed.slice(0, CUSTOM_ARG_MAX_LENGTH) : trimmed;
+    if (limited.length !== trimmed.length) {
+      logger.warn('Custom llama-server args trimmed to %d characters (max %d).', limited.length, CUSTOM_ARG_MAX_LENGTH);
+    }
+
+    const args: string[] = [];
+    let current = '';
+    let quote: '"' | '\'' | null = null;
+    let escaping = false;
+    let truncatedByCount = false;
+
+    const flush = () => {
+      if (!current) {
+        return;
+      }
+      if (args.length < CUSTOM_ARG_MAX_COUNT) {
+        args.push(current);
+      } else {
+        truncatedByCount = true;
+      }
+      current = '';
+    };
+
+    for (const char of limited) {
+      if (escaping) {
+        current += char;
+        escaping = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaping = true;
+        continue;
+      }
+      if (quote) {
+        if (char === quote) {
+          quote = null;
+        } else {
+          current += char;
+        }
+        continue;
+      }
+      if (char === '"' || char === '\'') {
+        quote = char;
+        continue;
+      }
+      if (/\s/.test(char)) {
+        flush();
+        if (args.length >= CUSTOM_ARG_MAX_COUNT) {
+          current = '';
+          truncatedByCount = true;
+          break;
+        }
+        continue;
+      }
+      current += char;
+    }
+
+    if (quote) {
+      logger.warn('Custom llama-server args contain an unmatched quote. Trailing quote was ignored.');
+    }
+
+    flush();
+
+    if (truncatedByCount) {
+      logger.warn('Custom llama-server args truncated to %d entries (max %d).', args.length, CUSTOM_ARG_MAX_COUNT);
+    }
+
+    return args;
   }
 
   /**

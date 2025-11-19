@@ -11,6 +11,7 @@ const LLAMACPP_DEFAULTS = {
   llamacppInstallDir: undefined,
   llamacppPort: 8080,
   llamacppHost: '127.0.0.1',
+  llamacppServerArgs: undefined,
 };
 
 const LLAMACPP_FIELDS: FieldDefinition[] = [
@@ -48,6 +49,13 @@ const LLAMACPP_FIELDS: FieldDefinition[] = [
     labelKey: 'providerConfig.llamacpp.fields.port.label',
     placeholderKey: 'providerConfig.llamacpp.fields.port.placeholder',
     inputType: 'number',
+  },
+  {
+    name: 'llamacppServerArgs',
+    labelKey: 'providerConfig.llamacpp.fields.serverArgs.label',
+    placeholderKey: 'providerConfig.llamacpp.fields.serverArgs.placeholder',
+    extraKey: 'providerConfig.llamacpp.fields.serverArgs.extra',
+    inputType: 'textarea',
   },
 ];
 

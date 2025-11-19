@@ -543,6 +543,11 @@
         "port": {
           "label": "Server port",
           "placeholder": "8080"
+        },
+        "serverArgs": {
+          "label": "Additional startup arguments",
+          "placeholder": "--gpu-layers 60 --parallel 4",
+          "extra": "Optional space-separated flags appended to llama-server (quotes supported)."
         }
       }
     }

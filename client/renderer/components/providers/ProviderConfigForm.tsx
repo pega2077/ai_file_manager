@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, Form, Input, Button, Space, Spin, Typography, message, Badge, Tag } from 'antd';
+import { Card, Form, Input, Button, Space, Spin, Typography, message, Tag } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, ApiOutlined } from '@ant-design/icons';
 import type { FormInstance } from 'antd/es/form';
 import { useTranslation } from '../../shared/i18n/I18nProvider';
@@ -13,7 +13,7 @@ type ProviderConfigResponse = NonNullable<AppConfig[ProviderKey]> | Record<strin
 
 export interface FieldDefinition {
   name: string;
-  inputType?: 'text' | 'password' | 'number';
+  inputType?: 'text' | 'password' | 'number' | 'textarea';
   labelKey: string;
   placeholderKey?: string;
   extraKey?: string;
@@ -224,15 +224,32 @@ const ProviderConfigForm = ({
         <Spin spinning={loading || saving} tip={loading ? t('providerConfig.common.loading') : undefined}>
           <Form<FormValues> form={form} layout="vertical" onFinish={handleSubmit} disabled={loading || saving}>
             {fields.map((field) => {
-              let InputComponent;
+              let InputComponent: typeof Input | typeof Input.TextArea | typeof Input.Password = Input;
               if (field.inputType === 'password') {
                 InputComponent = Input.Password;
-              } else if (field.inputType === 'number') {
-                InputComponent = Input;
-              } else {
-                InputComponent = Input;
+              } else if (field.inputType === 'textarea') {
+                InputComponent = Input.TextArea;
               }
-              
+
+              const placeholder = field.placeholderKey ? t(field.placeholderKey) : undefined;
+              const allowClear = field.inputType !== 'password';
+              const autoComplete = field.inputType === 'password' ? 'new-password' : 'off';
+
+              const inputNode = field.inputType === 'textarea' ? (
+                <InputComponent
+                  placeholder={placeholder}
+                  allowClear={allowClear}
+                  autoSize={{ minRows: 2, maxRows: 6 }}
+                />
+              ) : (
+                <InputComponent
+                  type={field.inputType === 'number' ? 'number' : undefined}
+                  placeholder={placeholder}
+                  allowClear={allowClear}
+                  autoComplete={autoComplete}
+                />
+              );
+
               return (
                 <Form.Item
                   key={field.name}
@@ -240,12 +257,7 @@ const ProviderConfigForm = ({
                   label={t(field.labelKey)}
                   extra={field.extraKey ? t(field.extraKey) : undefined}
                 >
-                  <InputComponent
-                    type={field.inputType === 'number' ? 'number' : undefined}
-                    placeholder={field.placeholderKey ? t(field.placeholderKey) : undefined}
-                    allowClear={field.inputType !== 'password'}
-                    autoComplete={field.inputType === 'password' ? 'new-password' : 'off'}
-                  />
+                  {inputNode}
                 </Form.Item>
               );
             })}

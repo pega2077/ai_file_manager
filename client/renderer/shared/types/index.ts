@@ -177,6 +177,7 @@ export interface LlamaCppConfig {
   llamacppInstallDir?: string;
   llamacppPort?: number;
   llamacppHost?: string;
+  llamacppServerArgs?: string;
 }
 
 export interface AppConfig {
