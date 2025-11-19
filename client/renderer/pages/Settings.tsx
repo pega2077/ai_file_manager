@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import FeedbackModal from "../components/feedback/FeedbackModal";
+import SystemTagsManager from "../components/SystemTagsManager";
 import { apiService } from "../services/api";
 import { useTranslation } from "../shared/i18n/I18nProvider";
 import {
@@ -102,6 +103,7 @@ const Settings = () => {
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const [feedbackIncludeLogsDefault, setFeedbackIncludeLogsDefault] =
     useState(false);
+  const [systemTagsModalOpen, setSystemTagsModalOpen] = useState(false);
 
   const layoutStyle = useMemo(
     () => ({
@@ -929,6 +931,19 @@ const Settings = () => {
               </div>
 
               <div>
+                <Text strong>{t("settings.labels.manageSystemTags")}</Text>
+                <Button
+                  onClick={() => setSystemTagsModalOpen(true)}
+                  style={{ marginLeft: 16 }}
+                >
+                  {t("settings.actions.manageSystemTags")}
+                </Button>
+                <Text type="secondary" style={{ marginLeft: 8 }}>
+                  {t("settings.descriptions.manageSystemTags")}
+                </Text>
+              </div>
+
+              <div>
                 <Text strong>{t("settings.labels.autoClassify")}</Text>
                 <Switch
                   checkedChildren={t("settings.common.enabled")}
@@ -1309,6 +1324,11 @@ const Settings = () => {
             onClose={() => setFeedbackModalOpen(false)}
             t={t}
             defaultIncludeLogs={feedbackIncludeLogsDefault}
+          />
+
+          <SystemTagsManager
+            open={systemTagsModalOpen}
+            onClose={() => setSystemTagsModalOpen(false)}
           />
         </div>
       </Content>

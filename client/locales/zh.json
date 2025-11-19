@@ -207,6 +207,7 @@
       "autoSaveRAG": "自动保存到 RAG",
       "autoTagEnabled": "自动打标签",
       "tagSummaryMaxLength": "标签摘要最大长度",
+      "manageSystemTags": "系统标签",
       "autoClassify": "自动分类无需确认",
     "checkFileNameOnImport": "导入时检查文件名",
   "enableDirectoryWatcher": "启用目录监听",
@@ -236,6 +237,7 @@
       "autoSaveRAG": "自动将导入的文件添加到 RAG 知识库。",
       "autoTagEnabled": "在导入或处理文件时自动提取标签。",
       "tagSummaryMaxLength": "生成标签摘要时使用的最大字符数（影响自动打标签）。",
+      "manageSystemTags": "管理用于标准化文件标签的预定义标签。",
       "autoClassify": "保存文件到推荐目录时跳过确认步骤。",
     "checkFileNameOnImport": "导入文件时自动校验文件名，发现非法字符或命名不规范时阻止导入。",
   "enableDirectoryWatcher": "监听工作目录中的新文件并自动加入导入队列。",
@@ -280,6 +282,7 @@
       "back": "返回文件",
       "saveApiBaseUrl": "保存 API 地址",
       "managePegaAccount": "管理 Pega 账号",
+      "manageSystemTags": "管理系统标签",
       "configureOllama": "配置 Ollama",
       "configureOpenai": "配置 OpenAI",
       "configureOpenrouter": "配置 OpenRouter",
@@ -1087,6 +1090,20 @@
       "contentType": "内容类型:",
       "charCount": "字符数:",
       "tokenCount": "Token数:"
+    }
+  },
+  "systemTags": {
+    "title": "管理系统标签",
+    "description": "系统标签用于标准化文件标签。当自动打标签生成标签时，会与系统标签进行比较并规范化，确保标签的一致性。",
+    "inputPlaceholder": "输入标签名称",
+    "addButton": "添加",
+    "emptyMessage": "暂无系统标签。添加标签以开始使用。",
+    "count": "标签总数：{{count}}",
+    "messages": {
+      "loadFailed": "加载系统标签失败",
+      "saveFailed": "保存系统标签失败",
+      "saveSuccess": "系统标签保存成功",
+      "tagExists": "该标签已存在"
     }
   }
 }
