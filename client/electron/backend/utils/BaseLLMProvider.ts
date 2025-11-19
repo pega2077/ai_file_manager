@@ -168,19 +168,94 @@ export abstract class BaseLLMProvider {
    * Try to parse JSON from raw string, extracting JSON objects/arrays if needed
    */
   protected tryParseJson(raw: string): Record<string, unknown> | undefined {
+    const direct = this.safeJsonParse(raw?.trim());
+    if (direct) {
+      return direct;
+    }
+
+    const candidates = this.extractJsonCandidates(raw);
+    for (const candidate of candidates) {
+      const parsed = this.safeJsonParse(candidate);
+      if (parsed) {
+        return parsed;
+      }
+    }
+    return undefined;
+  }
+
+  private safeJsonParse(raw?: string): Record<string, unknown> | undefined {
+    if (!raw) {
+      return undefined;
+    }
     try {
       return JSON.parse(raw) as Record<string, unknown>;
     } catch {
-      const match = raw.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-      if (!match) {
-        return undefined;
+      return undefined;
+    }
+  }
+
+  private extractJsonCandidates(raw: string): string[] {
+    if (!raw) {
+      return [];
+    }
+    const results: string[] = [];
+    const stack: Array<"{" | "["> = [];
+    let startIndex = -1;
+    let inString = false;
+    let escapeNext = false;
+
+    for (let i = 0; i < raw.length; i += 1) {
+      const char = raw[i];
+      if (inString) {
+        if (escapeNext) {
+          escapeNext = false;
+          continue;
+        }
+        if (char === "\\") {
+          escapeNext = true;
+          continue;
+        }
+        if (char === '"') {
+          inString = false;
+        }
+        continue;
       }
-      try {
-        return JSON.parse(match[0]) as Record<string, unknown>;
-      } catch {
-        return undefined;
+
+      if (char === '"') {
+        inString = true;
+        escapeNext = false;
+        continue;
+      }
+
+      if (char === "{" || char === "[") {
+        if (stack.length === 0) {
+          startIndex = i;
+        }
+        stack.push(char);
+        continue;
+      }
+
+      if (char === "}" || char === "]") {
+        if (stack.length === 0) {
+          startIndex = -1;
+          continue;
+        }
+        const last = stack[stack.length - 1];
+        const matches = (last === "{" && char === "}") || (last === "[" && char === "]");
+        if (!matches) {
+          stack.length = 0;
+          startIndex = -1;
+          continue;
+        }
+        stack.pop();
+        if (stack.length === 0 && startIndex !== -1) {
+          results.push(raw.slice(startIndex, i + 1));
+          startIndex = -1;
+        }
       }
     }
+
+    return results;
   }
 }
 

@@ -186,7 +186,7 @@ export class LlamaCppProvider extends BaseLLMProvider {
     };
 
     logger.info(`Generating structured JSON with llama-server`);
-
+    logger.debug(JSON.stringify(payload));
     try {
       const response = await httpPostJson<LlamaCppCompletionResponse>(
         url,
@@ -194,13 +194,19 @@ export class LlamaCppProvider extends BaseLLMProvider {
         { Accept: "application/json" },
         config.timeoutMs ?? 60000
       );
-
+      logger.info(`Generating structured JSON with llama-server response received`);
+      logger.debug(JSON.stringify(response.data?.content));
       if (!response.ok || !response.data?.content) {
         throw new Error("Empty response from llama-server");
       }
 
       // Try to parse JSON from response
       const parsed = this.tryParseJson(response.data.content);
+      if (!parsed) {
+        const preview = response.data.content?.slice(0, 500) ?? "";
+        logger.error("Failed to parse structured JSON from llama-server response", { preview });
+        throw new Error("llama-server returned non-JSON content");
+      }
       return parsed;
     } catch (error) {
       logger.error("Failed to generate structured JSON:", error);
