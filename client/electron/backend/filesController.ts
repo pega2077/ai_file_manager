@@ -15,6 +15,7 @@ import { buildVisionDescribePrompt, normalizeLanguage } from "./utils/promptHelp
 import type { SupportedLang } from "./utils/promptHelper";
 import { buildExtractTagsMessages } from "./utils/promptHelper";
 import type { ProviderName } from "./utils/llm";
+import { normalizeProviderName, isProviderValueProvided, respondWithInvalidProvider } from "./utils/providerHelper";
 import { app, nativeImage, shell } from "electron";
 import { pathToFileURL } from "url";
 import { randomUUID } from "crypto";
@@ -2128,18 +2129,12 @@ export async function recommendDirectoryHandler(req: Request, res: Response): Pr
       : [];
     const overrideContent = typeof body?.content === "string" ? body.content : undefined;
     // Optional provider override
-    const providerRaw = typeof body?.provider === "string" ? body.provider.trim().toLowerCase() : undefined;
-    const provider: ProviderName | undefined = providerRaw === "openai"
-      ? "openai"
-      : providerRaw === "azure-openai" || providerRaw === "azure" || providerRaw === "azure_openai"
-      ? "azure-openai"
-      : providerRaw === "openrouter"
-      ? "openrouter"
-      : providerRaw === "bailian" || providerRaw === "aliyun" || providerRaw === "dashscope"
-      ? "bailian"
-      : providerRaw === "ollama"
-      ? "ollama"
-      : undefined;
+    const providerInput = body?.provider;
+    const provider = normalizeProviderName(providerInput);
+    if (isProviderValueProvided(providerInput) && !provider) {
+      respondWithInvalidProvider(res, providerInput);
+      return;
+    }
 
     if (!filePath) {
       res.status(400).json({
@@ -2592,18 +2587,12 @@ export async function extractTagsHandler(req: Request, res: Response): Promise<v
     const topK = Math.max(1, Math.min(50, toNumber(body?.top_k, 10)));
     const language = normalizeLanguage(body?.language ?? (configManager.getConfig().language ?? "zh"), "zh");
     const domainHint = typeof body?.domain_hint === "string" ? body.domain_hint : "";
-    const providerRaw = typeof body?.provider === "string" ? body.provider.trim().toLowerCase() : undefined;
-    const provider: ProviderName | undefined = providerRaw === "openai"
-      ? "openai"
-      : providerRaw === "azure-openai" || providerRaw === "azure" || providerRaw === "azure_openai"
-      ? "azure-openai"
-      : providerRaw === "openrouter"
-      ? "openrouter"
-      : providerRaw === "bailian" || providerRaw === "aliyun" || providerRaw === "dashscope"
-      ? "bailian"
-      : providerRaw === "ollama"
-      ? "ollama"
-      : undefined;
+    const providerInput = body?.provider;
+    const provider = normalizeProviderName(providerInput);
+    if (isProviderValueProvided(providerInput) && !provider) {
+      respondWithInvalidProvider(res, providerInput);
+      return;
+    }
     const text = rawText;
     if (!text || !text.trim()) {
       res.status(400).json({
@@ -2704,18 +2693,12 @@ export async function updateFileTagsHandler(req: Request, res: Response): Promis
     const domainHint = typeof body?.domain_hint === "string" ? body.domain_hint : "";
     const cfg = configManager.getConfig();
     const language = normalizeLanguage(body?.language ?? (cfg.language ?? "zh"), "zh");
-    const providerRaw = typeof body?.provider === "string" ? body.provider.trim().toLowerCase() : undefined;
-    const provider: ProviderName | undefined = providerRaw === "openai"
-      ? "openai"
-      : providerRaw === "azure-openai" || providerRaw === "azure" || providerRaw === "azure_openai"
-      ? "azure-openai"
-      : providerRaw === "openrouter"
-      ? "openrouter"
-      : providerRaw === "bailian" || providerRaw === "aliyun" || providerRaw === "dashscope"
-      ? "bailian"
-      : providerRaw === "ollama"
-      ? "ollama"
-      : undefined;
+    const providerInput = body?.provider;
+    const provider = normalizeProviderName(providerInput);
+    if (isProviderValueProvided(providerInput) && !provider) {
+      respondWithInvalidProvider(res, providerInput);
+      return;
+    }
 
     if (!rawFileId) {
       res.status(400).json({

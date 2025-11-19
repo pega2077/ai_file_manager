@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { Op } from "sequelize";
 import { generateStructuredJson, describeImage, getActiveModelName, embedText } from "./utils/llm";
 import type { ProviderName } from "./utils/llm";
+import { normalizeProviderName, isProviderValueProvided, respondWithInvalidProvider } from "./utils/providerHelper";
 import { logger } from "../logger";
 import { configManager } from "../configManager";
 import {
@@ -105,26 +106,12 @@ export async function chatRecommendDirectoryHandler(
     }
 
     const language: SupportedLang = normalizeLanguage(body?.language);
-    const providerRaw =
-      typeof body?.provider === "string"
-        ? body.provider.trim().toLowerCase()
-        : undefined;
-    const provider: ProviderName | undefined =
-      providerRaw === "openai"
-        ? "openai"
-        : providerRaw === "azure-openai" ||
-          providerRaw === "azure" ||
-          providerRaw === "azure_openai"
-        ? "azure-openai"
-        : providerRaw === "openrouter"
-        ? "openrouter"
-        : providerRaw === "bailian" ||
-          providerRaw === "aliyun" ||
-          providerRaw === "dashscope"
-        ? "bailian"
-        : providerRaw === "ollama"
-        ? "ollama"
-        : undefined;
+    const providerInput = body?.provider;
+    const provider = normalizeProviderName(providerInput);
+    if (isProviderValueProvided(providerInput) && !provider) {
+      respondWithInvalidProvider(res, providerInput);
+      return;
+    }
     const messages = buildRecommendDirectoryMessages({
       language,
       fileName,
@@ -271,7 +258,12 @@ export async function chatValidateFileNameHandler(
       : fileContent;
 
     const language: SupportedLang = normalizeLanguage(body?.language);
-    const provider = normalizeProviderName(body?.provider);
+    const providerInput = body?.provider;
+    const provider = normalizeProviderName(providerInput);
+    if (isProviderValueProvided(providerInput) && !provider) {
+      respondWithInvalidProvider(res, providerInput);
+      return;
+    }
 
     const temperatureRaw =
       typeof body?.temperature === "number" && Number.isFinite(body.temperature)
@@ -434,26 +426,12 @@ export async function chatDescribeImageHandler(
       typeof body?.model === "string" && body.model.trim().length > 0
         ? body.model.trim()
         : undefined;
-    const providerRaw =
-      typeof body?.provider === "string"
-        ? body.provider.trim().toLowerCase()
-        : undefined;
-    const provider: ProviderName | undefined =
-      providerRaw === "openai"
-        ? "openai"
-        : providerRaw === "azure-openai" ||
-          providerRaw === "azure" ||
-          providerRaw === "azure_openai"
-        ? "azure-openai"
-        : providerRaw === "openrouter"
-        ? "openrouter"
-        : providerRaw === "bailian" ||
-          providerRaw === "aliyun" ||
-          providerRaw === "dashscope"
-        ? "bailian"
-        : providerRaw === "ollama"
-        ? "ollama"
-        : undefined;
+    const providerInput = body?.provider;
+    const provider = normalizeProviderName(providerInput);
+    if (isProviderValueProvided(providerInput) && !provider) {
+      respondWithInvalidProvider(res, providerInput);
+      return;
+    }
 
     if (!base64 && !imageUrl) {
       res.status(400).json({
@@ -635,7 +613,12 @@ export async function chatQueryPurposeHandler(
     );
 
     const language: SupportedLang = normalizeLanguage(body?.language);
-    const provider = normalizeProviderName(body?.provider);
+    const providerInput = body?.provider;
+    const provider = normalizeProviderName(providerInput);
+    if (isProviderValueProvided(providerInput) && !provider) {
+      respondWithInvalidProvider(res, providerInput);
+      return;
+    }
 
     const messages = buildQueryPurposeMessages({
       language,
@@ -834,7 +817,12 @@ export async function chatSummarizeDocumentsHandler(
     );
 
     const language: SupportedLang = normalizeLanguage(body?.language);
-    const provider = normalizeProviderName(body?.provider);
+    const providerInput = body?.provider;
+    const provider = normalizeProviderName(providerInput);
+    if (isProviderValueProvided(providerInput) && !provider) {
+      respondWithInvalidProvider(res, providerInput);
+      return;
+    }
 
     const files = (await FileModel.findAll({
       where: { file_id: documentIds },
@@ -1186,33 +1174,6 @@ function parseFileFilters(input: unknown): ParsedFileFilters {
     tags: parseList(obj.tags),
     file_types: parseList(obj.file_types),
   };
-}
-
-function normalizeProviderName(raw: unknown): ProviderName | undefined {
-  if (typeof raw !== "string") return undefined;
-  const v = raw.trim().toLowerCase();
-  switch (v) {
-    case "openai":
-      return "openai";
-    case "azure-openai":
-    case "azure":
-    case "azure_openai":
-      return "azure-openai";
-    case "openrouter":
-      return "openrouter";
-    case "bailian":
-    case "aliyun":
-    case "dashscope":
-      return "bailian";
-    case "ollama":
-      return "ollama";
-    case "llamacpp":
-    case "llama-cpp":
-    case "llama_cpp":
-      return "llamacpp";
-    default:
-      return undefined;
-  }
 }
 
 function escapeForLike(input: string): string {
@@ -2240,7 +2201,12 @@ export async function chatAnalyzeHandler(
     );
 
     const filters = parseFileFilters(body?.file_filters);
-    const provider = normalizeProviderName(body?.provider);
+    const providerInput = body?.provider;
+    const provider = normalizeProviderName(providerInput);
+    if (isProviderValueProvided(providerInput) && !provider) {
+      respondWithInvalidProvider(res, providerInput);
+      return;
+    }
     const overrideModel =
       typeof body?.override_model === "string" &&
       body.override_model.trim().length > 0
@@ -2449,7 +2415,12 @@ export async function chatAskHandlerMode1(
       Math.min(4000, Math.floor(maxTokensRaw))
     );
 
-    const provider = normalizeProviderName(body?.provider);
+    const providerInput = body?.provider;
+    const provider = normalizeProviderName(providerInput);
+    if (isProviderValueProvided(providerInput) && !provider) {
+      respondWithInvalidProvider(res, providerInput);
+      return;
+    }
     const filters = parseFileFilters(body?.file_filters);
 
     const retrieval = await retrieveContextCandidates({
@@ -3045,26 +3016,12 @@ export async function chatDirectoryStructureHandler(
       Math.min(100, Math.floor(maxDirsRaw))
     );
     const language: SupportedLang = normalizeLanguage(body?.language);
-    const providerRaw =
-      typeof body?.provider === "string"
-        ? body.provider.trim().toLowerCase()
-        : undefined;
-    const provider: ProviderName | undefined =
-      providerRaw === "openai"
-        ? "openai"
-        : providerRaw === "azure-openai" ||
-          providerRaw === "azure" ||
-          providerRaw === "azure_openai"
-        ? "azure-openai"
-        : providerRaw === "openrouter"
-        ? "openrouter"
-        : providerRaw === "bailian" ||
-          providerRaw === "aliyun" ||
-          providerRaw === "dashscope"
-        ? "bailian"
-        : providerRaw === "ollama"
-        ? "ollama"
-        : undefined;
+    const providerInput = body?.provider;
+    const provider = normalizeProviderName(providerInput);
+    if (isProviderValueProvided(providerInput) && !provider) {
+      respondWithInvalidProvider(res, providerInput);
+      return;
+    }
     const messages = buildDirectoryStructureMessages({
       language,
       profession,
