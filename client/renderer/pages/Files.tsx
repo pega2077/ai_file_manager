@@ -514,7 +514,7 @@ const FileList: React.FC<FileListProps> = ({
         }
       }
 
-      if (!sourceText) {
+      if (!sourceText && !editingFile.file_id) {
         setNameAssessmentStatus("warning");
         message.warning(
           translateOrFallback(
@@ -525,8 +525,8 @@ const FileList: React.FC<FileListProps> = ({
         return;
       }
 
-      const preparedContent = sourceText.trim();
-      if (!preparedContent) {
+      const preparedContent = (sourceText ?? "").trim();
+      if (!preparedContent && !editingFile.file_id) {
         setNameAssessmentStatus("warning");
         message.warning(
           translateOrFallback(
@@ -538,8 +538,9 @@ const FileList: React.FC<FileListProps> = ({
       }
 
       const assessmentResp = await apiService.validateFileName({
+        fileId: editingFile.file_id,
         fileName: currentName,
-        fileContent: preparedContent,
+        ...(preparedContent ? { fileContent: preparedContent } : {}),
         language: locale,
       });
 

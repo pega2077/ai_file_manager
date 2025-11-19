@@ -884,7 +884,8 @@ class ApiService {
 
   async validateFileName(payload: {
     fileName: string;
-    fileContent: string;
+    fileId?: string;
+    fileContent?: string;
     language?: string;
     providerOverride?: ProviderName;
     temperature?: number;
@@ -892,10 +893,20 @@ class ApiService {
   }): Promise<ApiResponse<FileNameAssessmentResult>> {
     const trimmedName = (payload.fileName ?? '').trim();
     const normalizedContent = (payload.fileContent ?? '').slice(0, MAX_FILE_NAME_ASSESSMENT_LENGTH);
+    const preparedContent = normalizedContent.trim();
+    const sanitizedFileId = typeof payload.fileId === 'string' ? payload.fileId.trim() : '';
 
-    if (!trimmedName || !normalizedContent.trim()) {
+    if (!trimmedName) {
       return Promise.reject(
-        Object.assign(new Error('fileName and fileContent are required'), {
+        Object.assign(new Error('fileName is required'), {
+          code: 'INVALID_INPUT',
+        })
+      );
+    }
+
+    if (!sanitizedFileId && !preparedContent) {
+      return Promise.reject(
+        Object.assign(new Error('fileId or fileContent is required'), {
           code: 'INVALID_INPUT',
         })
       );
@@ -904,8 +915,15 @@ class ApiService {
     const provider = payload.providerOverride ?? (await this.ensureProvider());
     const body: Record<string, unknown> = {
       file_name: trimmedName,
-      file_content: normalizedContent,
     };
+
+    if (sanitizedFileId) {
+      body.file_id = sanitizedFileId;
+    }
+
+    if (preparedContent) {
+      body.file_content = preparedContent;
+    }
 
     if (provider) {
       body.provider = provider;

@@ -62,6 +62,7 @@ type ChatRecommendBody = {
 
 type ChatValidateFileNameBody = {
   file_name?: unknown;
+  file_id?: unknown;
   file_content?: unknown;
   language?: unknown;
   provider?: unknown;
@@ -230,20 +231,22 @@ export async function chatValidateFileNameHandler(
   try {
     const body = req.body as ChatValidateFileNameBody | undefined;
     const fileNameRaw = typeof body?.file_name === "string" ? body.file_name : "";
+    const fileIdRaw = typeof body?.file_id === "string" ? body.file_id : "";
     const fileContentRaw =
       typeof body?.file_content === "string" ? body.file_content : "";
 
     const fileName = fileNameRaw.trim();
-    const fileContent = fileContentRaw.trim();
+    const fileId = fileIdRaw.trim();
+    const requestContent = fileContentRaw.trim();
 
-    if (!fileName || !fileContent) {
+    if (!fileName) {
       res.status(400).json({
         success: false,
         message: "invalid_request",
         data: null,
         error: {
           code: "INVALID_REQUEST",
-          message: "file_name and file_content are required",
+          message: "file_name is required",
           details: null,
         },
         timestamp: new Date().toISOString(),
@@ -252,10 +255,67 @@ export async function chatValidateFileNameHandler(
       return;
     }
 
-    const truncated = fileContent.length > MAX_FILENAME_ANALYSIS_CONTENT_LENGTH;
-    const contentForPrompt = truncated
-      ? `${fileContent.slice(0, MAX_FILENAME_ANALYSIS_CONTENT_LENGTH)}\n\n[Content truncated for analysis]`
-      : fileContent;
+    const missingContentMessage = fileId
+        ? "File content is empty. Please re-import the file and try again."
+        : "file_content is required";
+        
+    let resolvedContent = "";
+    let resolvedTruncated = false;
+
+    if (fileId) {
+      const dbContent = await loadFileContentForValidation(
+        fileId,
+        MAX_FILENAME_ANALYSIS_CONTENT_LENGTH
+      );
+      if (dbContent.content) {
+        resolvedContent = dbContent.content;
+        resolvedTruncated = dbContent.truncated;
+      }
+      
+      if(!resolvedContent && requestContent) {
+        res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: {
+          code: "INVALID_REQUEST",
+          message: missingContentMessage,
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+      }
+    }
+    
+    if (!resolvedContent && requestContent) {
+      resolvedTruncated =
+        requestContent.length > MAX_FILENAME_ANALYSIS_CONTENT_LENGTH;
+      resolvedContent = resolvedTruncated
+        ? requestContent.slice(0, MAX_FILENAME_ANALYSIS_CONTENT_LENGTH)
+        : requestContent;
+    }
+
+    if (!resolvedContent) {
+      res.status(400).json({
+        success: false,
+        message: "invalid_request",
+        data: null,
+        error: {
+          code: "INVALID_REQUEST",
+          message: missingContentMessage,
+          details: null,
+        },
+        timestamp: new Date().toISOString(),
+        request_id: "",
+      });
+      return;
+    }
+
+    const contentForPrompt = resolvedTruncated
+      ? `${resolvedContent}\n\n[Content truncated for analysis]`
+      : resolvedContent;
 
     const language: SupportedLang = normalizeLanguage(body?.language);
     const providerInput = body?.provider;
@@ -284,7 +344,7 @@ export async function chatValidateFileNameHandler(
       language,
       fileName,
       fileContent: contentForPrompt,
-      truncated,
+      truncated: resolvedTruncated,
       maxLength: MAX_FILENAME_ANALYSIS_CONTENT_LENGTH,
     });
 
@@ -361,7 +421,7 @@ export async function chatValidateFileNameHandler(
         quality_notes: qualityNotes,
         metadata: {
           model_used: getActiveModelName("chat", provider),
-          truncated_input: truncated,
+          truncated_input: resolvedTruncated,
           analyzed_content_length: contentForPrompt.length,
           response_time_ms: Date.now() - startTs,
           temperature,
@@ -1068,6 +1128,7 @@ interface HydratedChunkRow {
 }
 
 const MAX_FILENAME_ANALYSIS_CONTENT_LENGTH = 6000;
+const MAX_FILENAME_VALIDATION_CHUNKS = 40;
 
 const FILE_NAME_ASSESSMENT_RESPONSE_FORMAT = {
   json_schema: {
@@ -1157,6 +1218,85 @@ const MAX_DOCUMENT_IDS = 10;
 const MIN_PER_DOCUMENT_CHAR_LIMIT = 500;
 const MAX_PER_DOCUMENT_CHAR_LIMIT = 6000;
 const DEFAULT_PER_DOCUMENT_CHAR_LIMIT = 3000;
+
+type MinimalChunkForValidation = Pick<ChunkAttributes, "content" | "chunk_index" | "file_id">;
+
+async function loadFileContentForValidation(
+  fileId: string,
+  charLimit: number
+): Promise<{ content: string; truncated: boolean }> {
+  if (!fileId) {
+    return { content: "", truncated: false };
+  }
+  try {
+    const chunkRows = (await ChunkModel.findAll({
+      where: { file_id: fileId },
+      order: [["chunk_index", "ASC"]],
+      limit: MAX_FILENAME_VALIDATION_CHUNKS,
+      attributes: ["content", "chunk_index", "file_id"],
+      raw: true,
+    }).catch(() => [])) as MinimalChunkForValidation[];
+
+    const chunkResult = composeChunkContentWithinLimit(chunkRows, charLimit);
+    if (chunkResult.content) {
+      return chunkResult;
+    }
+
+    const fileRow = (await FileModel.findOne({
+      where: { file_id: fileId },
+      attributes: ["summary"],
+      raw: true,
+    }).catch(() => null)) as Pick<FileAttributes, "summary"> | null;
+
+    const summaryText = typeof fileRow?.summary === "string" ? fileRow.summary.trim() : "";
+    if (!summaryText) {
+      return { content: "", truncated: false };
+    }
+
+    const truncatedSummary = summaryText.length > charLimit;
+    return {
+      content: truncatedSummary ? summaryText.slice(0, charLimit) : summaryText,
+      truncated: truncatedSummary,
+    };
+  } catch (err) {
+    logger.error(`loadFileContentForValidation failed for ${fileId}`, err as unknown);
+    return { content: "", truncated: false };
+  }
+}
+
+function composeChunkContentWithinLimit(
+  chunks: MinimalChunkForValidation[],
+  charLimit: number
+): { content: string; truncated: boolean } {
+  if (!chunks.length || charLimit <= 0) {
+    return { content: "", truncated: false };
+  }
+  let remaining = charLimit;
+  const parts: string[] = [];
+  let truncated = false;
+
+  for (const chunk of chunks) {
+    const content = typeof chunk.content === "string" ? chunk.content.trim() : "";
+    if (!content) {
+      continue;
+    }
+    if (remaining <= 0) {
+      truncated = true;
+      break;
+    }
+    if (content.length <= remaining) {
+      parts.push(content);
+      remaining -= content.length;
+    } else {
+      parts.push(content.slice(0, remaining));
+      truncated = true;
+      remaining = 0;
+      break;
+    }
+  }
+
+  return { content: parts.join("\n").trim(), truncated };
+}
 
 function parseFileFilters(input: unknown): ParsedFileFilters {
   if (!input || typeof input !== "object") return {};

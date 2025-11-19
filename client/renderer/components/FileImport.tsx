@@ -779,15 +779,18 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           }
         }
 
-        if (!contentForAssessment) {
+        if (!contentForAssessment && !fileId) {
           notifyProgress("validate-file-name", "success", t("files.messages.fileNameAssessmentNoContent"));
           return { renamed: false };
         }
 
         try {
           const response = await apiService.validateFileName({
+            fileId,
             fileName: effectiveName,
-            fileContent: contentForAssessment.slice(0, MAX_NAME_VALIDATION_TEXT),
+            ...(contentForAssessment
+              ? { fileContent: contentForAssessment.slice(0, MAX_NAME_VALIDATION_TEXT) }
+              : {}),
             language,
           });
 
