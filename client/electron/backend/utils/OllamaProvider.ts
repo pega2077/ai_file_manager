@@ -47,13 +47,7 @@ export interface OllamaMessage {
   content: string;
 }
 
-export interface StructuredResponseFormat {
-  json_schema?: {
-    name?: string;
-    schema: unknown;
-    strict?: boolean;
-  };
-}
+export type StructuredResponseFormat = NonNullable<GenerateStructuredJsonParams["responseFormat"]>;
 
 export interface OllamaGeneratePayload {
   model: string;
