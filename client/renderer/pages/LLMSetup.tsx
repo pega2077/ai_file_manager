@@ -181,32 +181,38 @@ const LLMSetup = () => {
   const handleSaveConfig = async (values: ProviderConfigValues) => {
     setLoading(true);
     try {
-      let configUpdate: Partial<AppConfig> = {
+      // Get current config to merge with existing settings
+      const currentConfig = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const configUpdate: Partial<AppConfig> = {
         llmProvider: selectedProvider,
       };
 
       switch (selectedProvider) {
         case 'ollama':
           configUpdate.ollama = {
-            ollamaEndpoint: values.endpoint,
+            ...(currentConfig?.ollama || {}),
+            ollamaEndpoint: values.endpoint || 'http://127.0.0.1:11434',
             ollamaApiKey: values.apiKey,
           };
           break;
         case 'openai':
         case 'azure-openai':
           configUpdate.openai = {
+            ...(currentConfig?.openai || {}),
             openaiEndpoint: values.endpoint || 'https://api.openai.com/v1',
             openaiApiKey: values.apiKey,
           };
           break;
         case 'openrouter':
           configUpdate.openrouter = {
+            ...(currentConfig?.openrouter || {}),
             openrouterEndpoint: values.endpoint || 'https://openrouter.ai/api/v1',
             openrouterApiKey: values.apiKey,
           };
           break;
         case 'bailian':
           configUpdate.bailian = {
+            ...(currentConfig?.bailian || {}),
             bailianEndpoint: values.endpoint || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
             bailianApiKey: values.apiKey,
           };
@@ -225,6 +231,7 @@ const LLMSetup = () => {
             }
           }
           configUpdate.llamacpp = {
+            ...(currentConfig?.llamacpp || {}),
             llamacppHost: host,
             llamacppPort: port,
           };
@@ -303,11 +310,14 @@ const LLMSetup = () => {
   const handleSaveModels = async (values: { chatModel?: string; visionModel?: string; embedModel?: string }) => {
     setLoading(true);
     try {
-      let configUpdate: Partial<AppConfig> = {};
+      // Get current config to merge with existing settings
+      const currentConfig = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const configUpdate: Partial<AppConfig> = {};
 
       switch (selectedProvider) {
         case 'ollama':
           configUpdate.ollama = {
+            ...(currentConfig?.ollama || {}),
             ollamaModel: values.chatModel,
             ollamaVisionModel: values.visionModel,
             ollamaEmbedModel: values.embedModel,
@@ -316,6 +326,7 @@ const LLMSetup = () => {
         case 'openai':
         case 'azure-openai':
           configUpdate.openai = {
+            ...(currentConfig?.openai || {}),
             openaiModel: values.chatModel,
             openaiVisionModel: values.visionModel,
             openaiEmbedModel: values.embedModel,
@@ -323,6 +334,7 @@ const LLMSetup = () => {
           break;
         case 'openrouter':
           configUpdate.openrouter = {
+            ...(currentConfig?.openrouter || {}),
             openrouterModel: values.chatModel,
             openrouterVisionModel: values.visionModel,
             openrouterEmbedModel: values.embedModel,
@@ -330,6 +342,7 @@ const LLMSetup = () => {
           break;
         case 'bailian':
           configUpdate.bailian = {
+            ...(currentConfig?.bailian || {}),
             bailianModel: values.chatModel,
             bailianVisionModel: values.visionModel,
             bailianEmbedModel: values.embedModel,
@@ -337,6 +350,7 @@ const LLMSetup = () => {
           break;
         case 'pega':
           configUpdate.pega = {
+            ...(currentConfig?.pega || {}),
             pegaModel: values.chatModel,
             pegaVisionModel: values.visionModel,
             pegaEmbedModel: values.embedModel,
@@ -398,7 +412,9 @@ const LLMSetup = () => {
         return;
       }
 
+      const currentConfig = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
       const nextPegaConfig = {
+        ...(currentConfig?.pega || {}),
         pegaApiKey: apiKey,
         pegaAuthToken: token,
       };

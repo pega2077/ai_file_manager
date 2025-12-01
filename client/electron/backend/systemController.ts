@@ -250,10 +250,18 @@ const listProviderModels = async (req: Request, res: Response) => {
                 m.id.toLowerCase().includes('4o') ||
                 m.id.toLowerCase().includes('gemini')
               );
-              // Embedding models (OpenRouter has limited embedding support)
-              embedModels = models.filter((m) => 
-                m.id.toLowerCase().includes('embed')
-              );
+            }
+          }
+
+          // Fetch embedding models from dedicated API
+          const embedResponse = await fetch(`${endpoint}/embeddings/models`, {
+            method: "GET",
+            headers,
+          });
+          if (embedResponse.ok) {
+            const embedRawData: unknown = await embedResponse.json();
+            if (isOpenRouterModelsData(embedRawData) && Array.isArray(embedRawData.data)) {
+              embedModels = embedRawData.data.map((m) => ({ id: m.id, name: m.name || m.id }));
             }
           }
         } catch (e) {
