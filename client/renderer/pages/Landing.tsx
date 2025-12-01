@@ -21,15 +21,8 @@ const Landing = () => {
         if (isInitialized) {
           navigate('/files');
         } else {
-          // Check if LLM provider is already configured
-          const hasLlmConfig = Boolean(cfg?.llmProvider);
-          if (hasLlmConfig) {
-            // LLM already configured, go to directory setup
-            navigate('/setup');
-          } else {
-            // Start with LLM setup first
-            navigate('/llm-setup');
-          }
+          // Always start with LLM setup for uninitialized apps
+          navigate('/llm-setup');
         }
       } catch (error) {
         console.error('Error checking initialization status:', error);
