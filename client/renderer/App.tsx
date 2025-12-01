@@ -7,6 +7,7 @@ import Directories from './pages/Directories';
 import Files from './pages/Files';
 import Search from './pages/Search';
 import Setup from './pages/Setup';
+import LLMSetup from './pages/LLMSetup';
 import Settings from './pages/Settings';
 import Bot from './pages/Bot';
 import Convert from './pages/Convert';
@@ -61,6 +62,7 @@ function App() {
           <Route path="/home" element={<Directories />} />
           <Route path="/files" element={<Files />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/llm-setup" element={<LLMSetup />} />
           <Route path="/setup" element={<Setup />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/settings/pega-auth" element={<PegaAuth />} />

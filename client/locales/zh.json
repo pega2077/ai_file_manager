@@ -1110,5 +1110,77 @@
       "saveSuccess": "系统标签保存成功",
       "tagExists": "该标签已存在"
     }
+  },
+  "llmSetup": {
+    "pageTitle": "设置大语言模型",
+    "steps": {
+      "selectProvider": {
+        "title": "选择提供商",
+        "description": "选择大语言模型提供商"
+      },
+      "configure": {
+        "title": "配置参数",
+        "description": "填写接口参数或登录账号"
+      },
+      "selectModels": {
+        "title": "选择模型",
+        "description": "选择语言、视觉和嵌入模型"
+      }
+    },
+    "cards": {
+      "selectProvider": "第1步 - 选择大语言模型提供商",
+      "configureProvider": "第2步 - 配置提供商",
+      "pegaAuth": "第2步 - 登录 Pega 平台",
+      "selectModels": "第3步 - 选择模型"
+    },
+    "form": {
+      "providerLabel": "大语言模型提供商",
+      "endpointLabel": "API 地址",
+      "apiKeyLabel": "API Key",
+      "chatModelLabel": "对话模型（语言模型）",
+      "visionModelLabel": "视觉模型",
+      "embedModelLabel": "文本嵌入模型"
+    },
+    "placeholders": {
+      "endpoint": "输入 API 地址",
+      "apiKey": "输入 API Key",
+      "selectModel": "选择模型"
+    },
+    "validation": {
+      "endpointRequired": "请输入 API 地址",
+      "apiKeyRequired": "请输入 API Key"
+    },
+    "options": {
+      "providers": {
+        "ollama": "Ollama（本地/网关）",
+        "pega": "Pega 平台（推荐）",
+        "openai": "OpenAI",
+        "openrouter": "OpenRouter",
+        "bailian": "阿里百炼",
+        "azureOpenai": "Azure OpenAI",
+        "llamacpp": "Llama.cpp（本地）"
+      }
+    },
+    "descriptions": {
+      "provider": "选择您要使用的大语言模型服务提供商。Pega 平台提供免费的基础额度。",
+      "pegaAuth": "登录 Pega 平台以获取 API Key。未登录用户也可使用，但调用频率有限制。"
+    },
+    "actions": {
+      "skipLogin": "跳过登录（有限制）",
+      "skipModelSelection": "使用默认模型",
+      "refreshModels": "刷新模型列表",
+      "completeSetup": "完成配置"
+    },
+    "messages": {
+      "configSaved": "配置已保存",
+      "configSaveFailed": "保存配置失败",
+      "modelsSaved": "模型设置已保存",
+      "modelsSaveFailed": "保存模型设置失败",
+      "saveFailed": "保存失败",
+      "loadingModels": "正在加载模型列表...",
+      "fetchModelsFailed": "获取模型列表失败",
+      "noConfigNeeded": "此提供商无需额外配置",
+      "pegaAlreadyLoggedIn": "您已登录 Pega 平台"
+    }
   }
 }

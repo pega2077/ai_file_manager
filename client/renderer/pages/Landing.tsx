@@ -21,11 +21,19 @@ const Landing = () => {
         if (isInitialized) {
           navigate('/files');
         } else {
-          navigate('/setup');
+          // Check if LLM provider is already configured
+          const hasLlmConfig = Boolean(cfg?.llmProvider);
+          if (hasLlmConfig) {
+            // LLM already configured, go to directory setup
+            navigate('/setup');
+          } else {
+            // Start with LLM setup first
+            navigate('/llm-setup');
+          }
         }
       } catch (error) {
         console.error('Error checking initialization status:', error);
-        navigate('/setup');
+        navigate('/llm-setup');
       }
     }, 2000);
 
