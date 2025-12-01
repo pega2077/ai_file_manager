@@ -20,6 +20,47 @@ interface ModelsResponse {
   embedModels: ModelInfo[];
 }
 
+// Type guard helpers for API response validation
+interface OllamaModelsData {
+  models?: Array<{ name: string; details?: { family?: string } }>;
+}
+
+interface OpenAIModelsData {
+  data?: Array<{ id: string }>;
+}
+
+interface OpenRouterModelsData {
+  data?: Array<{ id: string; name?: string }>;
+}
+
+interface PegaStatusData {
+  ollama?: { available: boolean; models?: string[] };
+  openrouter?: { available: boolean; models?: string[] };
+}
+
+const isOllamaModelsData = (data: unknown): data is OllamaModelsData => {
+  if (typeof data !== 'object' || data === null) return false;
+  const d = data as Record<string, unknown>;
+  return d.models === undefined || Array.isArray(d.models);
+};
+
+const isOpenAIModelsData = (data: unknown): data is OpenAIModelsData => {
+  if (typeof data !== 'object' || data === null) return false;
+  const d = data as Record<string, unknown>;
+  return d.data === undefined || Array.isArray(d.data);
+};
+
+const isOpenRouterModelsData = (data: unknown): data is OpenRouterModelsData => {
+  if (typeof data !== 'object' || data === null) return false;
+  const d = data as Record<string, unknown>;
+  return d.data === undefined || Array.isArray(d.data);
+};
+
+const isPegaStatusData = (data: unknown): data is PegaStatusData => {
+  if (typeof data !== 'object' || data === null) return false;
+  return true;
+};
+
 // Route handlers for system-level operations
 const status = (_req: Request, res: Response) => {
   res.json({ status: "healthy" });
@@ -113,9 +154,9 @@ const listProviderModels = async (req: Request, res: Response) => {
             headers,
           });
           if (response.ok) {
-            const data = await response.json() as { models?: Array<{ name: string; details?: { family?: string } }> };
-            if (Array.isArray(data.models)) {
-              models = data.models.map((m) => ({ id: m.name, name: m.name }));
+            const rawData: unknown = await response.json();
+            if (isOllamaModelsData(rawData) && Array.isArray(rawData.models)) {
+              models = rawData.models.map((m) => ({ id: m.name, name: m.name }));
               // All models in Ollama can potentially be used for chat
               chatModels = models;
               // Vision models typically have 'vl' or 'vision' in their name
@@ -153,9 +194,9 @@ const listProviderModels = async (req: Request, res: Response) => {
               },
             });
             if (response.ok) {
-              const data = await response.json() as { data?: Array<{ id: string }> };
-              if (Array.isArray(data.data)) {
-                models = data.data.map((m) => ({ id: m.id, name: m.id }));
+              const rawData: unknown = await response.json();
+              if (isOpenAIModelsData(rawData) && Array.isArray(rawData.data)) {
+                models = rawData.data.map((m) => ({ id: m.id, name: m.id }));
                 // Chat models (gpt-*)
                 chatModels = models.filter((m) => 
                   m.id.startsWith('gpt-') || 
@@ -197,9 +238,9 @@ const listProviderModels = async (req: Request, res: Response) => {
             headers,
           });
           if (response.ok) {
-            const data = await response.json() as { data?: Array<{ id: string; name?: string }> };
-            if (Array.isArray(data.data)) {
-              models = data.data.map((m) => ({ id: m.id, name: m.name || m.id }));
+            const rawData: unknown = await response.json();
+            if (isOpenRouterModelsData(rawData) && Array.isArray(rawData.data)) {
+              models = rawData.data.map((m) => ({ id: m.id, name: m.name || m.id }));
               // All OpenRouter models can be used for chat
               chatModels = models;
               // Vision models
@@ -235,9 +276,9 @@ const listProviderModels = async (req: Request, res: Response) => {
               },
             });
             if (response.ok) {
-              const data = await response.json() as { data?: Array<{ id: string }> };
-              if (Array.isArray(data.data)) {
-                models = data.data.map((m) => ({ id: m.id, name: m.id }));
+              const rawData: unknown = await response.json();
+              if (isOpenAIModelsData(rawData) && Array.isArray(rawData.data)) {
+                models = rawData.data.map((m) => ({ id: m.id, name: m.id }));
                 chatModels = models.filter((m) => 
                   m.id.includes('qwen') || 
                   m.id.includes('turbo') ||
@@ -291,27 +332,25 @@ const listProviderModels = async (req: Request, res: Response) => {
             headers,
           });
           if (response.ok) {
-            const data = await response.json() as {
-              ollama?: { available: boolean; models?: string[] };
-              openrouter?: { available: boolean; models?: string[] };
-            };
-            
-            // Use models from the active mode
-            if (pegaMode === "ollama" && data.ollama?.models) {
-              models = data.ollama.models.map((m) => ({ id: m, name: m }));
-            } else if (pegaMode === "openrouter" && data.openrouter?.models) {
-              models = data.openrouter.models.map((m) => ({ id: m, name: m }));
+            const rawData: unknown = await response.json();
+            if (isPegaStatusData(rawData)) {
+              // Use models from the active mode
+              if (pegaMode === "ollama" && rawData.ollama?.models) {
+                models = rawData.ollama.models.map((m) => ({ id: m, name: m }));
+              } else if (pegaMode === "openrouter" && rawData.openrouter?.models) {
+                models = rawData.openrouter.models.map((m) => ({ id: m, name: m }));
+              }
+              
+              chatModels = models;
+              visionModels = models.filter((m) => 
+                m.id.toLowerCase().includes('vl') || 
+                m.id.toLowerCase().includes('vision')
+              );
+              embedModels = models.filter((m) => 
+                m.id.toLowerCase().includes('embed') || 
+                m.id.toLowerCase().includes('bge')
+              );
             }
-            
-            chatModels = models;
-            visionModels = models.filter((m) => 
-              m.id.toLowerCase().includes('vl') || 
-              m.id.toLowerCase().includes('vision')
-            );
-            embedModels = models.filter((m) => 
-              m.id.toLowerCase().includes('embed') || 
-              m.id.toLowerCase().includes('bge')
-            );
           }
         } catch (e) {
           logger.warn("Failed to fetch Pega models", e as unknown);

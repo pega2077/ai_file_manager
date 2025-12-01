@@ -211,12 +211,25 @@ const LLMSetup = () => {
             bailianApiKey: values.apiKey,
           };
           break;
-        case 'llamacpp':
+        case 'llamacpp': {
+          let host = '127.0.0.1';
+          let port = 8080;
+          if (values.endpoint) {
+            try {
+              const url = new URL(values.endpoint);
+              host = url.hostname || '127.0.0.1';
+              port = parseInt(url.port || '8080', 10) || 8080;
+            } catch {
+              // Use defaults if URL parsing fails
+              console.warn('Failed to parse llamacpp endpoint URL, using defaults');
+            }
+          }
           configUpdate.llamacpp = {
-            llamacppHost: values.endpoint ? new URL(values.endpoint).hostname : '127.0.0.1',
-            llamacppPort: values.endpoint ? parseInt(new URL(values.endpoint).port || '8080', 10) : 8080,
+            llamacppHost: host,
+            llamacppPort: port,
           };
           break;
+        }
       }
 
       await window.electronAPI.updateAppConfig(configUpdate);
@@ -246,29 +259,35 @@ const LLMSetup = () => {
         body: JSON.stringify({ provider: selectedProvider }),
       });
 
-      const result = await response.json() as {
-        success: boolean;
-        data?: ModelsResponse;
-        error?: { message: string };
+      const result: unknown = await response.json();
+      
+      // Validate response structure
+      const isValidResult = (obj: unknown): obj is { success: boolean; data?: ModelsResponse; error?: { message: string } } => {
+        if (typeof obj !== 'object' || obj === null) return false;
+        const r = obj as Record<string, unknown>;
+        return typeof r.success === 'boolean';
       };
+      
+      if (!isValidResult(result)) {
+        setModelsError(t('llmSetup.messages.fetchModelsFailed'));
+        return;
+      }
 
       if (result.success && result.data) {
         setModels(result.data);
-        // Pre-fill with first available models
+        // Pre-fill with first available models - batch all updates
+        const formValues: Record<string, string> = {};
         if (result.data.chatModels.length > 0) {
-          modelForm.setFieldsValue({
-            chatModel: result.data.chatModels[0]?.id,
-          });
+          formValues.chatModel = result.data.chatModels[0]?.id;
         }
         if (result.data.visionModels.length > 0) {
-          modelForm.setFieldsValue({
-            visionModel: result.data.visionModels[0]?.id,
-          });
+          formValues.visionModel = result.data.visionModels[0]?.id;
         }
         if (result.data.embedModels.length > 0) {
-          modelForm.setFieldsValue({
-            embedModel: result.data.embedModels[0]?.id,
-          });
+          formValues.embedModel = result.data.embedModels[0]?.id;
+        }
+        if (Object.keys(formValues).length > 0) {
+          modelForm.setFieldsValue(formValues);
         }
       } else {
         setModelsError(result.error?.message || t('llmSetup.messages.fetchModelsFailed'));
