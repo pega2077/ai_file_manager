@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, Form, Input, Button, Space, Spin, Typography, message, Tag } from 'antd';
+import { Card, Form, Input, Button, Space, Spin, Typography, message, Tag, Select } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, ApiOutlined } from '@ant-design/icons';
 import type { FormInstance } from 'antd/es/form';
 import { useTranslation } from '../../shared/i18n/I18nProvider';
@@ -13,7 +13,8 @@ type ProviderConfigResponse = NonNullable<AppConfig[ProviderKey]> | Record<strin
 
 export interface FieldDefinition {
   name: string;
-  inputType?: 'text' | 'password' | 'number' | 'textarea';
+  inputType?: 'text' | 'password' | 'number' | 'textarea' | 'select';
+  modelType?: 'chat' | 'vision' | 'embed';
   labelKey: string;
   placeholderKey?: string;
   extraKey?: string;
@@ -32,6 +33,18 @@ interface ProviderConfigFormProps {
 type FormValues = Record<string, string>;
 
 type HealthStatus = 'unknown' | 'healthy' | 'unhealthy' | 'checking';
+
+interface ModelInfo {
+  id: string;
+  name: string;
+}
+
+interface ModelsResponse {
+  models: ModelInfo[];
+  chatModels: ModelInfo[];
+  visionModels: ModelInfo[];
+  embedModels: ModelInfo[];
+}
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -91,6 +104,8 @@ const ProviderConfigForm = ({
   const [saving, setSaving] = useState(false);
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('unknown');
   const [initialValues, setInitialValues] = useState<FormValues>({});
+  const [models, setModels] = useState<ModelsResponse | null>(null);
+  const [modelsLoading, setModelsLoading] = useState(false);
   const providerSnapshotRef = useRef<ProviderConfigResponse>({});
 
   const defaultDisplayValues = useMemo(() => toDisplayValues(defaults, fields), [defaults, fields]);
@@ -121,6 +136,10 @@ const ProviderConfigForm = ({
   useEffect(() => {
     void loadConfig(form);
     handleCheckHealth();
+    // Auto-fetch models if there are select fields
+    if (fields.some(field => field.inputType === 'select')) {
+      void handleFetchModels();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providerKey]);
 
@@ -187,6 +206,40 @@ const ProviderConfigForm = ({
     }
   };
 
+  const handleFetchModels = async () => {
+    setModelsLoading(true);
+    try {
+      const apiBaseUrl = await window.electronAPI.getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/api/providers/models`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ provider: providerKey }),
+      });
+
+      const result = await response.json() as {
+        success: boolean;
+        data?: ModelsResponse;
+        error?: { message: string };
+      };
+
+      if (result.success && result.data) {
+        setModels(result.data);
+        message.success(t('providerConfig.common.modelsFetched'));
+      } else {
+        setModels(null);
+        message.error(result.error?.message || t('providerConfig.common.modelsFetchError'));
+      }
+    } catch (error) {
+      console.error('Models fetch failed:', error);
+      setModels(null);
+      message.error(t('providerConfig.common.modelsFetchError'));
+    } finally {
+      setModelsLoading(false);
+    }
+  };
+
   const renderHealthStatus = () => {
     if (healthStatus === 'checking') {
       return <Tag icon={<Spin size="small" />} color="processing">{t('providerConfig.common.checking')}</Tag>;
@@ -224,31 +277,57 @@ const ProviderConfigForm = ({
         <Spin spinning={loading || saving} tip={loading ? t('providerConfig.common.loading') : undefined}>
           <Form<FormValues> form={form} layout="vertical" onFinish={handleSubmit} disabled={loading || saving}>
             {fields.map((field) => {
-              let InputComponent: typeof Input | typeof Input.TextArea | typeof Input.Password = Input;
-              if (field.inputType === 'password') {
-                InputComponent = Input.Password;
-              } else if (field.inputType === 'textarea') {
-                InputComponent = Input.TextArea;
-              }
-
               const placeholder = field.placeholderKey ? t(field.placeholderKey) : undefined;
               const allowClear = field.inputType !== 'password';
               const autoComplete = field.inputType === 'password' ? 'new-password' : 'off';
 
-              const inputNode = field.inputType === 'textarea' ? (
-                <InputComponent
-                  placeholder={placeholder}
-                  allowClear={allowClear}
-                  autoSize={{ minRows: 2, maxRows: 6 }}
-                />
-              ) : (
-                <InputComponent
-                  type={field.inputType === 'number' ? 'number' : undefined}
-                  placeholder={placeholder}
-                  allowClear={allowClear}
-                  autoComplete={autoComplete}
-                />
-              );
+              let inputNode: React.ReactNode;
+
+              if (field.inputType === 'select') {
+                const modelOptions = useMemo(() => {
+                  if (!models || !field.modelType) return [];
+                  const modelList = models[field.modelType + 'Models' as keyof ModelsResponse] as ModelInfo[];
+                  return modelList?.map(model => ({
+                    value: model.id,
+                    label: model.name || model.id,
+                  })) || [];
+                }, [models, field.modelType]);
+
+                inputNode = (
+                  <Select
+                    placeholder={placeholder}
+                    allowClear={allowClear}
+                    loading={modelsLoading}
+                    options={modelOptions}
+                    showSearch
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                  />
+                );
+              } else {
+                let InputComponent: typeof Input | typeof Input.TextArea | typeof Input.Password = Input;
+                if (field.inputType === 'password') {
+                  InputComponent = Input.Password;
+                } else if (field.inputType === 'textarea') {
+                  InputComponent = Input.TextArea;
+                }
+
+                inputNode = field.inputType === 'textarea' ? (
+                  <InputComponent
+                    placeholder={placeholder}
+                    allowClear={allowClear}
+                    autoSize={{ minRows: 2, maxRows: 6 }}
+                  />
+                ) : (
+                  <InputComponent
+                    type={field.inputType === 'number' ? 'number' : undefined}
+                    placeholder={placeholder}
+                    allowClear={allowClear}
+                    autoComplete={autoComplete}
+                  />
+                );
+              }
 
               return (
                 <Form.Item
@@ -280,6 +359,15 @@ const ProviderConfigForm = ({
                 >
                   {t('providerConfig.common.checkHealth')}
                 </Button>
+                {fields.some(field => field.inputType === 'select') && (
+                  <Button
+                    onClick={handleFetchModels}
+                    loading={modelsLoading}
+                    disabled={loading || saving}
+                  >
+                    {t('providerConfig.common.fetchModels')}
+                  </Button>
+                )}
               </Space>
             </Form.Item>
           </Form>

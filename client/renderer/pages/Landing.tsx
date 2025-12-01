@@ -21,11 +21,12 @@ const Landing = () => {
         if (isInitialized) {
           navigate('/files');
         } else {
-          navigate('/setup');
+          // Always start with LLM setup for uninitialized apps
+          navigate('/llm-setup');
         }
       } catch (error) {
         console.error('Error checking initialization status:', error);
-        navigate('/setup');
+        navigate('/llm-setup');
       }
     }, 2000);
 

@@ -396,7 +396,10 @@
       "healthCheckError": "Health check error",
       "statusHealthy": "Service healthy",
       "statusUnhealthy": "Service unhealthy",
-      "statusUnknown": "Not checked"
+      "statusUnknown": "Not checked",
+      "fetchModels": "Fetch Models",
+      "modelsFetched": "Model list updated",
+      "modelsFetchError": "Failed to fetch model list"
     },
     "ollama": {
       "title": "Ollama configuration",
@@ -485,6 +488,11 @@
           "label": "Embedding model",
           "placeholder": "voyage/voyage-large-2-instruct",
           "extra": "Default embedding model: voyage/voyage-large-2-instruct"
+        },
+        "visionModel": {
+          "label": "Vision model",
+          "placeholder": "google/gemma-3-12b-it:free",
+          "extra": "Default vision model: google/gemma-3-12b-it:free"
         }
       }
     },
@@ -1103,6 +1111,78 @@
       "saveFailed": "Failed to save system tags",
       "saveSuccess": "System tags saved successfully",
       "tagExists": "This tag already exists"
+    }
+  },
+  "llmSetup": {
+    "pageTitle": "Configure Language Model",
+    "steps": {
+      "selectProvider": {
+        "title": "Select Provider",
+        "description": "Choose your LLM provider"
+      },
+      "configure": {
+        "title": "Configure",
+        "description": "Enter API parameters or sign in"
+      },
+      "selectModels": {
+        "title": "Select Models",
+        "description": "Choose language, vision, and embedding models"
+      }
+    },
+    "cards": {
+      "selectProvider": "Step 1 - Select LLM Provider",
+      "configureProvider": "Step 2 - Configure Provider",
+      "pegaAuth": "Step 2 - Sign in to Pega Platform",
+      "selectModels": "Step 3 - Select Models"
+    },
+    "form": {
+      "providerLabel": "LLM Provider",
+      "endpointLabel": "API Endpoint",
+      "apiKeyLabel": "API Key",
+      "chatModelLabel": "Chat Model (Language Model)",
+      "visionModelLabel": "Vision Model",
+      "embedModelLabel": "Text Embedding Model"
+    },
+    "placeholders": {
+      "endpoint": "Enter API endpoint",
+      "apiKey": "Enter API key",
+      "selectModel": "Select a model"
+    },
+    "validation": {
+      "endpointRequired": "API endpoint is required",
+      "apiKeyRequired": "API key is required"
+    },
+    "options": {
+      "providers": {
+        "ollama": "Ollama (local or gateway)",
+        "pega": "Pega Platform (recommended)",
+        "openai": "OpenAI",
+        "openrouter": "OpenRouter",
+        "bailian": "Alibaba Bailian",
+        "azureOpenai": "Azure OpenAI",
+        "llamacpp": "Llama.cpp (local)"
+      }
+    },
+    "descriptions": {
+      "provider": "Select your preferred LLM service provider. Pega Platform offers a free basic quota.",
+      "pegaAuth": "Sign in to Pega Platform to get your API key. You can also use it without signing in, but with rate limits."
+    },
+    "actions": {
+      "skipLogin": "Skip sign-in (limited access)",
+      "skipModelSelection": "Use default models",
+      "refreshModels": "Refresh model list",
+      "completeSetup": "Complete Setup"
+    },
+    "messages": {
+      "configSaved": "Configuration saved",
+      "configSaveFailed": "Failed to save configuration",
+      "modelsSaved": "Model settings saved",
+      "modelsSaveFailed": "Failed to save model settings",
+      "saveFailed": "Failed to save",
+      "loadingModels": "Loading model list...",
+      "fetchModelsFailed": "Failed to fetch model list",
+      "noConfigNeeded": "No additional configuration required for this provider",
+      "pegaAlreadyLoggedIn": "You are already signed in to Pega Platform"
     }
   }
 }
