@@ -493,6 +493,11 @@
           "label": "嵌入模型",
           "placeholder": "voyage/voyage-large-2-instruct",
           "extra": "默认嵌入模型：voyage/voyage-large-2-instruct"
+        },
+        "visionModel": {
+          "label": "视觉模型",
+          "placeholder": "google/gemma-3-12b-it:free",
+          "extra": "默认视觉模型：google/gemma-3-12b-it:free"
         }
       }
     },

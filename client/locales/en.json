@@ -488,6 +488,11 @@
           "label": "Embedding model",
           "placeholder": "voyage/voyage-large-2-instruct",
           "extra": "Default embedding model: voyage/voyage-large-2-instruct"
+        },
+        "visionModel": {
+          "label": "Vision model",
+          "placeholder": "google/gemma-3-12b-it:free",
+          "extra": "Default vision model: google/gemma-3-12b-it:free"
         }
       }
     },
