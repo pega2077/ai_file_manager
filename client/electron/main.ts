@@ -1,4 +1,4 @@
-﻿import {
+import {
   app,
   BrowserWindow,
   ipcMain,
@@ -700,6 +700,7 @@ function createWindow() {
     width: 1920,
     height: 1080,
     show: !isInitialized,
+    roundedCorners: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.mjs"),
     },
