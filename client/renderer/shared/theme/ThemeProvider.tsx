@@ -1,6 +1,12 @@
 import { ConfigProvider, theme as antdTheme } from "antd";
 import type { ThemeConfig } from "antd";
-import { useCallback, useEffect, useMemo, useState, type PropsWithChildren } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type PropsWithChildren,
+} from "react";
 import type { AppConfig } from "../types";
 import {
   ThemeContext,
@@ -9,6 +15,10 @@ import {
   type ThemeMode,
 } from "./context";
 
+import { useTranslation } from "../i18n/I18nProvider";
+import zhCN from "antd/locale/zh_CN";
+import enUS from "antd/locale/en_US";
+
 const fallbackTheme: ThemeConfig = {
   algorithm: antdTheme.defaultAlgorithm,
 };
@@ -16,20 +26,29 @@ const fallbackTheme: ThemeConfig = {
 const ThemeProvider = ({ children }: PropsWithChildren) => {
   const [mode, setModeState] = useState<ThemeMode>("light");
   const [followSystem, setFollowSystemState] = useState<boolean>(true);
+  const { locale } = useTranslation();
 
   const applySystemPreference = useCallback((): ThemeMode => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    ) {
       setModeState("light");
       return "light";
     }
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const prefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)"
+    ).matches;
     const nextMode = prefersDark ? "dark" : "light";
     setModeState(nextMode);
     return nextMode;
   }, []);
 
   const persistPreference = useCallback(
-    async (modeToPersist: ThemeMode | undefined, shouldFollowSystem: boolean) => {
+    async (
+      modeToPersist: ThemeMode | undefined,
+      shouldFollowSystem: boolean
+    ) => {
       try {
         const updates: Partial<AppConfig> = {
           themeFollowSystem: shouldFollowSystem,
@@ -46,9 +65,12 @@ const ThemeProvider = ({ children }: PropsWithChildren) => {
         await window.electronAPI.updateAppConfig(updates);
       } catch (error) {
         if (window.electronAPI?.logError) {
-          void window.electronAPI.logError("Failed to persist theme preference", {
-            error: error instanceof Error ? error.message : String(error),
-          });
+          void window.electronAPI.logError(
+            "Failed to persist theme preference",
+            {
+              error: error instanceof Error ? error.message : String(error),
+            }
+          );
         }
         throw error;
       }
@@ -85,7 +107,10 @@ const ThemeProvider = ({ children }: PropsWithChildren) => {
       }
 
       try {
-        await persistPreference(nextFollowSystem ? undefined : nextMode, nextFollowSystem);
+        await persistPreference(
+          nextFollowSystem ? undefined : nextMode,
+          nextFollowSystem
+        );
       } catch (error) {
         if (didChange) {
           setModeState(previousMode);
@@ -125,7 +150,10 @@ const ThemeProvider = ({ children }: PropsWithChildren) => {
       }
 
       try {
-        await persistPreference(shouldFollow ? undefined : resultingMode, shouldFollow);
+        await persistPreference(
+          shouldFollow ? undefined : resultingMode,
+          shouldFollow
+        );
       } catch (error) {
         setFollowSystemState(previousFollow);
         if (shouldFollow) {
@@ -142,7 +170,9 @@ const ThemeProvider = ({ children }: PropsWithChildren) => {
 
     const loadThemePreference = async () => {
       try {
-        const config = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+        const config = (await window.electronAPI.getAppConfig()) as
+          | AppConfig
+          | undefined;
         if (cancelled) {
           return;
         }
@@ -186,7 +216,11 @@ const ThemeProvider = ({ children }: PropsWithChildren) => {
   }, [applySystemPreference]);
 
   useEffect(() => {
-    if (!followSystem || typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    if (
+      !followSystem ||
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    ) {
       return undefined;
     }
 
@@ -220,10 +254,13 @@ const ThemeProvider = ({ children }: PropsWithChildren) => {
     document.body.setAttribute("data-theme", mode);
   }, [mode]);
 
-  const themeConfig = useMemo<ThemeConfig>(() => ({
-    algorithm:
-      mode === "dark" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-  }), [mode]);
+  const themeConfig = useMemo<ThemeConfig>(
+    () => ({
+      algorithm:
+        mode === "dark" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+    }),
+    [mode]
+  );
 
   const contextValue = useMemo(
     () => ({
@@ -237,9 +274,22 @@ const ThemeProvider = ({ children }: PropsWithChildren) => {
     [followSystem, mode, setFollowSystem, setMode, toggleMode]
   );
 
+  const antdLocale = useMemo(() => {
+    switch (locale) {
+      case "zh":
+        return zhCN;
+      case "en":
+        return enUS;
+      default:
+        return enUS;
+    }
+  }, [locale]);
+
   return (
     <ThemeContext.Provider value={contextValue}>
-      <ConfigProvider theme={themeConfig ?? fallbackTheme}>{children}</ConfigProvider>
+      <ConfigProvider locale={antdLocale} theme={themeConfig ?? fallbackTheme}>
+        {children}
+      </ConfigProvider>
     </ThemeContext.Provider>
   );
 };
