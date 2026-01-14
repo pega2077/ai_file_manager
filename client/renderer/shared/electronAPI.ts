@@ -4,7 +4,8 @@
  */
 
 // Check if we're in Electron environment
-const isElectron = typeof window !== 'undefined' && electronAPI;
+const isElectron = typeof window !== 'undefined' && window.electronAPI;
+const nativeElectronAPI = typeof window !== 'undefined' ? window.electronAPI : null;
 
 /**
  * Safe electronAPI wrapper with web fallbacks
@@ -12,8 +13,8 @@ const isElectron = typeof window !== 'undefined' && electronAPI;
 export const electronAPI = {
   // Folder/File selection
   selectFolder: async (): Promise<string | null> => {
-    if (isElectron && electronAPI.selectFolder) {
-      return electronAPI.selectFolder();
+    if (isElectron && nativeElectronAPI?.selectFolder) {
+      return nativeElectronAPI.selectFolder();
     }
     // Web fallback: Not supported in web mode
     console.warn('selectFolder not available in web mode');
@@ -21,8 +22,8 @@ export const electronAPI = {
   },
 
   selectFile: async (): Promise<string[] | null> => {
-    if (isElectron && electronAPI.selectFile) {
-      return electronAPI.selectFile();
+    if (isElectron && nativeElectronAPI?.selectFile) {
+      return nativeElectronAPI.selectFile();
     }
     // Web fallback: Not supported in web mode
     console.warn('selectFile not available in web mode');
@@ -31,8 +32,8 @@ export const electronAPI = {
 
   // File operations
   openFile: async (filePath: string): Promise<boolean> => {
-    if (isElectron && electronAPI.openFile) {
-      return electronAPI.openFile(filePath);
+    if (isElectron && nativeElectronAPI?.openFile) {
+      return nativeElectronAPI.openFile(filePath);
     }
     // Web fallback: Open in new tab
     console.warn('openFile not fully supported in web mode, attempting to open URL');
@@ -45,8 +46,8 @@ export const electronAPI = {
   },
 
   openFolder: async (filePath: string): Promise<boolean> => {
-    if (isElectron && electronAPI.openFolder) {
-      return electronAPI.openFolder(filePath);
+    if (isElectron && nativeElectronAPI?.openFolder) {
+      return nativeElectronAPI.openFolder(filePath);
     }
     // Web fallback: Not supported
     console.warn('openFolder not available in web mode');
@@ -55,8 +56,8 @@ export const electronAPI = {
 
   // Clipboard
   copyToClipboard: async (text: string): Promise<boolean> => {
-    if (isElectron && electronAPI.copyToClipboard) {
-      return electronAPI.copyToClipboard(text);
+    if (isElectron && nativeElectronAPI?.copyToClipboard) {
+      return nativeElectronAPI.copyToClipboard(text);
     }
     // Web fallback: Use navigator.clipboard API
     try {
@@ -68,8 +69,8 @@ export const electronAPI = {
   },
 
   readClipboardText: async (): Promise<string> => {
-    if (isElectron && electronAPI.readClipboardText) {
-      return electronAPI.readClipboardText();
+    if (isElectron && nativeElectronAPI?.readClipboardText) {
+      return nativeElectronAPI.readClipboardText();
     }
     // Web fallback: Use navigator.clipboard API
     try {
@@ -81,8 +82,8 @@ export const electronAPI = {
 
   // File import
   importFile: async (): Promise<{ success: boolean; message: string }> => {
-    if (isElectron && electronAPI.importFile) {
-      return electronAPI.importFile();
+    if (isElectron && nativeElectronAPI?.importFile) {
+      return nativeElectronAPI.importFile();
     }
     // Web fallback: Not supported
     console.warn('importFile not available in web mode');
@@ -91,8 +92,8 @@ export const electronAPI = {
 
   // File URL conversion
   toFileUrl: (filePath: string): string => {
-    if (isElectron && electronAPI.toFileUrl) {
-      return electronAPI.toFileUrl(filePath);
+    if (isElectron && nativeElectronAPI?.toFileUrl) {
+      return nativeElectronAPI.toFileUrl(filePath);
     }
     // Web fallback: Return as is
     return filePath;
@@ -100,16 +101,16 @@ export const electronAPI = {
 
   // API Base URL
   getApiBaseUrl: async (): Promise<string> => {
-    if (isElectron && electronAPI.getApiBaseUrl) {
-      return electronAPI.getApiBaseUrl();
+    if (isElectron && nativeElectronAPI?.getApiBaseUrl) {
+      return nativeElectronAPI.getApiBaseUrl();
     }
     // Web fallback: Use current origin with port 8000
     return window.location.origin || 'http://localhost:8000';
   },
 
   setApiBaseUrl: async (url: string): Promise<boolean> => {
-    if (isElectron && electronAPI.setApiBaseUrl) {
-      return electronAPI.setApiBaseUrl(url);
+    if (isElectron && nativeElectronAPI?.setApiBaseUrl) {
+      return nativeElectronAPI.setApiBaseUrl(url);
     }
     // Web fallback: Store in localStorage
     try {
@@ -122,16 +123,16 @@ export const electronAPI = {
 
   // App config
   getAppConfig: async (): Promise<unknown> => {
-    if (isElectron && electronAPI.getAppConfig) {
-      return electronAPI.getAppConfig();
+    if (isElectron && nativeElectronAPI?.getAppConfig) {
+      return nativeElectronAPI.getAppConfig();
     }
     // Web fallback: Return empty config
     return {};
   },
 
   updateAppConfig: async (updates: unknown): Promise<unknown> => {
-    if (isElectron && electronAPI.updateAppConfig) {
-      return electronAPI.updateAppConfig(updates);
+    if (isElectron && nativeElectronAPI?.updateAppConfig) {
+      return nativeElectronAPI.updateAppConfig(updates);
     }
     // Web fallback: No-op
     return updates;
@@ -139,8 +140,8 @@ export const electronAPI = {
 
   // Window management
   showMainWindow: async (options?: { route?: string; refreshFiles?: boolean }): Promise<boolean> => {
-    if (isElectron && electronAPI.showMainWindow) {
-      return electronAPI.showMainWindow(options);
+    if (isElectron && nativeElectronAPI?.showMainWindow) {
+      return nativeElectronAPI.showMainWindow(options);
     }
     // Web fallback: Navigate to route if specified
     if (options?.route) {
@@ -150,40 +151,40 @@ export const electronAPI = {
   },
 
   showBotWindow: async (): Promise<boolean> => {
-    if (isElectron && electronAPI.showBotWindow) {
-      return electronAPI.showBotWindow();
+    if (isElectron && nativeElectronAPI?.showBotWindow) {
+      return nativeElectronAPI.showBotWindow();
     }
     // Web fallback: Not supported
     return false;
   },
 
   hideBotWindow: async (): Promise<boolean> => {
-    if (isElectron && electronAPI.hideBotWindow) {
-      return electronAPI.hideBotWindow();
+    if (isElectron && nativeElectronAPI?.hideBotWindow) {
+      return nativeElectronAPI.hideBotWindow();
     }
     // Web fallback: Not supported
     return false;
   },
 
   moveBotWindow: (deltaX: number, deltaY: number): void => {
-    if (isElectron && electronAPI.moveBotWindow) {
-      electronAPI.moveBotWindow(deltaX, deltaY);
+    if (isElectron && nativeElectronAPI?.moveBotWindow) {
+      nativeElectronAPI.moveBotWindow(deltaX, deltaY);
     }
     // Web fallback: No-op
   },
 
   // Locale
   getPreferredLocale: async (): Promise<string> => {
-    if (isElectron && electronAPI.getPreferredLocale) {
-      return electronAPI.getPreferredLocale();
+    if (isElectron && nativeElectronAPI?.getPreferredLocale) {
+      return nativeElectronAPI.getPreferredLocale();
     }
     // Web fallback: Use browser language or localStorage
     return localStorage.getItem('preferredLocale') || navigator.language || 'en';
   },
 
   setPreferredLocale: async (locale: string): Promise<string> => {
-    if (isElectron && electronAPI.setPreferredLocale) {
-      return electronAPI.setPreferredLocale(locale);
+    if (isElectron && nativeElectronAPI?.setPreferredLocale) {
+      return nativeElectronAPI.setPreferredLocale(locale);
     }
     // Web fallback: Store in localStorage
     localStorage.setItem('preferredLocale', locale);
@@ -191,8 +192,8 @@ export const electronAPI = {
   },
 
   getSystemLocale: async (): Promise<string> => {
-    if (isElectron && electronAPI.getSystemLocale) {
-      return electronAPI.getSystemLocale();
+    if (isElectron && nativeElectronAPI?.getSystemLocale) {
+      return nativeElectronAPI.getSystemLocale();
     }
     // Web fallback: Use browser language
     return navigator.language || 'en';
@@ -200,8 +201,8 @@ export const electronAPI = {
 
   // Logging
   logError: async (message: string, meta?: unknown): Promise<boolean> => {
-    if (isElectron && electronAPI.logError) {
-      return electronAPI.logError(message, meta);
+    if (isElectron && nativeElectronAPI?.logError) {
+      return nativeElectronAPI.logError(message, meta);
     }
     // Web fallback: Console error
     console.error(message, meta);
@@ -210,8 +211,8 @@ export const electronAPI = {
 
   // App control
   quitApp: async (): Promise<boolean> => {
-    if (isElectron && electronAPI.quitApp) {
-      return electronAPI.quitApp();
+    if (isElectron && nativeElectronAPI?.quitApp) {
+      return nativeElectronAPI.quitApp();
     }
     // Web fallback: Not supported
     console.warn('quitApp not available in web mode');
@@ -219,8 +220,8 @@ export const electronAPI = {
   },
 
   clearAllData: async (): Promise<boolean> => {
-    if (isElectron && electronAPI.clearAllData) {
-      return electronAPI.clearAllData();
+    if (isElectron && nativeElectronAPI?.clearAllData) {
+      return nativeElectronAPI.clearAllData();
     }
     // Web fallback: Clear localStorage
     try {
@@ -233,15 +234,15 @@ export const electronAPI = {
 
   // File import notifications
   sendFileImportNotification: (payload: any): void => {
-    if (isElectron && electronAPI.sendFileImportNotification) {
-      electronAPI.sendFileImportNotification(payload);
+    if (isElectron && nativeElectronAPI?.sendFileImportNotification) {
+      nativeElectronAPI.sendFileImportNotification(payload);
     }
     // Web fallback: No-op
   },
 
   onFileImportNotification: (callback: (payload: any) => void): (() => void) => {
-    if (isElectron && electronAPI.onFileImportNotification) {
-      return electronAPI.onFileImportNotification(callback);
+    if (isElectron && nativeElectronAPI?.onFileImportNotification) {
+      return nativeElectronAPI.onFileImportNotification(callback);
     }
     // Web fallback: Return no-op cleanup function
     return () => {};
@@ -249,45 +250,45 @@ export const electronAPI = {
 
   // Directory watcher
   registerDirectoryWatcherImporter: (): void => {
-    if (isElectron && electronAPI.registerDirectoryWatcherImporter) {
-      electronAPI.registerDirectoryWatcherImporter();
+    if (isElectron && nativeElectronAPI?.registerDirectoryWatcherImporter) {
+      nativeElectronAPI.registerDirectoryWatcherImporter();
     }
     // Web fallback: No-op
   },
 
   unregisterDirectoryWatcherImporter: (): void => {
-    if (isElectron && electronAPI.unregisterDirectoryWatcherImporter) {
-      electronAPI.unregisterDirectoryWatcherImporter();
+    if (isElectron && nativeElectronAPI?.unregisterDirectoryWatcherImporter) {
+      nativeElectronAPI.unregisterDirectoryWatcherImporter();
     }
     // Web fallback: No-op
   },
 
   pauseDirectoryWatcher: async (): Promise<boolean> => {
-    if (isElectron && electronAPI.pauseDirectoryWatcher) {
-      return electronAPI.pauseDirectoryWatcher();
+    if (isElectron && nativeElectronAPI?.pauseDirectoryWatcher) {
+      return nativeElectronAPI.pauseDirectoryWatcher();
     }
     // Web fallback: Not supported
     return false;
   },
 
   resumeDirectoryWatcher: async (): Promise<boolean> => {
-    if (isElectron && electronAPI.resumeDirectoryWatcher) {
-      return electronAPI.resumeDirectoryWatcher();
+    if (isElectron && nativeElectronAPI?.resumeDirectoryWatcher) {
+      return nativeElectronAPI.resumeDirectoryWatcher();
     }
     // Web fallback: Not supported
     return false;
   },
 
   notifyDirectoryWatcherStatus: (payload: any): void => {
-    if (isElectron && electronAPI.notifyDirectoryWatcherStatus) {
-      electronAPI.notifyDirectoryWatcherStatus(payload);
+    if (isElectron && nativeElectronAPI?.notifyDirectoryWatcherStatus) {
+      nativeElectronAPI.notifyDirectoryWatcherStatus(payload);
     }
     // Web fallback: No-op
   },
 
   onDirectoryWatcherImportRequest: (callback: (payload: any) => void): (() => void) => {
-    if (isElectron && electronAPI.onDirectoryWatcherImportRequest) {
-      return electronAPI.onDirectoryWatcherImportRequest(callback);
+    if (isElectron && nativeElectronAPI?.onDirectoryWatcherImportRequest) {
+      return nativeElectronAPI.onDirectoryWatcherImportRequest(callback);
     }
     // Web fallback: Return no-op cleanup function
     return () => {};
@@ -295,8 +296,8 @@ export const electronAPI = {
 
   // Log archive
   getLogArchive: async (): Promise<{ filename: string; data: string; contentType?: string } | null> => {
-    if (isElectron && electronAPI.getLogArchive) {
-      return electronAPI.getLogArchive();
+    if (isElectron && nativeElectronAPI?.getLogArchive) {
+      return nativeElectronAPI.getLogArchive();
     }
     // Web fallback: Not supported
     return null;

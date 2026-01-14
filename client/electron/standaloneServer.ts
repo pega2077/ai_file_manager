@@ -139,6 +139,7 @@ export const stopStandaloneServer = async (): Promise<void> => {
   }
 
   logger.info("Attempting to stop Express server gracefully...", server.address());
+  // Try graceful shutdown first
   server.closeAllConnections();
   
   const stopPromise = new Promise<void>((resolve, reject) => {
@@ -157,7 +158,7 @@ export const stopStandaloneServer = async (): Promise<void> => {
   const timeoutPromise = new Promise<void>((resolve) => {
     setTimeout(() => {
       logger.warn("Express server stop timed out, forcing shutdown");
-      // Force close all connections if available (Node.js 18.2.0+)
+      // Force close all connections again if timeout occurs (Node.js 18.2.0+)
       if (server && 'closeAllConnections' in server && typeof server.closeAllConnections === 'function') {
         server.closeAllConnections();
         logger.info("Forced close of all server connections");
