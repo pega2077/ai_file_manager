@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 dist-electron
+
+# Build artifacts
+builds/

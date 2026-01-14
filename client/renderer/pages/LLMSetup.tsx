@@ -21,6 +21,7 @@ import { useTranslation } from '../shared/i18n/I18nProvider';
 import type { AppConfig } from '../shared/types';
 import { detectPegaIdentifier } from '../shared/utils/pegaAuth';
 
+import { electronAPI } from "../shared/electronAPI";
 const { Content } = Layout;
 const { Step } = Steps;
 const { Title, Text, Paragraph } = Typography;
@@ -110,7 +111,7 @@ const LLMSetup = () => {
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+        const cfg = (await electronAPI.getAppConfig()) as AppConfig | undefined;
         if (cfg) {
           if (cfg.llmProvider) {
             setSelectedProvider(cfg.llmProvider);
@@ -182,7 +183,7 @@ const LLMSetup = () => {
     setLoading(true);
     try {
       // Get current config to merge with existing settings
-      const currentConfig = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const currentConfig = (await electronAPI.getAppConfig()) as AppConfig | undefined;
       const configUpdate: Partial<AppConfig> = {
         llmProvider: selectedProvider,
       };
@@ -239,7 +240,7 @@ const LLMSetup = () => {
         }
       }
 
-      await window.electronAPI.updateAppConfig(configUpdate);
+      await electronAPI.updateAppConfig(configUpdate);
       apiService.setProvider(selectedProvider);
       message.success(t('llmSetup.messages.configSaved'));
       setCurrentStep(2);
@@ -257,7 +258,7 @@ const LLMSetup = () => {
     setModelsLoading(true);
     setModelsError(null);
     try {
-      const apiBaseUrl = await window.electronAPI.getApiBaseUrl();
+      const apiBaseUrl = await electronAPI.getApiBaseUrl();
       const response = await fetch(`${apiBaseUrl}/api/providers/models`, {
         method: 'POST',
         headers: {
@@ -311,7 +312,7 @@ const LLMSetup = () => {
     setLoading(true);
     try {
       // Get current config to merge with existing settings
-      const currentConfig = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const currentConfig = (await electronAPI.getAppConfig()) as AppConfig | undefined;
       const configUpdate: Partial<AppConfig> = {};
 
       switch (selectedProvider) {
@@ -358,7 +359,7 @@ const LLMSetup = () => {
           break;
       }
 
-      await window.electronAPI.updateAppConfig(configUpdate);
+      await electronAPI.updateAppConfig(configUpdate);
       message.success(t('llmSetup.messages.modelsSaved'));
       // Navigate to the next setup step (directory setup)
       navigate('/setup');
@@ -374,7 +375,7 @@ const LLMSetup = () => {
     setLoading(true);
     try {
       // Just save the provider selection and continue
-      await window.electronAPI.updateAppConfig({ llmProvider: selectedProvider });
+      await electronAPI.updateAppConfig({ llmProvider: selectedProvider });
       navigate('/setup');
     } catch (error) {
       console.error('Failed to save provider:', error);
@@ -412,13 +413,13 @@ const LLMSetup = () => {
         return;
       }
 
-      const currentConfig = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const currentConfig = (await electronAPI.getAppConfig()) as AppConfig | undefined;
       const nextPegaConfig = {
         ...(currentConfig?.pega || {}),
         pegaApiKey: apiKey,
         pegaAuthToken: token,
       };
-      await window.electronAPI.updateAppConfig({ llmProvider: 'pega', pega: nextPegaConfig });
+      await electronAPI.updateAppConfig({ llmProvider: 'pega', pega: nextPegaConfig });
       apiService.setProvider('pega');
       apiService.setPegaApiKey(apiKey);
       apiService.setPegaAuthToken(token);
@@ -467,7 +468,7 @@ const LLMSetup = () => {
     // Continue without login (limited access)
     setLoading(true);
     try {
-      await window.electronAPI.updateAppConfig({ llmProvider: 'pega' });
+      await electronAPI.updateAppConfig({ llmProvider: 'pega' });
       apiService.setProvider('pega');
       setCurrentStep(2);
       void fetchModels();

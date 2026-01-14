@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar';
 import { apiService } from '../services/api';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 
+import { electronAPI } from "../shared/electronAPI";
 const { Content } = Layout;
 const { Title, Paragraph, Text } = Typography;
 
@@ -110,12 +111,12 @@ const FileConversion: React.FC = () => {
   }, [fetchFormats]);
 
   const handleSelectFile = async () => {
-    if (!window.electronAPI) {
+    if (!electronAPI) {
       message.error(t('convert.messages.desktopNotAvailable'));
       return;
     }
     try {
-      const selected = await window.electronAPI.selectFile();
+      const selected = await electronAPI.selectFile();
       const selectedPath = Array.isArray(selected) ? selected[0] : selected;
       if (selectedPath) {
         setSourceFile(selectedPath);
@@ -128,12 +129,12 @@ const FileConversion: React.FC = () => {
   };
 
   const handleSelectOutputDirectory = async () => {
-    if (!window.electronAPI) {
+    if (!electronAPI) {
       message.error(t('convert.messages.desktopNotAvailable'));
       return;
     }
     try {
-      const selected = await window.electronAPI.selectFolder();
+      const selected = await electronAPI.selectFolder();
       if (selected) {
         setOutputDirectory(selected);
       }
@@ -212,11 +213,11 @@ const FileConversion: React.FC = () => {
   };
 
   const handleOpenConvertedFile = async () => {
-    if (!conversionResult || !window.electronAPI) {
+    if (!conversionResult || !electronAPI) {
       return;
     }
     try {
-      const opened = await window.electronAPI.openFile(conversionResult.output_file_path);
+      const opened = await electronAPI.openFile(conversionResult.output_file_path);
       if (!opened) {
         message.error(t('convert.messages.cannotOpenFile'));
       }
@@ -227,11 +228,11 @@ const FileConversion: React.FC = () => {
   };
 
   const handleRevealFolder = async () => {
-    if (!conversionResult || !window.electronAPI) {
+    if (!conversionResult || !electronAPI) {
       return;
     }
     try {
-      const opened = await window.electronAPI.openFolder(conversionResult.output_file_path);
+      const opened = await electronAPI.openFolder(conversionResult.output_file_path);
       if (!opened) {
         message.error(t('convert.messages.cannotOpenDirectory'));
       }

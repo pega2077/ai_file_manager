@@ -1,8 +1,28 @@
 import path from 'node:path'
 import { promises as fs } from 'node:fs'
-import { app } from 'electron'
 import { configManager } from './configManager'
 import { getBaseDir, resolveProjectRoot } from './backend/utils/pathHelper'
+
+// Dynamic import for Electron to support both standalone and Electron modes
+let app: any = null;
+
+/**
+ * Lazy-load Electron app if available
+ */
+function getElectronApp(): any {
+  if (app === null) {
+    try {
+      // Only import electron if available (Electron environment)
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const electron = require("electron");
+      app = electron.app;
+    } catch {
+      // Standalone mode - electron not available
+      app = false; // Set to false to indicate we've tried and failed
+    }
+  }
+  return app === false ? null : app;
+}
 
 type Dict = Record<string, unknown>
 
@@ -41,8 +61,12 @@ async function findLocalesDir(): Promise<string> {
       // ignore
     }
   }
-  // Fallback to relative to app path
-  return path.join(app.getAppPath(), 'locales')
+  // Fallback to relative to app path or current directory
+  const electronApp = getElectronApp();
+  if (electronApp) {
+    return path.join(electronApp.getAppPath(), 'locales')
+  }
+  return path.join(process.cwd(), 'locales')
 }
 
 class I18n {
@@ -53,7 +77,8 @@ class I18n {
 
   async load(forceLocale?: string): Promise<void> {
     const cfgLocale = configManager.getConfig().language
-    const systemLocale = normalizeLocale(app.getLocale())
+    const electronApp = getElectronApp();
+    const systemLocale = electronApp ? normalizeLocale(electronApp.getLocale()) : normalizeLocale(process.env.LANG || 'en');
     this.locale = normalizeLocale(forceLocale ?? cfgLocale ?? systemLocale)
     const localesDir = await findLocalesDir()
     try {

@@ -7,6 +7,7 @@ import { useTranslation } from '../shared/i18n/I18nProvider';
 import type { AppConfig } from '../shared/types';
 import { detectPegaIdentifier, maskPegaCredential } from '../shared/utils/pegaAuth';
 
+import { electronAPI } from "../shared/electronAPI";
 const { Content } = Layout;
 const { Title, Paragraph, Text } = Typography;
 
@@ -44,7 +45,7 @@ const PegaAuth = () => {
     let mounted = true;
     const loadConfig = async () => {
       try {
-        const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+        const cfg = (await electronAPI.getAppConfig()) as AppConfig | undefined;
         if (!mounted || !cfg) {
           return;
         }
@@ -130,7 +131,7 @@ const PegaAuth = () => {
         return;
       }
 
-      const currentConfig = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const currentConfig = (await electronAPI.getAppConfig()) as AppConfig | undefined;
       const previousProviderValue = ((currentConfig?.llmProvider && currentConfig.llmProvider !== 'pega'
         ? currentConfig.llmProvider
         : currentConfig?.pega?.pegaPreviousProvider) ?? 'ollama') as AppConfig['llmProvider'];
@@ -140,7 +141,7 @@ const PegaAuth = () => {
         pegaAuthToken: token,
         pegaPreviousProvider: previousProviderValue,
       };
-      await window.electronAPI.updateAppConfig({ llmProvider: 'pega', pega: nextPegaConfig });
+      await electronAPI.updateAppConfig({ llmProvider: 'pega', pega: nextPegaConfig });
       apiService.setProvider('pega');
   apiService.setPegaApiKey(apiKey);
       apiService.setPegaAuthToken(token);
@@ -253,7 +254,7 @@ const PegaAuth = () => {
   const performLogout = async () => {
     setLogoutLoading(true);
     try {
-      const currentConfig = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const currentConfig = (await electronAPI.getAppConfig()) as AppConfig | undefined;
       const fallbackProvider = ((currentConfig?.pega?.pegaPreviousProvider && currentConfig.pega.pegaPreviousProvider !== 'pega'
         ? currentConfig.pega.pegaPreviousProvider
         : previousProvider && previousProvider !== 'pega'
@@ -271,7 +272,7 @@ const PegaAuth = () => {
       if (currentConfig?.llmProvider === 'pega') {
         updates.llmProvider = fallbackProvider;
       }
-      await window.electronAPI.updateAppConfig(updates);
+      await electronAPI.updateAppConfig(updates);
       if (updates.llmProvider) {
         apiService.setProvider(updates.llmProvider);
       } else {

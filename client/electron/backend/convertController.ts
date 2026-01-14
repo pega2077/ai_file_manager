@@ -1,5 +1,4 @@
 import type { Express, Request, Response } from "express";
-import { app, BrowserWindow } from "electron";
 import path from "path";
 import { logger } from "../logger";
 import { promises as fsp } from "fs";
@@ -7,6 +6,33 @@ import { ensureTempDir } from "./utils/pathHelper";
 import { convertFileViaService } from "./utils/fileConversion";
 import { configManager } from "../configManager";
 import { httpGetJson } from "./utils/httpClient";
+
+// Dynamic import for Electron to support both standalone and Electron modes
+let app: any = null;
+let BrowserWindow: any = null;
+
+/**
+ * Lazy-load Electron modules if available
+ */
+function getElectronModules(): { app: any; BrowserWindow: any } {
+  if (app === null) {
+    try {
+      // Only import electron if available (Electron environment)
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const electron = require("electron");
+      app = electron.app;
+      BrowserWindow = electron.BrowserWindow;
+    } catch {
+      // Standalone mode - electron not available
+      app = false;
+      BrowserWindow = false;
+    }
+  }
+  return { 
+    app: app === false ? null : app,
+    BrowserWindow: BrowserWindow === false ? null : BrowserWindow
+  };
+}
 
 type FormatsData = {
   inputs: string[];
@@ -84,15 +110,22 @@ function extractTitle(html: string): string {
 
 async function fetchWebpage(targetUrl: string): Promise<{ html: string; finalUrl: string; contentType: string; title: string }>
 {
-  if (!app.isReady()) {
-    await app.whenReady().catch(() => void 0);
+  const { app: electronApp, BrowserWindow: BrowserWindowClass } = getElectronModules();
+  
+  // In standalone mode, we can't use BrowserWindow, so throw an error
+  if (!electronApp || !BrowserWindowClass) {
+    throw new Error("webpage_fetch_not_supported_in_standalone_mode");
+  }
+  
+  if (!electronApp.isReady()) {
+    await electronApp.whenReady().catch(() => void 0);
   }
 
   //const userAgent = process.env.WEB_FETCH_USER_AGENT?.trim() || "AiFileManagerBot/1.0 (+https://pegamob.com)";
 
   return new Promise((resolve, reject) => {
     let settled = false;
-    const win = new BrowserWindow({
+    const win = new BrowserWindowClass({
       show: false,
       width: 1920,
       height: 1080,
@@ -116,7 +149,7 @@ async function fetchWebpage(targetUrl: string): Promise<{ html: string; finalUrl
     } = {};
     const filter = { urls: ["*://*/*"] };
 
-    const onCompleted = (details: Electron.OnCompletedListenerDetails) => {
+    const onCompleted = (details: any) => {
       if (details.webContentsId !== win.webContents.id || details.resourceType !== "mainFrame") {
         return;
       }
@@ -139,7 +172,7 @@ async function fetchWebpage(targetUrl: string): Promise<{ html: string; finalUrl
       }
     };
 
-    const onErrorOccurred = (details: Electron.OnErrorOccurredListenerDetails) => {
+    const onErrorOccurred = (details: any) => {
       if (details.webContentsId !== win.webContents.id || details.resourceType !== "mainFrame" || settled) {
         return;
       }
@@ -172,7 +205,7 @@ async function fetchWebpage(targetUrl: string): Promise<{ html: string; finalUrl
 
     //win.webContents.setUserAgent(userAgent);
 
-    win.webContents.once("did-fail-load", (_event, errorCode, errorDesc) => {
+    win.webContents.once("did-fail-load", (_event: any, errorCode: number, errorDesc: string) => {
       if (settled) return;
       settled = true;
       cleanup();
@@ -220,7 +253,7 @@ async function fetchWebpage(targetUrl: string): Promise<{ html: string; finalUrl
       }
     });
 
-    win.loadURL(targetUrl).catch((err) => {
+    win.loadURL(targetUrl).catch((err: any) => {
       if (settled) return;
       settled = true;
       cleanup();

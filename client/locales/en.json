@@ -82,6 +82,7 @@
       "regenerate": "Regenerate",
       "continue": "Continue",
       "selectTarget": "Select Target Folder",
+      "checkPath": "Check Path",
       "createStructure": "Create Structure And Complete Setup",
       "pendingStructure": "Pending Directory Structure",
       "selectedPath": "Selected: {path}"
@@ -124,6 +125,7 @@
       "pending": "Structure To Be Created"
     },
     "placeholders": {
+      "pathInput": "Enter directory path manually",
       "profession": "Select or enter your profession",
       "purpose": "e.g. project documentation, research notes"
     },

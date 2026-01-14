@@ -4,6 +4,7 @@ let API_BASE_URL = `${ROOT_BASE_URL}/api`;
 
 import { BatchFileRecordResponse, FileConversionResult, StageFileResponse, WebpageConversionResult } from '../shared/types';
 import type { AppConfig } from '../shared/types';
+import { electronAPI } from '../shared/electronAPI';
 
 // Function to update API base URL
 export const updateApiBaseUrl = (url: string) => {
@@ -12,17 +13,15 @@ export const updateApiBaseUrl = (url: string) => {
   API_BASE_URL = `${normalized}/api`;
 };
 
-// Initialize API base URL from electron store
+// Initialize API base URL from electron store or web environment
 const initializeApiBaseUrl = async () => {
-  if (window.electronAPI) {
-    try {
-      const url = await window.electronAPI.getApiBaseUrl();
-      updateApiBaseUrl(url);
-    } catch (error) {
-      console.warn('Failed to get API base URL from store, using default:', error);
-      ROOT_BASE_URL = 'http://localhost:8000';
-      API_BASE_URL = `${ROOT_BASE_URL}/api`;
-    }
+  try {
+    const url = await electronAPI.getApiBaseUrl();
+    updateApiBaseUrl(url);
+  } catch (error) {
+    console.warn('Failed to get API base URL, using default:', error);
+    ROOT_BASE_URL = 'http://localhost:8000';
+    API_BASE_URL = `${ROOT_BASE_URL}/api`;
   }
 };
 
@@ -368,7 +367,7 @@ class ApiService {
     // Load once from app config via IPC and cache locally
     if (this.provider !== null) return this.provider;
     try {
-      const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig | undefined;
+      const cfg = (await electronAPI.getAppConfig()) as import('../shared/types').AppConfig | undefined;
       const p = (cfg?.llmProvider ?? 'ollama') as ProviderName;
       this.provider = p;
       return p;
@@ -540,12 +539,12 @@ class ApiService {
       return this.pegaBaseUrl;
     }
 
-    if (!window.electronAPI) {
+    if (!electronAPI) {
       throw new Error('Electron API is unavailable; cannot resolve Pega endpoint');
     }
 
     try {
-      const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const cfg = (await electronAPI.getAppConfig()) as AppConfig | undefined;
       const endpoint = cfg?.pega?.pegaEndpoint;
       if (typeof endpoint === 'string' && endpoint.trim().length > 0) {
         const normalized = endpoint.replace(/\/+$/, '');
@@ -578,12 +577,12 @@ class ApiService {
       return this.pegaAuthToken;
     }
 
-    if (!window.electronAPI) {
+    if (!electronAPI) {
       return null;
     }
 
     try {
-      const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const cfg = (await electronAPI.getAppConfig()) as AppConfig | undefined;
       const token = typeof cfg?.pega?.pegaAuthToken === 'string' ? cfg.pega.pegaAuthToken.trim() : '';
       this.pegaAuthToken = token.length > 0 ? token : null;
       return this.pegaAuthToken;
@@ -598,12 +597,12 @@ class ApiService {
       return this.pegaApiKey;
     }
 
-    if (!window.electronAPI) {
+    if (!electronAPI) {
       return null;
     }
 
     try {
-      const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const cfg = (await electronAPI.getAppConfig()) as AppConfig | undefined;
       const apiKey = typeof cfg?.pega?.pegaApiKey === 'string' ? cfg.pega.pegaApiKey.trim() : '';
       const tokenFallback = typeof cfg?.pega?.pegaAuthToken === 'string' ? cfg.pega.pegaAuthToken.trim() : '';
       const value = apiKey.length > 0 ? apiKey : tokenFallback;

@@ -1,11 +1,37 @@
-import { BrowserWindow, app } from "electron";
 import path from "path";
 import { pathToFileURL } from "url";
 import { promises as fsp } from "fs";
 import { ensureTempDir } from "./pathHelper";
 import { logger } from "../../logger";
 
-let captureWindow: BrowserWindow | null = null;
+// Dynamic import for Electron to support both standalone and Electron modes
+let app: any = null;
+let BrowserWindow: any = null;
+
+/**
+ * Lazy-load Electron modules if available
+ */
+function getElectronModules(): { app: any; BrowserWindow: any } {
+  if (app === null) {
+    try {
+      // Only import electron if available (Electron environment)
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const electron = require("electron");
+      app = electron.app;
+      BrowserWindow = electron.BrowserWindow;
+    } catch {
+      // Standalone mode - electron not available
+      app = false;
+      BrowserWindow = false;
+    }
+  }
+  return { 
+    app: app === false ? null : app,
+    BrowserWindow: BrowserWindow === false ? null : BrowserWindow
+  };
+}
+
+let captureWindow: any | null = null;
 let captureLockActive = false;
 const captureWaiters: Array<() => void> = [];
 
@@ -33,12 +59,18 @@ async function acquireCaptureLock(): Promise<() => void> {
   };
 }
 
-function ensureCaptureWindow(): BrowserWindow {
+function ensureCaptureWindow(): any {
+  const { BrowserWindow: BrowserWindowClass } = getElectronModules();
+  
+  if (!BrowserWindowClass) {
+    throw new Error("video_capture_not_supported_in_standalone_mode");
+  }
+  
   if (captureWindow && !captureWindow.isDestroyed()) {
     return captureWindow;
   }
 
-  captureWindow = new BrowserWindow({
+  captureWindow = new BrowserWindowClass({
     show: false,
     width: 800,
     height: 600,

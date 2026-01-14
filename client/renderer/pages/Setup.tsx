@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout, Steps, Form, Input, Button, Card, Space, message, AutoComplete, Tree, Collapse, Select, Typography, Modal } from 'antd';
+import { FolderOpenOutlined, CheckOutlined } from '@ant-design/icons';
 import { apiService, type DirectoryListItem, type DirectoryListResponse } from '../services/api';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 import { findDirectoryStructurePreset } from '../shared/directoryPresets';
 import type { DirectoryStructureEntry } from '../shared/directoryPresets';
 import type { AppConfig } from '../shared/types';
 
+import { electronAPI } from "../shared/electronAPI";
 const { Content } = Layout;
 const { Step } = Steps;
 const { TextArea } = Input;
@@ -59,7 +61,7 @@ const Setup = () => {
     let mounted = true;
     const loadConfig = async () => {
       try {
-        const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+        const cfg = (await electronAPI.getAppConfig()) as AppConfig | undefined;
         if (!mounted || !cfg) {
           return;
         }
@@ -206,12 +208,12 @@ const Setup = () => {
   };
 
   const logElectronError = async (title: string, details: Record<string, unknown>) => {
-    if (typeof window.electronAPI.logError !== 'function') {
+    if (typeof electronAPI.logError !== 'function') {
       return;
     }
 
     try {
-      await window.electronAPI.logError(title, details);
+      await electronAPI.logError(title, details);
     } catch {
       // Intentionally ignore logging failures to avoid blocking user flow
     }
@@ -219,7 +221,7 @@ const Setup = () => {
 
   const completeInitialization = async (workDirectory: string, successMessage: string): Promise<void> => {
     try {
-      await window.electronAPI.updateAppConfig({ isInitialized: true, workDirectory });
+      await electronAPI.updateAppConfig({ isInitialized: true, workDirectory });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       message.error(t('setup.messages.finalizeError'));
@@ -230,9 +232,9 @@ const Setup = () => {
       throw new Error('SETUP_FINALIZE_FAILED');
     }
 
-    if (typeof window.electronAPI.showBotWindow === 'function') {
+    if (typeof electronAPI.showBotWindow === 'function') {
       try {
-        await window.electronAPI.showBotWindow();
+        await electronAPI.showBotWindow();
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         await logElectronError('Failed to show assistant window after setup', {
@@ -319,7 +321,7 @@ const Setup = () => {
     setLlmProvider(value);
     apiService.setProvider(value);
     try {
-      await window.electronAPI.updateAppConfig({ llmProvider: value });
+      await electronAPI.updateAppConfig({ llmProvider: value });
       message.success(t('setup.messages.providerUpdated'));
     } catch (error) {
       message.error(t('setup.messages.providerUpdateError'));
@@ -340,7 +342,7 @@ const Setup = () => {
 
   const handleSelectFolder = async () => {
     try {
-      const folder = await window.electronAPI.selectFolder();
+      const folder = await electronAPI.selectFolder();
       if (folder) {
         setSelectedFolder(folder);
         setExistingDirectoryItems([]);
@@ -381,6 +383,19 @@ const Setup = () => {
     }
   };
 
+  const handleManualPathChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVal = e.target.value;
+    setSelectedFolder(newVal);
+    if (newVal !== checkedDirectoryPath) {
+      setExistingDirectoryItems([]);
+    }
+  };
+
+  const handleManualPathConfirm = async () => {
+    if (!selectedFolder) return;
+    await inspectDirectory(selectedFolder);
+  };
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 0:
@@ -388,14 +403,26 @@ const Setup = () => {
           <Card title={t('setup.cards.stepOne')} style={{ maxWidth: 600, margin: '0 auto' }}>
             <Space direction="vertical" style={{ width: '100%' }}>
               <div>
-                <Button onClick={handleSelectFolder} loading={checkingDirectory}>
-                  {t('setup.actions.selectTarget')}
-                </Button>
-                {selectedFolder && (
-                  <div style={{ marginTop: 8 }}>
-                    {t('setup.actions.selectedPath', { path: selectedFolder })}
-                  </div>
-                )}
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input
+                    placeholder={t('setup.placeholders.pathInput')}
+                    value={selectedFolder}
+                    onChange={handleManualPathChange}
+                    onPressEnter={handleManualPathConfirm}
+                  />
+                  <Button
+                    onClick={handleSelectFolder}
+                    icon={<FolderOpenOutlined />}
+                    loading={checkingDirectory}
+                    title={t('setup.actions.selectTarget')}
+                  />
+                  <Button
+                    onClick={handleManualPathConfirm}
+                    loading={checkingDirectory}
+                    icon={<CheckOutlined />}
+                    title={t('setup.actions.checkPath')}
+                  />
+                </Space.Compact>
                 <div style={{ marginTop: 12 }}>
                   <Text type="secondary" style={{ display: 'block' }}>
                     {t('setup.hints.emptyDirectory')}

@@ -16,7 +16,6 @@ import type { SupportedLang } from "./utils/promptHelper";
 import { buildExtractTagsMessages } from "./utils/promptHelper";
 import type { ProviderName } from "./utils/llm";
 import { normalizeProviderName, isProviderValueProvided, respondWithInvalidProvider } from "./utils/providerHelper";
-import { app, nativeImage, shell } from "electron";
 import { pathToFileURL } from "url";
 import { randomUUID } from "crypto";
 import ChunkModel from "./models/chunk";
@@ -25,6 +24,37 @@ import { configManager } from "../configManager";
 import type { AppConfig } from "../configManager";
 import { i18n } from "../languageHelper";
 import { extractVideoScreenshots } from "./utils/videoCapture";
+
+// Dynamic import for Electron to support both standalone and Electron modes
+let app: any = null;
+let nativeImage: any = null;
+let shell: any = null;
+
+/**
+ * Lazy-load Electron modules if available
+ */
+function getElectronModules(): { app: any; nativeImage: any; shell: any } {
+  if (app === null) {
+    try {
+      // Only import electron if available (Electron environment)
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const electron = require("electron");
+      app = electron.app;
+      nativeImage = electron.nativeImage;
+      shell = electron.shell;
+    } catch {
+      // Standalone mode - electron not available
+      app = false;
+      nativeImage = false;
+      shell = false;
+    }
+  }
+  return { 
+    app: app === false ? null : app,
+    nativeImage: nativeImage === false ? null : nativeImage,
+    shell: shell === false ? null : shell
+  };
+}
 
 function getTextConversionFailedMessage(): string {
   return i18n.t("backend.files.errors.textConversionFailed", "Failed to convert file to text");
@@ -55,28 +85,31 @@ async function summarizeVideoContent(
     for (const shot of shots) {
       try {
         let base64: string | null = null;
+        const { nativeImage: nativeImageModule } = getElectronModules();
         try {
-          const nativeImg = nativeImage.createFromPath(shot.filePath);
-          if (!nativeImg.isEmpty()) {
-            const { width, height } = nativeImg.getSize();
-            if (width > 0 && height > 0) {
-              const maxDimensionLimit = Math.max(1, maxDescribeDimension);
-              const maxOriginalDimension = Math.max(width, height);
-              const shouldResize = maxOriginalDimension > maxDimensionLimit;
-              let processedImage = nativeImg;
-              if (shouldResize) {
-                const scale = maxDimensionLimit / maxOriginalDimension;
-                const targetWidth = Math.max(1, Math.round(width * scale));
-                const targetHeight = Math.max(1, Math.round(height * scale));
-                processedImage = nativeImg.resize({
-                  width: targetWidth,
-                  height: targetHeight,
-                  quality: "best",
-                });
-              }
-              if (!processedImage.isEmpty()) {
-                const pngBuffer = processedImage.toPNG();
-                base64 = pngBuffer.length > 0 ? pngBuffer.toString("base64") : null;
+          if (nativeImageModule) {
+            const nativeImg = nativeImageModule.createFromPath(shot.filePath);
+            if (!nativeImg.isEmpty()) {
+              const { width, height } = nativeImg.getSize();
+              if (width > 0 && height > 0) {
+                const maxDimensionLimit = Math.max(1, maxDescribeDimension);
+                const maxOriginalDimension = Math.max(width, height);
+                const shouldResize = maxOriginalDimension > maxDimensionLimit;
+                let processedImage = nativeImg;
+                if (shouldResize) {
+                  const scale = maxDimensionLimit / maxOriginalDimension;
+                  const targetWidth = Math.max(1, Math.round(width * scale));
+                  const targetHeight = Math.max(1, Math.round(height * scale));
+                  processedImage = nativeImg.resize({
+                    width: targetWidth,
+                    height: targetHeight,
+                    quality: "best",
+                  });
+                }
+                if (!processedImage.isEmpty()) {
+                  const pngBuffer = processedImage.toPNG();
+                  base64 = pngBuffer.length > 0 ? pngBuffer.toString("base64") : null;
+                }
               }
             }
           }
@@ -518,10 +551,15 @@ export async function previewFileHandler(req: Request, res: Response): Promise<v
             sharpMod = (await import('sharp')).default;
           } catch (e) {
             try {
-              const appRoot = app.getAppPath();
-              // When packaged with electron-builder, extra resources are placed alongside app.asar
-              const candidate = path.resolve(appRoot, '..', 'resources', 'sharp');
-              sharpMod = require(path.join(candidate, 'lib', 'sharp')); // attempt common path
+              const { app: electronApp } = getElectronModules();
+              if (electronApp) {
+                const appRoot = electronApp.getAppPath();
+                // When packaged with electron-builder, extra resources are placed alongside app.asar
+                const candidate = path.resolve(appRoot, '..', 'resources', 'sharp');
+                sharpMod = require(path.join(candidate, 'lib', 'sharp')); // attempt common path
+              } else {
+                throw e;
+              }
             } catch {
               throw e;
             }
@@ -951,12 +989,17 @@ function resolveDirectoryBase(inputPath: string): string | null {
   if (path.isAbsolute(inputPath)) return path.normalize(inputPath);
   const candidates: string[] = [];
   try {
-    const appRoot = app.getAppPath();
-    // Try a few likely bases (dev/build)
-    candidates.push(path.resolve(process.cwd(), inputPath));
-    candidates.push(path.resolve(appRoot, inputPath));
-    candidates.push(path.resolve(appRoot, "..", inputPath));
-    candidates.push(path.resolve(appRoot, "..", "..", inputPath));
+    const { app: electronApp } = getElectronModules();
+    if (electronApp) {
+      const appRoot = electronApp.getAppPath();
+      // Try a few likely bases (dev/build)
+      candidates.push(path.resolve(process.cwd(), inputPath));
+      candidates.push(path.resolve(appRoot, inputPath));
+      candidates.push(path.resolve(appRoot, "..", inputPath));
+      candidates.push(path.resolve(appRoot, "..", "..", inputPath));
+    } else {
+      candidates.push(path.resolve(process.cwd(), inputPath));
+    }
   } catch {
     candidates.push(path.resolve(process.cwd(), inputPath));
   }
@@ -1391,10 +1434,11 @@ export async function deleteFileHandler(req: Request, res: Response): Promise<vo
     if (confirmDelete) {
       const absPath = fileRow.path;
       if (absPath && typeof absPath === "string") {
-        const canTrash = typeof shell?.trashItem === "function";
+        const { shell: shellModule } = getElectronModules();
+        const canTrash = shellModule && typeof shellModule.trashItem === "function";
         try {
           if (canTrash) {
-            await shell.trashItem(absPath);
+            await shellModule.trashItem(absPath);
           } else {
             await fsp.unlink(absPath);
             logger.warn("shell.trashItem is unavailable, file permanently deleted", { path: absPath });

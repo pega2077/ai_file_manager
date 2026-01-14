@@ -1,23 +1,52 @@
-import { app } from "electron";
 import path from "path";
 import { promises as fsp } from "fs";
 import fs from "fs";
 
+// Dynamic import for Electron to support both standalone and Electron modes
+let app: any = null;
+
+/**
+ * Lazy-load Electron app if available
+ */
+function getElectronApp(): any {
+  if (app === null) {
+    try {
+      // Only import electron if available (Electron environment)
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const electron = require("electron");
+      app = electron.app;
+    } catch {
+      // Standalone mode - electron not available
+      app = false; // Set to false to indicate we've tried and failed
+    }
+  }
+  return app === false ? null : app;
+}
+
 /**
  * Resolve a writable temp directory based on environment.
- * - Development: use app.getAppPath()/temp (works in dev folders)
- * - Production: use path.dirname(app.getPath('exe'))/temp (writeable next to exe)
+ * - Electron Development: use app.getAppPath()/temp (works in dev folders)
+ * - Electron Production: use path.dirname(app.getPath('exe'))/temp (writeable next to exe)
+ * - Standalone: use process.cwd()/temp
  * Ensures the directory exists and returns its absolute path.
  */
 export async function ensureTempDir(): Promise<string> {
   let baseDir: string;
-  if (app.isPackaged === false) {
-    // Development mode: prefer app root; fallback to cwd if undefined
-    const appRoot = app.getAppPath();
-    baseDir = appRoot || process.cwd();
+  
+  const electronApp = getElectronApp();
+  if (electronApp) {
+    // Electron mode
+    if (electronApp.isPackaged === false) {
+      // Development mode: prefer app root; fallback to cwd if undefined
+      const appRoot = electronApp.getAppPath();
+      baseDir = appRoot || process.cwd();
+    } else {
+      // Production mode: place temp next to the executable (Program Files can be read-only)
+      baseDir = path.dirname(electronApp.getPath("exe"));
+    }
   } else {
-    // Production mode: place temp next to the executable (Program Files can be read-only)
-    baseDir = path.dirname(app.getPath("exe"));
+    // Standalone mode: use current working directory
+    baseDir = process.cwd();
   }
 
   const tempDir = path.join(baseDir, "temp");
@@ -27,16 +56,24 @@ export async function ensureTempDir(): Promise<string> {
 
 /**
  * Resolve the base directory for app data according to env.
- * - Dev: app.getAppPath() or CWD
- * - Prod: directory of the executable
+ * - Electron Dev: app.getAppPath() or CWD
+ * - Electron Prod: directory of the executable
+ * - Standalone: process.cwd()
  */
 export function getBaseDir(): string {
   try {
-    if (app.isPackaged === false) {
-      const appRoot = app.getAppPath();
-      return appRoot || process.cwd();
+    const electronApp = getElectronApp();
+    if (electronApp) {
+      // Electron mode
+      if (electronApp.isPackaged === false) {
+        const appRoot = electronApp.getAppPath();
+        return appRoot || process.cwd();
+      }
+      return path.dirname(electronApp.getPath("exe"));
+    } else {
+      // Standalone mode
+      return process.cwd();
     }
-    return path.dirname(app.getPath("exe"));
   } catch {
     return process.cwd();
   }
@@ -44,13 +81,18 @@ export function getBaseDir(): string {
 
 /**
  * Resolve the repository/project root used for resources like database when a relative path is configured.
- * - Dev: usually two levels above app root (client/dist-electron -> repo root)
- * - Prod: one level above the executable directory (bundle root)
+ * - Electron Dev: usually two levels above app root (client/dist-electron -> repo root)
+ * - Electron Prod: one level above the executable directory (bundle root)
+ * - Standalone: process.cwd()
  */
 export function resolveProjectRoot(): string {
   const base = getBaseDir();
   //console.log('Base dir for project root resolution:', base);
-  return app.isPackaged ? path.join(base, "..") : base;
+  const electronApp = getElectronApp();
+  if (electronApp && electronApp.isPackaged) {
+    return path.join(base, "..");
+  }
+  return base;
 }
 
 /**

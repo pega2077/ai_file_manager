@@ -1,3 +1,5 @@
+import { electronAPI } from '../electronAPI';
+
 export const FILE_IMPORT_NOTIFICATION_EVENT = 'file-import-notification';
 
 export type FileImportStep =
@@ -50,8 +52,8 @@ export const dispatchFileImportNotification = (
     return;
   }
 
-  if (window.electronAPI?.sendFileImportNotification) {
-    window.electronAPI.sendFileImportNotification(detail);
+  if (electronAPI.sendFileImportNotification) {
+    electronAPI.sendFileImportNotification(detail);
     return;
   }
 
@@ -73,8 +75,8 @@ export const subscribeFileImportNotifications = (
     return () => undefined;
   }
 
-  if (window.electronAPI?.onFileImportNotification) {
-    return window.electronAPI.onFileImportNotification(listener);
+  if (electronAPI.onFileImportNotification) {
+    return electronAPI.onFileImportNotification(listener);
   }
 
   const handler = (event: Event) => {

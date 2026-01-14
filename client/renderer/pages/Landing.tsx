@@ -4,6 +4,7 @@ import { Layout, Typography, Space, Button, message } from 'antd';
 import reactLogo from '../assets/react.svg';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 
+import { electronAPI } from "../shared/electronAPI";
 const { Content } = Layout;
 const { Title, Text } = Typography;
 
@@ -15,7 +16,7 @@ const Landing = () => {
   useEffect(() => {
     const timer = setTimeout(async () => {
       try {
-  const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+  const cfg = (await electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
         const isInitialized = Boolean(cfg?.isInitialized);
         console.log('isInitialized:', isInitialized);
         if (isInitialized) {
@@ -50,7 +51,7 @@ const Landing = () => {
           <Button
             type="default"
             onClick={async () => {
-              await window.electronAPI.updateAppConfig({ isInitialized: false });
+              await electronAPI.updateAppConfig({ isInitialized: false });
               message.success(t('landing.resetMessage'));
             }}
           >

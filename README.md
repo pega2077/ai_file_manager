@@ -2,6 +2,11 @@
 
 A smart file manager powered by AI. It automatically classifies your imported files into the most suitable folders and tags them intelligently based on their content, making future search and retrieval easy. You can also import files into a local knowledge base and use large language models for intelligent Q&A.
 
+## Deployment Options
+
+- 🖥️ **Desktop Application** - Electron-based desktop app for Windows and macOS
+- 🌐 **Web Server Mode** - Standalone web server for cloud/self-hosted deployment
+
 ## Features
 
  ![Features1](intro/page.001.jpeg)
@@ -14,16 +19,20 @@ A smart file manager powered by AI. It automatically classifies your imported fi
 - 🔍 **Semantic Search** - Intelligent document retrieval based on vector database
 - 💬 **Intelligent Q&A** - Document content Q&A based on RAG technology
 - 🗄️ **Local Storage** - All data stored locally, protecting privacy and security
-- 🖥️ **Cross-Platform Support** - Supports Windows and macOS systems
+- 🖥️ **Cross-Platform Support** - Supports Windows, macOS, and web deployment
 
 ## Technical Architecture
 
-- **Frontend Interface**: Electron + React + TypeScript
-- **Local Service Layer**: Embedded Node.js (Express) server inside the Electron main process
+- **Frontend Interface**: React + TypeScript (can run in Electron or browser)
+- **Local Service Layer**: Node.js (Express) server (embedded in Electron or standalone)
 - **Document Processing**: Remote file conversion via the configurable `fileConvertEndpoint` service (with Node orchestration)
 - **Data Storage**: SQLite (document metadata via Sequelize) + Faiss vector index (faiss-node)
 - **AI Models**: Pluggable LLM / embedding providers (OpenAI, Azure, OpenRouter, Bailian, Ollama, etc.)
   - See [LLM Provider Architecture](docs/LLM_PROVIDER_ARCHITECTURE.md) for detailed documentation
+- **Deployment Modes**: 
+  - Desktop: Electron + React with embedded Express server
+  - Web: Standalone Express server serving React SPA
+  - See [Web Mode Documentation](docs/WEB_MODE.md) for deployment guide
 
 ## Project Structure
 

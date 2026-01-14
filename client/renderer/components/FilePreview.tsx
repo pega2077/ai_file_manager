@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 import { apiService } from '../services/api';
 import type { AppConfig } from '../shared/types';
+import { electronAPI } from "../shared/electronAPI";
 import {
   DEFAULT_SUPPORTED_PREVIEW_EXTENSIONS,
   extractPreviewExtension,
@@ -48,7 +49,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
     if (!previewData || previewData.file_type !== 'html') {
       return null;
     }
-    const fileUrl = window.electronAPI?.toFileUrl?.(previewData.file_path);
+    const fileUrl = electronAPI.toFileUrl?.(previewData.file_path);
     if (!fileUrl) {
       return previewData.content;
     }
@@ -83,7 +84,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
     setExtensionsReady(false);
 
     const loadSupportedExtensions = async () => {
-      if (!window.electronAPI?.getAppConfig) {
+      if (!electronAPI.getAppConfig) {
         if (!cancelled) {
           setExtensionsReady(true);
         }
@@ -91,7 +92,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
       }
 
       try {
-        const rawConfig = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+        const rawConfig = (await electronAPI.getAppConfig()) as AppConfig | undefined;
         if (cancelled) {
           return;
         }
@@ -109,7 +110,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
           return sanitized;
         });
       } catch (error) {
-        window.electronAPI?.logError?.('filePreview.loadSupportedExtensionsFailed', {
+        electronAPI.logError?.('filePreview.loadSupportedExtensionsFailed', {
           err: String(error),
         });
       } finally {
@@ -215,7 +216,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
     try {
       // Use system default handler to open the file directory
       const folderPath = filePath.substring(0, filePath.lastIndexOf(getPathSeparator()));
-      await window.electronAPI.openFile(folderPath);
+      await electronAPI.openFile(folderPath);
     } catch (error) {
       message.error(t('filePreview.messages.openFolderFailed'));
       console.error(error);
@@ -224,7 +225,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
 
   const handleOpenWithDefault = async () => {
     try {
-      await window.electronAPI.openFile(filePath);
+      await electronAPI.openFile(filePath);
     } catch (error) {
       message.error(t('filePreview.messages.openFileFailed'));
       console.error(error);
@@ -254,7 +255,7 @@ const FilePreview = ({ filePath, fileName, visible, onClose }: FilePreviewProps)
         if (/^(data:|blob:|https?:|file:)/i.test(content)) {
           return content;
         }
-        const fileUrl = window.electronAPI?.toFileUrl?.(previewData.file_path);
+        const fileUrl = electronAPI.toFileUrl?.(previewData.file_path);
         return fileUrl && fileUrl.length > 0 ? fileUrl : content;
       })();
 

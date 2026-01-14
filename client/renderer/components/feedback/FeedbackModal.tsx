@@ -18,6 +18,7 @@ import type { RcFile, UploadFile, UploadChangeParam } from "antd/es/upload/inter
 import * as Sentry from "@sentry/react";
 import type { TranslationFunction } from "../../shared/i18n/I18nProvider";
 
+import { electronAPI } from "../../shared/electronAPI";
 const { TextArea } = Input;
 const { Text } = Typography;
 
@@ -100,7 +101,7 @@ const FeedbackModal = ({ open, onClose, t, defaultIncludeLogs = false }: Feedbac
       return;
     }
 
-    if (!window.electronAPI?.getLogArchive) {
+    if (!electronAPI.getLogArchive) {
       message.error(t("settings.feedback.errors.logsUnavailable"));
       form.setFieldsValue({ includeLogs: false });
       return;
@@ -108,7 +109,7 @@ const FeedbackModal = ({ open, onClose, t, defaultIncludeLogs = false }: Feedbac
 
     try {
       setFetchingLogs(true);
-      const archive = await window.electronAPI.getLogArchive();
+      const archive = await electronAPI.getLogArchive();
       if (!archive) {
         throw new Error("log_archive_missing");
       }

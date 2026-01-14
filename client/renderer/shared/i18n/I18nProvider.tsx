@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { apiService } from '../../services/api'
+import { electronAPI } from '../electronAPI'
 import {
   FALLBACK_LOCALE,
   LOCALE_LABELS,
@@ -61,24 +62,18 @@ export function I18nProvider({ children, initialLocale }: I18nProviderProps) {
 
     window.localStorage.setItem(STORAGE_KEY, locale)
 
-    if (window.electronAPI?.setPreferredLocale) {
-      void window.electronAPI.setPreferredLocale(locale)
-    }
+    void electronAPI.setPreferredLocale(locale)
   }, [locale])
 
   useEffect(() => {
-    if (!window.electronAPI?.getPreferredLocale) {
-      return
-    }
-
-    void window.electronAPI.getPreferredLocale()
+    void electronAPI.getPreferredLocale()
       .then((storedLocale) => {
         if (typeof storedLocale === 'string') {
           setLocaleState(normalizeLocale(storedLocale))
         }
       })
       .catch(() => {
-        // Ignore preload errors; fallback logic already covers locale selection.
+        // Ignore errors; fallback logic already covers locale selection.
       })
   }, [])
 
