@@ -179,23 +179,21 @@ export const stopStandaloneServer = async (): Promise<void> => {
   }
 };
 
-// If this file is run directly, start the server
-if (import.meta.url === `file://${process.argv[1]}`) {
-  startStandaloneServer().catch((error) => {
-    logger.error("Failed to start standalone server", error);
-    process.exit(1);
-  });
+logger.info("Starting standalone server...");
+startStandaloneServer().catch((error) => {
+  logger.error("Failed to start standalone server", error);
+  process.exit(1);
+});
 
-  // Handle graceful shutdown
-  process.on("SIGINT", async () => {
-    logger.info("SIGINT received, shutting down...");
-    await stopStandaloneServer();
-    process.exit(0);
-  });
+// Handle graceful shutdown
+process.on("SIGINT", async () => {
+  logger.info("SIGINT received, shutting down...");
+  await stopStandaloneServer();
+  process.exit(0);
+});
 
-  process.on("SIGTERM", async () => {
-    logger.info("SIGTERM received, shutting down...");
-    await stopStandaloneServer();
-    process.exit(0);
-  });
-}
+process.on("SIGTERM", async () => {
+  logger.info("SIGTERM received, shutting down...");
+  await stopStandaloneServer();
+  process.exit(0);
+});
