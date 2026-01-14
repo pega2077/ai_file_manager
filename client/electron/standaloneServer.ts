@@ -77,20 +77,30 @@ export const startStandaloneServer = async (): Promise<void> => {
     registerSystemTagsRoutes(app);
 
     // Serve static files from the React build
-    // In production, the static files should be in ../web relative to this file
-    const staticPath = path.resolve(__dirname, "..", "web");
+    // The static files should be in builds/web relative to project root
+    // When running with tsx, __dirname is electron directory
+    // When running compiled, __dirname is builds/electron/electron directory
+    const isCompiledMode = __dirname.includes('builds');
+    const staticPath = isCompiledMode 
+      ? path.resolve(__dirname, "..", "..", "web")
+      : path.resolve(__dirname, "..", "builds", "web");
     logger.info(`Serving static files from: ${staticPath}`);
     
     app.use(express.static(staticPath));
 
     // SPA fallback: serve index.html for all non-API routes
-    app.get("*", (req: Request, res: Response) => {
+    // Must be registered AFTER all specific routes
+    app.use((req: Request, res: Response, next: NextFunction) => {
       // Don't serve index.html for API routes
       if (req.path.startsWith("/api/")) {
-        res.status(404).json({ error: "Not found" });
-        return;
+        return next();
       }
-      res.sendFile(path.join(staticPath, "index.html"));
+      // Serve index.html for all other routes
+      res.sendFile(path.join(staticPath, "index.html"), (err) => {
+        if (err) {
+          next(err);
+        }
+      });
     });
 
     // Generic error handler (last middleware)

@@ -1,9 +1,29 @@
 import fs from "fs";
 import path from "path";
 import { logger } from "./logger";
-import { app } from "electron";
 import { getBaseDir, resolveProjectRoot, resolveDatabaseAbsolutePath } from "./backend/utils/pathHelper";
 import { DEFAULT_SUPPORTED_PREVIEW_EXTENSIONS, sanitizePreviewExtensions } from "../shared/filePreviewConfig";
+
+// Dynamic import for Electron to support both standalone and Electron modes
+let app: any = null;
+
+/**
+ * Lazy-load Electron app if available
+ */
+function getElectronApp(): any {
+  if (app === null) {
+    try {
+      // Only import electron if available (Electron environment)
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const electron = require("electron");
+      app = electron.app;
+    } catch {
+      // Standalone mode - electron not available
+      app = false; // Set to false to indicate we've tried and failed
+    }
+  }
+  return app === false ? null : app;
+}
 
 export interface AppConfig {
   useLocalService: boolean;
@@ -287,13 +307,18 @@ export class ConfigManager {
   }
 
   constructor() {
-    logger.info("App path:", app.getAppPath());
-    logger.info("Exe path:", app.getPath("exe"));
+    const electronApp = getElectronApp();
+    if (electronApp) {
+      logger.info("App path:", electronApp.getAppPath());
+      logger.info("Exe path:", electronApp.getPath("exe"));
+    } else {
+      logger.info("Running in standalone mode");
+    }
     // Determine base directory depending on packaged state
     const appRoot = this.getAppRoot();
 
     logger.info(
-      `ConfigManager: ${app.isPackaged ? 'Production' : 'Development'} mode :`,
+      `ConfigManager: ${electronApp && electronApp.isPackaged ? 'Production' : 'Development'} mode :`,
       appRoot
     );
 

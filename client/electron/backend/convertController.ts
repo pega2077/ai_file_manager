@@ -149,7 +149,7 @@ async function fetchWebpage(targetUrl: string): Promise<{ html: string; finalUrl
     } = {};
     const filter = { urls: ["*://*/*"] };
 
-    const onCompleted = (details: Electron.OnCompletedListenerDetails) => {
+    const onCompleted = (details: any) => {
       if (details.webContentsId !== win.webContents.id || details.resourceType !== "mainFrame") {
         return;
       }
@@ -172,7 +172,7 @@ async function fetchWebpage(targetUrl: string): Promise<{ html: string; finalUrl
       }
     };
 
-    const onErrorOccurred = (details: Electron.OnErrorOccurredListenerDetails) => {
+    const onErrorOccurred = (details: any) => {
       if (details.webContentsId !== win.webContents.id || details.resourceType !== "mainFrame" || settled) {
         return;
       }
