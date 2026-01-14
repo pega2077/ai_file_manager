@@ -2,8 +2,28 @@ import type { Express, Request, Response } from "express";
 import path from "path";
 import fs from "fs";
 import { promises as fsp } from "fs";
-import { app } from "electron";
 import { logger } from "../logger";
+
+// Dynamic import for Electron to support both standalone and Electron modes
+let app: any = null;
+
+/**
+ * Lazy-load Electron app if available
+ */
+function getElectronApp(): any {
+  if (app === null) {
+    try {
+      // Only import electron if available (Electron environment)
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const electron = require("electron");
+      app = electron.app;
+    } catch {
+      // Standalone mode - electron not available
+      app = false; // Set to false to indicate we've tried and failed
+    }
+  }
+  return app === false ? null : app;
+}
 
 type CreateFoldersBody = {
   target_folder?: unknown;
@@ -52,11 +72,16 @@ function resolveDirectoryBase(inputPath: string): string | null {
   }
   const candidates: string[] = [];
   try {
-    const appRoot = app.getAppPath();
-    candidates.push(path.resolve(process.cwd(), inputPath));
-    candidates.push(path.resolve(appRoot, inputPath));
-    candidates.push(path.resolve(appRoot, "..", inputPath));
-    candidates.push(path.resolve(appRoot, "..", "..", inputPath));
+    const electronApp = getElectronApp();
+    if (electronApp) {
+      const appRoot = electronApp.getAppPath();
+      candidates.push(path.resolve(process.cwd(), inputPath));
+      candidates.push(path.resolve(appRoot, inputPath));
+      candidates.push(path.resolve(appRoot, "..", inputPath));
+      candidates.push(path.resolve(appRoot, "..", "..", inputPath));
+    } else {
+      candidates.push(path.resolve(process.cwd(), inputPath));
+    }
   } catch {
     candidates.push(path.resolve(process.cwd(), inputPath));
   }
