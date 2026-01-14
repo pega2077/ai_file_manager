@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout, Steps, Form, Input, Button, Card, Space, message, AutoComplete, Tree, Collapse, Select, Typography, Modal } from 'antd';
+import { FolderOpenOutlined, CheckOutlined } from '@ant-design/icons';
 import { apiService, type DirectoryListItem, type DirectoryListResponse } from '../services/api';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 import { findDirectoryStructurePreset } from '../shared/directoryPresets';
@@ -382,6 +383,19 @@ const Setup = () => {
     }
   };
 
+  const handleManualPathChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVal = e.target.value;
+    setSelectedFolder(newVal);
+    if (newVal !== checkedDirectoryPath) {
+      setExistingDirectoryItems([]);
+    }
+  };
+
+  const handleManualPathConfirm = async () => {
+    if (!selectedFolder) return;
+    await inspectDirectory(selectedFolder);
+  };
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 0:
@@ -389,14 +403,26 @@ const Setup = () => {
           <Card title={t('setup.cards.stepOne')} style={{ maxWidth: 600, margin: '0 auto' }}>
             <Space direction="vertical" style={{ width: '100%' }}>
               <div>
-                <Button onClick={handleSelectFolder} loading={checkingDirectory}>
-                  {t('setup.actions.selectTarget')}
-                </Button>
-                {selectedFolder && (
-                  <div style={{ marginTop: 8 }}>
-                    {t('setup.actions.selectedPath', { path: selectedFolder })}
-                  </div>
-                )}
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input
+                    placeholder={t('setup.placeholders.pathInput')}
+                    value={selectedFolder}
+                    onChange={handleManualPathChange}
+                    onPressEnter={handleManualPathConfirm}
+                  />
+                  <Button
+                    onClick={handleSelectFolder}
+                    icon={<FolderOpenOutlined />}
+                    loading={checkingDirectory}
+                    title={t('setup.actions.selectTarget')}
+                  />
+                  <Button
+                    onClick={handleManualPathConfirm}
+                    loading={checkingDirectory}
+                    icon={<CheckOutlined />}
+                    title={t('setup.actions.checkPath')}
+                  />
+                </Space.Compact>
                 <div style={{ marginTop: 12 }}>
                   <Text type="secondary" style={{ display: 'block' }}>
                     {t('setup.hints.emptyDirectory')}

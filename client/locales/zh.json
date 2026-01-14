@@ -81,6 +81,7 @@
       "regenerate": "重新生成",
       "continue": "继续",
       "selectTarget": "选择目标文件夹",
+      "checkPath": "检查路径",
       "createStructure": "创建目录结构并完成初始化",
       "pendingStructure": "待创建目录结构",
       "selectedPath": "已选择：{path}"
@@ -123,6 +124,7 @@
       "pending": "待创建目录结构"
     },
     "placeholders": {
+      "pathInput": "手动输入文件夹路径",
       "profession": "选择或输入您的职业",
       "purpose": "例如：项目文档、研究笔记"
     },
