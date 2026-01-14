@@ -205,7 +205,7 @@ async function fetchWebpage(targetUrl: string): Promise<{ html: string; finalUrl
 
     //win.webContents.setUserAgent(userAgent);
 
-    win.webContents.once("did-fail-load", (_event, errorCode, errorDesc) => {
+    win.webContents.once("did-fail-load", (_event: any, errorCode: number, errorDesc: string) => {
       if (settled) return;
       settled = true;
       cleanup();
@@ -253,7 +253,7 @@ async function fetchWebpage(targetUrl: string): Promise<{ html: string; finalUrl
       }
     });
 
-    win.loadURL(targetUrl).catch((err) => {
+    win.loadURL(targetUrl).catch((err: any) => {
       if (settled) return;
       settled = true;
       cleanup();

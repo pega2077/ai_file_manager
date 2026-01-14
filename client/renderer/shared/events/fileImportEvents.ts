@@ -1,3 +1,5 @@
+import { electronAPI } from '../electronAPI';
+
 export const FILE_IMPORT_NOTIFICATION_EVENT = 'file-import-notification';
 
 export type FileImportStep =
