@@ -1,13 +1,12 @@
 import * as Sentry from "@sentry/react";
 import type { AppConfig } from "../types";
+import { electronAPI } from "../electronAPI";
 
 let initialized = false;
 
 const logInitializationError = async (message: string, meta?: Record<string, unknown>) => {
   try {
-    if (window.electronAPI?.logError) {
-      await window.electronAPI.logError(message, meta);
-    }
+    await electronAPI.logError(message, meta);
   } catch (error) {
     console.error("Failed to log Sentry initialization error", error);
   }
@@ -18,12 +17,8 @@ export const initializeSentry = async (): Promise<void> => {
     return;
   }
 
-  if (!window.electronAPI?.getAppConfig) {
-    return;
-  }
-
   try {
-    const appConfig = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+    const appConfig = (await electronAPI.getAppConfig()) as AppConfig | undefined;
     const dsn = appConfig?.sentry?.dsn;
     if (!dsn) {
       return;

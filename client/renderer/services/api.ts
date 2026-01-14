@@ -4,6 +4,7 @@ let API_BASE_URL = `${ROOT_BASE_URL}/api`;
 
 import { BatchFileRecordResponse, FileConversionResult, StageFileResponse, WebpageConversionResult } from '../shared/types';
 import type { AppConfig } from '../shared/types';
+import { electronAPI } from '../shared/electronAPI';
 
 // Function to update API base URL
 export const updateApiBaseUrl = (url: string) => {
@@ -12,17 +13,15 @@ export const updateApiBaseUrl = (url: string) => {
   API_BASE_URL = `${normalized}/api`;
 };
 
-// Initialize API base URL from electron store
+// Initialize API base URL from electron store or web environment
 const initializeApiBaseUrl = async () => {
-  if (window.electronAPI) {
-    try {
-      const url = await window.electronAPI.getApiBaseUrl();
-      updateApiBaseUrl(url);
-    } catch (error) {
-      console.warn('Failed to get API base URL from store, using default:', error);
-      ROOT_BASE_URL = 'http://localhost:8000';
-      API_BASE_URL = `${ROOT_BASE_URL}/api`;
-    }
+  try {
+    const url = await electronAPI.getApiBaseUrl();
+    updateApiBaseUrl(url);
+  } catch (error) {
+    console.warn('Failed to get API base URL, using default:', error);
+    ROOT_BASE_URL = 'http://localhost:8000';
+    API_BASE_URL = `${ROOT_BASE_URL}/api`;
   }
 };
 
