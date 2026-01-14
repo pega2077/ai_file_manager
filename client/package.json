@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
+    "build:web": "vite build --config vite.config.standalone.ts && tsc electron/standaloneServer.ts --outDir builds/electron --module esnext --target es2020 --moduleResolution bundler --esModuleInterop --resolveJsonModule --skipLibCheck",
+    "start:web": "tsx electron/standaloneServer.ts",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "rebuild:native": "electron-rebuild -f -w faiss-node"
