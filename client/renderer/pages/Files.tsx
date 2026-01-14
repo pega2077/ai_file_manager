@@ -41,6 +41,7 @@ import { apiService, type FileNameAssessmentResult } from "../services/api";
 import { ImportedFileItem } from "../shared/types";
 import { useTranslation } from "../shared/i18n/I18nProvider";
 
+import { electronAPI } from "../shared/electronAPI";
 const { Content } = Layout;
 const { Option } = Select;
 
@@ -285,8 +286,8 @@ const FileList: React.FC<FileListProps> = ({
         file.path.substring(0, file.path.lastIndexOf("\\")) ||
         file.path.substring(0, file.path.lastIndexOf("/"));
 
-      if (window.electronAPI && window.electronAPI.openFolder) {
-        const success = await window.electronAPI.openFolder(dirPath);
+      if (electronAPI && electronAPI.openFolder) {
+        const success = await electronAPI.openFolder(dirPath);
         if (!success) {
           message.error(t("files.messages.openDirectoryFailed"));
         }
@@ -302,8 +303,8 @@ const FileList: React.FC<FileListProps> = ({
   // 打开文件
   const handleOpenFile = async (file: ImportedFileItem) => {
     try {
-      if (window.electronAPI && window.electronAPI.openFile) {
-        const success = await window.electronAPI.openFile(file.path);
+      if (electronAPI && electronAPI.openFile) {
+        const success = await electronAPI.openFile(file.path);
         if (!success) {
           message.error(t("files.messages.openFileFailed"));
         }
@@ -1497,7 +1498,7 @@ const FilesPage: React.FC = () => {
       try {
         await importRef.current?.importFile(filePath);
       } catch (error) {
-        window.electronAPI?.logError?.("files-import-file-failed", {
+        electronAPI.logError?.("files-import-file-failed", {
           err: String(error),
           filePath,
         });
@@ -1515,17 +1516,17 @@ const FilesPage: React.FC = () => {
           return text;
         }
       } catch (error) {
-        window.electronAPI?.logError?.("files-read-clipboard-browser-failed", {
+        electronAPI.logError?.("files-read-clipboard-browser-failed", {
           err: String(error),
         });
       }
     }
 
-    if (window.electronAPI?.readClipboardText) {
+    if (electronAPI.readClipboardText) {
       try {
-        return await window.electronAPI.readClipboardText();
+        return await electronAPI.readClipboardText();
       } catch (error) {
-        window.electronAPI?.logError?.("files-read-clipboard-electron-failed", {
+        electronAPI.logError?.("files-read-clipboard-electron-failed", {
           err: String(error),
         });
       }
@@ -1562,7 +1563,7 @@ const FilesPage: React.FC = () => {
         await importFileFromPath(data.output_file_path);
         message.success(t("bot.messages.webImportSuccess"));
       } catch (error) {
-        window.electronAPI?.logError?.("files-web-import-failed", {
+        electronAPI.logError?.("files-web-import-failed", {
           url: trimmed,
           err: String(error),
         });
@@ -1607,7 +1608,7 @@ const FilesPage: React.FC = () => {
       setUrlInputValue("");
       setUrlInputVisible(true);
     } catch (error) {
-      window.electronAPI?.logError?.("files-import-clipboard-url-failed", {
+      electronAPI.logError?.("files-import-clipboard-url-failed", {
         err: String(error),
       });
       message.error(t("bot.messages.webImportFailed"));
@@ -1627,7 +1628,7 @@ const FilesPage: React.FC = () => {
       void importRef.current
         .retryImport(file)
         .catch((error: unknown) => {
-          window.electronAPI?.logError?.("retry import failed", {
+          electronAPI.logError?.("retry import failed", {
             err: String(error),
             fileId: file.file_id,
           });
@@ -1641,7 +1642,7 @@ const FilesPage: React.FC = () => {
     const loadWorkDirectory = async () => {
       try {
         const cfg =
-          (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
+          (await electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
         const wd = cfg?.workDirectory as string | undefined;
         if (wd) setWorkDirectory(wd);
       } catch (error) {

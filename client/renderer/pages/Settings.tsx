@@ -30,6 +30,7 @@ import { useTheme } from "../shared/theme";
 import type { ThemeMode } from "../shared/theme";
 import type { ApiError, PegaStatusResponse, PegaUser } from "../services/api";
 
+import { electronAPI } from "../shared/electronAPI";
 const { Content } = Layout;
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -219,7 +220,7 @@ const Settings = () => {
 
       try {
         const appConfig =
-          (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
+          (await electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
         setFeedbackIncludeLogsDefault(
           Boolean(appConfig?.sentry?.sendLogsByDefault)
         );
@@ -315,7 +316,7 @@ const Settings = () => {
       }
 
       try {
-        const url = await window.electronAPI.getApiBaseUrl();
+        const url = await electronAPI.getApiBaseUrl();
         setApiBaseUrl(url);
       } catch (error) {
         console.error("Failed to load API base URL:", error);
@@ -594,7 +595,7 @@ const Settings = () => {
     if (value !== locale) {
       const newSettings = { ...settings, language: value };
       try {
-        await window.electronAPI.updateAppConfig({ language: value });
+        await electronAPI.updateAppConfig({ language: value });
       } catch (error) {
         console.error("Failed to save language:", error);
       }
@@ -610,7 +611,7 @@ const Settings = () => {
       llmProvider: value,
     }));
     try {
-      await window.electronAPI.updateAppConfig({ llmProvider: value });
+      await electronAPI.updateAppConfig({ llmProvider: value });
       message.success(t("settings.messages.providerUpdated"));
     } catch (error) {
       message.error(t("settings.messages.providerUpdateError"));
@@ -626,14 +627,14 @@ const Settings = () => {
       pegaMode: nextMode,
     }));
     try {
-      const appConfig = (await window.electronAPI.getAppConfig()) as
+      const appConfig = (await electronAPI.getAppConfig()) as
         | import("../shared/types").AppConfig
         | undefined;
       const nextPegaConfig = {
         ...(appConfig?.pega ?? {}),
         pegaMode: nextMode,
       };
-      await window.electronAPI.updateAppConfig({
+      await electronAPI.updateAppConfig({
         pega: nextPegaConfig,
       });
       message.success(t("settings.messages.pegaModeUpdated"));
@@ -652,7 +653,7 @@ const Settings = () => {
 
   const handleSaveSettings = async () => {
     try {
-      await window.electronAPI.updateAppConfig({
+      await electronAPI.updateAppConfig({
         theme: followSystem ? undefined : mode,
         themeFollowSystem: followSystem,
         language: settings.language,
@@ -677,11 +678,11 @@ const Settings = () => {
 
   // const handleSaveApiBaseUrl = async () => {
   //   try {
-  //     if (window.electronAPI) {
+  //     if (electronAPI) {
   //       const urlToSave = settings.useLocalService
   //         ? "http://localhost:8000"
   //         : apiBaseUrl;
-  //       await window.electronAPI.setApiBaseUrl(urlToSave);
+  //       await electronAPI.setApiBaseUrl(urlToSave);
   //       updateApiBaseUrl(urlToSave);
   //       message.success(t("settings.messages.apiSuccess"));
   //     }
@@ -722,9 +723,9 @@ const Settings = () => {
       onOk: async () => {
         try {
           // Use Electron main process to clear data and relaunch the app
-          await window.electronAPI.clearAllData();
+          await electronAPI.clearAllData();
           // Mark app as uninitialized before restarting
-          await window.electronAPI.updateAppConfig({
+          await electronAPI.updateAppConfig({
             isInitialized: false,
             workDirectory: "",
             theme: "light",

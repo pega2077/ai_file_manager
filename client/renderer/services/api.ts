@@ -367,7 +367,7 @@ class ApiService {
     // Load once from app config via IPC and cache locally
     if (this.provider !== null) return this.provider;
     try {
-      const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig | undefined;
+      const cfg = (await electronAPI.getAppConfig()) as import('../shared/types').AppConfig | undefined;
       const p = (cfg?.llmProvider ?? 'ollama') as ProviderName;
       this.provider = p;
       return p;
@@ -539,12 +539,12 @@ class ApiService {
       return this.pegaBaseUrl;
     }
 
-    if (!window.electronAPI) {
+    if (!electronAPI) {
       throw new Error('Electron API is unavailable; cannot resolve Pega endpoint');
     }
 
     try {
-      const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const cfg = (await electronAPI.getAppConfig()) as AppConfig | undefined;
       const endpoint = cfg?.pega?.pegaEndpoint;
       if (typeof endpoint === 'string' && endpoint.trim().length > 0) {
         const normalized = endpoint.replace(/\/+$/, '');
@@ -577,12 +577,12 @@ class ApiService {
       return this.pegaAuthToken;
     }
 
-    if (!window.electronAPI) {
+    if (!electronAPI) {
       return null;
     }
 
     try {
-      const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const cfg = (await electronAPI.getAppConfig()) as AppConfig | undefined;
       const token = typeof cfg?.pega?.pegaAuthToken === 'string' ? cfg.pega.pegaAuthToken.trim() : '';
       this.pegaAuthToken = token.length > 0 ? token : null;
       return this.pegaAuthToken;
@@ -597,12 +597,12 @@ class ApiService {
       return this.pegaApiKey;
     }
 
-    if (!window.electronAPI) {
+    if (!electronAPI) {
       return null;
     }
 
     try {
-      const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const cfg = (await electronAPI.getAppConfig()) as AppConfig | undefined;
       const apiKey = typeof cfg?.pega?.pegaApiKey === 'string' ? cfg.pega.pegaApiKey.trim() : '';
       const tokenFallback = typeof cfg?.pega?.pegaAuthToken === 'string' ? cfg.pega.pegaAuthToken.trim() : '';
       const value = apiKey.length > 0 ? apiKey : tokenFallback;

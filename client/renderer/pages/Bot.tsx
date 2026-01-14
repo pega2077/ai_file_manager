@@ -12,6 +12,7 @@ import {
 import { apiService } from "../services/api";
 import type { DirectoryWatchImportRequest } from "../../shared/directoryWatcher";
 
+import { electronAPI } from "../shared/electronAPI";
 const isValidHttpUrl = (value: string): boolean => {
   try {
     const parsed = new URL(value);
@@ -54,7 +55,7 @@ const Bot: React.FC = () => {
   const showMainWindow = useCallback(
     async (options?: { route?: string; refreshFiles?: boolean }) => {
       try {
-        await window.electronAPI.showMainWindow(options);
+        await electronAPI.showMainWindow(options);
         return true;
       } catch (error) {
         console.error("Failed to show main window:", error);
@@ -90,17 +91,17 @@ const Bot: React.FC = () => {
           return text;
         }
       } catch (error) {
-        window.electronAPI?.logError?.("bot-read-clipboard-browser-failed", {
+        electronAPI.logError?.("bot-read-clipboard-browser-failed", {
           err: String(error),
         });
       }
     }
 
-    if (window.electronAPI?.readClipboardText) {
+    if (electronAPI.readClipboardText) {
       try {
-        return await window.electronAPI.readClipboardText();
+        return await electronAPI.readClipboardText();
       } catch (error) {
-        window.electronAPI?.logError?.("bot-read-clipboard-electron-failed", {
+        electronAPI.logError?.("bot-read-clipboard-electron-failed", {
           err: String(error),
         });
       }
@@ -114,7 +115,7 @@ const Bot: React.FC = () => {
       try {
         await importRef.current?.importFile(filePath);
       } catch (error) {
-        window.electronAPI?.logError?.("bot-handle-file-import-failed", {
+        electronAPI.logError?.("bot-handle-file-import-failed", {
           err: String(error),
         });
         message.error(t("files.messages.fileImportFailed"));
@@ -154,7 +155,7 @@ const Bot: React.FC = () => {
         await handleFileImport(data.output_file_path);
         message.success(t("bot.messages.webImportSuccess"));
       } catch (error) {
-        window.electronAPI?.logError?.("bot-web-import-failed", {
+        electronAPI.logError?.("bot-web-import-failed", {
           url: trimmed,
           err: String(error),
         });
@@ -180,7 +181,7 @@ const Bot: React.FC = () => {
       await openFilesView();
     } else if (key === "hideBot") {
       try {
-        await window.electronAPI.hideBotWindow();
+        await electronAPI.hideBotWindow();
       } catch (error) {
         console.error("Failed to hide bot window:", error);
       }
@@ -193,7 +194,7 @@ const Bot: React.FC = () => {
         }
         await handleWebImport(urlFromClipboard);
       } catch (error) {
-        window.electronAPI?.logError?.("bot-paste-url-failed", {
+        electronAPI.logError?.("bot-paste-url-failed", {
           err: String(error),
         });
         message.error(t("bot.messages.webImportFailed"));
@@ -201,14 +202,14 @@ const Bot: React.FC = () => {
     } else if (key === "openWorkdir") {
       try {
         const cfg =
-          (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
+          (await electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
         const workDir = cfg?.workDirectory as string | undefined;
         if (!workDir) {
           message.error(t("bot.messages.workdirNotSet"));
           return;
         }
-        if (window.electronAPI?.openFolder) {
-          const ok = await window.electronAPI.openFolder(workDir);
+        if (electronAPI.openFolder) {
+          const ok = await electronAPI.openFolder(workDir);
           if (!ok) {
             message.error(t("bot.messages.openWorkdirFailed"));
           }
@@ -221,7 +222,7 @@ const Bot: React.FC = () => {
       }
     } else if (key === "exitApp") {
       try {
-        await window.electronAPI.quitApp();
+        await electronAPI.quitApp();
       } catch (error) {
         console.error("Failed to quit application:", error);
       }
@@ -258,7 +259,7 @@ const Bot: React.FC = () => {
     if (!isDragging.current) return;
     const deltaX = e.clientX - startPos.current.x;
     const deltaY = e.clientY - startPos.current.y;
-    window.electronAPI.moveBotWindow(deltaX, deltaY);
+    electronAPI.moveBotWindow(deltaX, deltaY);
   };
 
   const handleMouseUp = () => {
@@ -320,7 +321,7 @@ const Bot: React.FC = () => {
       }
 
       try {
-        window.electronAPI?.notifyDirectoryWatcherStatus?.({
+        electronAPI.notifyDirectoryWatcherStatus?.({
           status: "accepted",
           taskId,
           filePath,
@@ -339,7 +340,7 @@ const Bot: React.FC = () => {
 
       const importer = importRef.current;
       if (!importer || typeof importer.importFile !== "function") {
-        window.electronAPI?.notifyDirectoryWatcherStatus?.({
+        electronAPI.notifyDirectoryWatcherStatus?.({
           status: "busy",
           taskId,
           filePath,
@@ -356,7 +357,7 @@ const Bot: React.FC = () => {
           });
         } catch (error) {
           const errMsg = error instanceof Error ? error.message : String(error ?? "unknown error");
-          window.electronAPI?.notifyDirectoryWatcherStatus?.({
+          electronAPI.notifyDirectoryWatcherStatus?.({
             status: "error",
             taskId,
             filePath,
@@ -479,19 +480,19 @@ const Bot: React.FC = () => {
 
   useEffect(() => {
     try {
-      window.electronAPI?.registerDirectoryWatcherImporter?.();
+      electronAPI.registerDirectoryWatcherImporter?.();
     } catch (error) {
       console.error("Failed to register directory watcher importer:", error);
     }
 
-    const unsubscribe = window.electronAPI?.onDirectoryWatcherImportRequest?.(
+    const unsubscribe = electronAPI.onDirectoryWatcherImportRequest?.(
       handleDirectoryWatcherTask
     );
 
     return () => {
       unsubscribe?.();
       try {
-        window.electronAPI?.unregisterDirectoryWatcherImporter?.();
+        electronAPI.unregisterDirectoryWatcherImporter?.();
       } catch (error) {
         console.error("Failed to unregister directory watcher importer:", error);
       }

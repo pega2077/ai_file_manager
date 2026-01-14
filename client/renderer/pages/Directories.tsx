@@ -8,6 +8,7 @@ import FileImport, { FileImportRef } from '../components/FileImport';
 import { FileItem, DirectoryResponse, BatchFileRecordResponse, FileRecordStatus } from '../shared/types';
 import { useTranslation } from '../shared/i18n/I18nProvider';
 
+import { electronAPI } from "../shared/electronAPI";
 const { Content } = Layout;
 
 const Directories = () => {
@@ -193,7 +194,7 @@ const Directories = () => {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const cfg = (await window.electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
+        const cfg = (await electronAPI.getAppConfig()) as import('../shared/types').AppConfig;
         const storedWorkDirectory = cfg?.workDirectory as string | undefined;
         if (storedWorkDirectory) {
           setWorkDirectory(storedWorkDirectory);
@@ -268,7 +269,7 @@ const Directories = () => {
     }
     const fullPath = composeFullPath(activeDirectory, record.name);
     try {
-      const success = await window.electronAPI.openFolder(fullPath);
+      const success = await electronAPI.openFolder(fullPath);
       if (!success) {
         message.error(t('home.messages.cannotOpenFolder'));
       }
@@ -286,7 +287,7 @@ const Directories = () => {
     }
     const fullPath = composeFullPath(activeDirectory, record.name);
     try {
-      const success = await window.electronAPI.openFile(fullPath);
+      const success = await electronAPI.openFile(fullPath);
       if (!success) {
         message.error(t('home.messages.cannotOpenFile'));
       }
@@ -362,7 +363,7 @@ const Directories = () => {
     }
 
     try {
-      const success = await window.electronAPI.openFile(fullPath);
+      const success = await electronAPI.openFile(fullPath);
       if (!success) {
         message.error(t('home.messages.cannotOpenFile'));
       }

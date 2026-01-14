@@ -5,6 +5,7 @@ import type { FormInstance } from 'antd/es/form';
 import { useTranslation } from '../../shared/i18n/I18nProvider';
 import type { AppConfig } from '../../shared/types';
 
+import { electronAPI } from "../../shared/electronAPI";
 type ProviderKey = 'ollama' | 'openai' | 'openrouter' | 'bailian' | 'llamacpp';
 
 type ProviderRecord = Record<string, string | number | undefined>;
@@ -113,7 +114,7 @@ const ProviderConfigForm = ({
   const loadConfig = async (formInstance: FormInstance<FormValues>) => {
     setLoading(true);
     try {
-      const config = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+      const config = (await electronAPI.getAppConfig()) as AppConfig | undefined;
       const providerConfig = (config?.[providerKey] as ProviderConfigResponse) ?? {};
       providerSnapshotRef.current = providerConfig;
 
@@ -148,7 +149,7 @@ const ProviderConfigForm = ({
     try {
       const sanitized = sanitizeEntries(values, fields);
       const merged = mergeProviderConfig(providerSnapshotRef.current, sanitized);
-      await window.electronAPI.updateAppConfig({ [providerKey]: merged });
+      await electronAPI.updateAppConfig({ [providerKey]: merged });
       providerSnapshotRef.current = merged;
       const display = toDisplayValues(merged, fields);
       setInitialValues(display);
@@ -174,7 +175,7 @@ const ProviderConfigForm = ({
   const handleCheckHealth = async () => {
     setHealthStatus('checking');
     try {
-      const apiBaseUrl = await window.electronAPI.getApiBaseUrl();
+      const apiBaseUrl = await electronAPI.getApiBaseUrl();
       const response = await fetch(`${apiBaseUrl}/api/providers/health`, {
         method: 'POST',
         headers: {
@@ -209,7 +210,7 @@ const ProviderConfigForm = ({
   const handleFetchModels = async () => {
     setModelsLoading(true);
     try {
-      const apiBaseUrl = await window.electronAPI.getApiBaseUrl();
+      const apiBaseUrl = await electronAPI.getApiBaseUrl();
       const response = await fetch(`${apiBaseUrl}/api/providers/models`, {
         method: 'POST',
         headers: {

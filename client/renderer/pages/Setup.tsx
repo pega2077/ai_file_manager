@@ -7,6 +7,7 @@ import { findDirectoryStructurePreset } from '../shared/directoryPresets';
 import type { DirectoryStructureEntry } from '../shared/directoryPresets';
 import type { AppConfig } from '../shared/types';
 
+import { electronAPI } from "../shared/electronAPI";
 const { Content } = Layout;
 const { Step } = Steps;
 const { TextArea } = Input;
@@ -59,7 +60,7 @@ const Setup = () => {
     let mounted = true;
     const loadConfig = async () => {
       try {
-        const cfg = (await window.electronAPI.getAppConfig()) as AppConfig | undefined;
+        const cfg = (await electronAPI.getAppConfig()) as AppConfig | undefined;
         if (!mounted || !cfg) {
           return;
         }
@@ -206,12 +207,12 @@ const Setup = () => {
   };
 
   const logElectronError = async (title: string, details: Record<string, unknown>) => {
-    if (typeof window.electronAPI.logError !== 'function') {
+    if (typeof electronAPI.logError !== 'function') {
       return;
     }
 
     try {
-      await window.electronAPI.logError(title, details);
+      await electronAPI.logError(title, details);
     } catch {
       // Intentionally ignore logging failures to avoid blocking user flow
     }
@@ -219,7 +220,7 @@ const Setup = () => {
 
   const completeInitialization = async (workDirectory: string, successMessage: string): Promise<void> => {
     try {
-      await window.electronAPI.updateAppConfig({ isInitialized: true, workDirectory });
+      await electronAPI.updateAppConfig({ isInitialized: true, workDirectory });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       message.error(t('setup.messages.finalizeError'));
@@ -230,9 +231,9 @@ const Setup = () => {
       throw new Error('SETUP_FINALIZE_FAILED');
     }
 
-    if (typeof window.electronAPI.showBotWindow === 'function') {
+    if (typeof electronAPI.showBotWindow === 'function') {
       try {
-        await window.electronAPI.showBotWindow();
+        await electronAPI.showBotWindow();
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         await logElectronError('Failed to show assistant window after setup', {
@@ -319,7 +320,7 @@ const Setup = () => {
     setLlmProvider(value);
     apiService.setProvider(value);
     try {
-      await window.electronAPI.updateAppConfig({ llmProvider: value });
+      await electronAPI.updateAppConfig({ llmProvider: value });
       message.success(t('setup.messages.providerUpdated'));
     } catch (error) {
       message.error(t('setup.messages.providerUpdateError'));
@@ -340,7 +341,7 @@ const Setup = () => {
 
   const handleSelectFolder = async () => {
     try {
-      const folder = await window.electronAPI.selectFolder();
+      const folder = await electronAPI.selectFolder();
       if (folder) {
         setSelectedFolder(folder);
         setExistingDirectoryItems([]);

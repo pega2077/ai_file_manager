@@ -25,6 +25,7 @@ import {
 import Sidebar from "../components/Sidebar";
 import { useTranslation } from "../shared/i18n/I18nProvider";
 
+import { electronAPI } from "../shared/electronAPI";
 const { Content } = Layout;
 const { Search } = Input;
 
@@ -340,8 +341,8 @@ const SearchPage = () => {
     }
 
     try {
-      if (window.electronAPI?.openFile) {
-        const opened = await window.electronAPI.openFile(result.file_path);
+      if (electronAPI.openFile) {
+        const opened = await electronAPI.openFile(result.file_path);
         if (!opened) {
           message.error(t("search.messages.openFileFailed"));
         }

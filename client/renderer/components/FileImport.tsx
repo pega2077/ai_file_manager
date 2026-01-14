@@ -23,6 +23,7 @@ import {
 } from "../shared/events/fileImportEvents";
 import type { DirectoryWatchStatusMessage } from "../../shared/directoryWatcher";
 
+import { electronAPI } from "../shared/electronAPI";
 type FileImportProps = {
   onImported?: () => void;
 };
@@ -303,7 +304,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             message,
             filePath: meta.filePath,
           };
-          window.electronAPI?.notifyDirectoryWatcherStatus?.(payload);
+          electronAPI.notifyDirectoryWatcherStatus?.(payload);
         } catch (error) {
           console.error("Failed to notify directory watcher progress:", error);
         }
@@ -326,7 +327,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             message,
             error: errorMessage,
           };
-          window.electronAPI?.notifyDirectoryWatcherStatus?.(payload);
+          electronAPI.notifyDirectoryWatcherStatus?.(payload);
         } catch (error) {
           console.error("Failed to notify directory watcher idle status:", error);
         } finally {
@@ -427,7 +428,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       const loadWorkDirectory = async () => {
         try {
           const cfg =
-            (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
+            (await electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
           const wd = cfg?.workDirectory as string | undefined;
           if (wd) setWorkDirectory(wd);
         } catch (error) {
@@ -653,12 +654,12 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       async <T,>(operation: () => Promise<T>): Promise<T> => {
         let paused = false;
         try {
-          if (window.electronAPI?.pauseDirectoryWatcher) {
-            await window.electronAPI.pauseDirectoryWatcher();
+          if (electronAPI.pauseDirectoryWatcher) {
+            await electronAPI.pauseDirectoryWatcher();
             paused = true;
           }
         } catch (error) {
-          window.electronAPI?.logError?.("pauseDirectoryWatcher failed", {
+          electronAPI.logError?.("pauseDirectoryWatcher failed", {
             err: String(error),
           });
         }
@@ -668,9 +669,9 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         } finally {
           if (paused) {
             try {
-              await window.electronAPI?.resumeDirectoryWatcher?.();
+              await electronAPI.resumeDirectoryWatcher?.();
             } catch (error) {
-              window.electronAPI?.logError?.("resumeDirectoryWatcher failed", {
+              electronAPI.logError?.("resumeDirectoryWatcher failed", {
                 err: String(error),
               });
             }
@@ -772,7 +773,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
               }
             }
           } catch (error) {
-            window.electronAPI?.logError?.("previewFile for assessFileNameAfterImport failed", {
+            electronAPI.logError?.("previewFile for assessFileNameAfterImport failed", {
               err: String(error),
               path: filePath,
             });
@@ -849,7 +850,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           const msg = conversionMessage ?? t("files.messages.fileNameAssessmentFailed");
           message.error(msg);
           notifyProgress("validate-file-name", "error", msg);
-          window.electronAPI?.logError?.("assessFileNameAfterImport failed", {
+          electronAPI.logError?.("assessFileNameAfterImport failed", {
             err: String(error),
             fileId,
             filePath,
@@ -883,14 +884,14 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         let cfg: import("../shared/types").AppConfig | undefined;
         let latestWorkDir = workDirectory;
         try {
-          cfg = (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
+          cfg = (await electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
           if (cfg?.workDirectory && cfg.workDirectory !== workDirectory) {
             latestWorkDir = cfg.workDirectory;
             setWorkDirectory(cfg.workDirectory);
           }
         } catch (error) {
           message.error(t("files.messages.fileImportFailed"));
-          window.electronAPI?.logError?.("processFile getAppConfig failed", {
+          electronAPI.logError?.("processFile getAppConfig failed", {
             err: String(error),
           });
           notifyError(error, t("files.messages.fileImportFailed"));
@@ -919,7 +920,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             );
           } catch (err) {
             message.error(t("files.messages.fileSaveFailed"));
-            window.electronAPI?.logError?.("saveFile (workspace direct) failed", {
+            electronAPI.logError?.("saveFile (workspace direct) failed", {
               err: String(err),
               path: normalizedPath,
             });
@@ -996,7 +997,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
               } else {
                 message.warning(displayMessage);
               }
-              window.electronAPI?.logError?.("importToRag (workspace direct) failed", {
+              electronAPI.logError?.("importToRag (workspace direct) failed", {
                 err: String(err),
                 path: normalizedPath,
                 conversionMessage: conversionMessage ?? undefined,
@@ -1045,7 +1046,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             notifyProgress("stage-file", "success", t("common.success"));
           } catch (err) {
             message.error(t("files.messages.stageFailed"));
-            window.electronAPI?.logError?.("stageFileToTemp failed", {
+            electronAPI.logError?.("stageFileToTemp failed", {
               err: String(err),
             });
             notifyError(err, t("files.messages.stageFailed"));
@@ -1061,7 +1062,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           directoryStructureResponse = await apiService.listDirectoryRecursive(latestWorkDir);
         } catch (err) {
           message.error(t("files.messages.getDirectoryStructureFailed"));
-          window.electronAPI?.logError?.("listDirectoryRecursive failed", {
+          electronAPI.logError?.("listDirectoryRecursive failed", {
             err: String(err),
           });
           notifyError(err, t("files.messages.getDirectoryStructureFailed"));
@@ -1093,7 +1094,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             const displayMessage = t("files.messages.describeImageFailed");
             notifyProgress("describe-image", "error", displayMessage);
             message.error(displayMessage);
-            window.electronAPI?.logError?.("describe-image failed", {
+            electronAPI.logError?.("describe-image failed", {
               err: String(e),
               path: stagedPath,
             });
@@ -1117,7 +1118,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           const fallback = t("files.messages.getRecommendationFailed");
           const displayMessage = conversionMessage ?? fallback;
           message.error(displayMessage);
-          window.electronAPI?.logError?.("recommendDirectory HTTP error", {
+          electronAPI.logError?.("recommendDirectory HTTP error", {
             err: String(err),
             conversionMessage: conversionMessage ?? undefined,
           });
@@ -1171,7 +1172,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
             );
           } catch (error) {
             message.error(t("files.messages.fileSaveFailed"));
-            window.electronAPI?.logError?.("saveFile (auto classify) failed", {
+            electronAPI.logError?.("saveFile (auto classify) failed", {
               err: String(error),
               path: stagedPath,
             });
@@ -1260,7 +1261,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
                 } else {
                   message.warning(displayMessage);
                 }
-                window.electronAPI?.logError?.(
+                electronAPI.logError?.(
                   "importToRag (auto classify) failed",
                   {
                     err: String(e),
@@ -1348,7 +1349,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           error instanceof Error ? error.message : String(error ?? "unknown error"),
         );
         currentTaskMetaRef.current = null;
-        window.electronAPI?.logError?.("processFile queue failed", {
+        electronAPI.logError?.("processFile queue failed", {
           err: String(error),
           path: nextTask.path,
         });
@@ -1396,11 +1397,11 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
       try {
         // Refresh latest config before importing
         const cfg =
-          (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
+          (await electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
         if (cfg?.workDirectory && cfg.workDirectory !== workDirectory) {
           setWorkDirectory(cfg.workDirectory);
         }
-        const selected = await window.electronAPI.selectFile();
+        const selected = await electronAPI.selectFile();
         if (!selected) return;
 
         const selectedPaths = Array.isArray(selected) ? selected : [selected];
@@ -1423,7 +1424,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         });
       } catch (error) {
         message.error(t("files.messages.fileImportFailed"));
-        window.electronAPI?.logError?.("handleStartImport failed", {
+        electronAPI.logError?.("handleStartImport failed", {
           err: String(error),
         });
       }
@@ -1510,7 +1511,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           );
         } catch (error) {
           message.error(t("files.messages.fileSaveFailed"));
-          window.electronAPI?.logError?.("handleImportConfirm saveFile threw", {
+          electronAPI.logError?.("handleImportConfirm saveFile threw", {
             err: String(error),
             path: importFilePath,
           });
@@ -1530,9 +1531,9 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           let savedName = (saveData?.filename || savedPath.split(/[\\/]/).pop() || importFilePath.split(/[\\/]/).pop() || "").trim();
           let cfgLatest: import("../shared/types").AppConfig | undefined;
           try {
-            cfgLatest = (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
+            cfgLatest = (await electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
           } catch (cfgError) {
-            window.electronAPI?.logError?.("getAppConfig (confirm) failed", {
+            electronAPI.logError?.("getAppConfig (confirm) failed", {
               err: String(cfgError),
             });
           }
@@ -1584,7 +1585,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
               const displayMessage = t("files.messages.describeImageFailed");
               notifyProgress("describe-image", "error", displayMessage);
               message.error(displayMessage);
-              window.electronAPI?.logError?.("describe-image (confirm) failed", {
+              electronAPI.logError?.("describe-image (confirm) failed", {
                 err: String(e),
                 path: savedPath,
               });
@@ -1644,7 +1645,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
               } else {
                 message.warning(displayMessage);
               }
-              window.electronAPI?.logError?.("importToRag (confirm) failed", {
+              electronAPI.logError?.("importToRag (confirm) failed", {
                 err: String(e),
                 conversionMessage: conversionMessage ?? undefined,
               });
@@ -1660,7 +1661,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         }
       } catch (error) {
         message.error(t("files.messages.fileSaveFailed"));
-        window.electronAPI?.logError?.("handleImportConfirm saveFile failed", {
+        electronAPI.logError?.("handleImportConfirm saveFile failed", {
           err: String(error),
         });
         notifyError(error, t("files.messages.fileSaveFailed"));
@@ -1713,7 +1714,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           );
         } catch (error) {
           message.error(t("files.messages.fileSaveFailed"));
-          window.electronAPI?.logError?.(
+          electronAPI.logError?.(
             "handleManualSelectConfirm saveFile threw",
             { err: String(error), path: importFilePath }
           );
@@ -1734,10 +1735,10 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
           let cfgLatest: import("../shared/types").AppConfig | undefined;
           let language: "zh" | "en" = "en";
           try {
-            cfgLatest = (await window.electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
+            cfgLatest = (await electronAPI.getAppConfig()) as import("../shared/types").AppConfig;
             language = (cfgLatest?.language || "en") as "zh" | "en";
           } catch (cfgError) {
-            window.electronAPI?.logError?.("getAppConfig (manual confirm) failed", {
+            electronAPI.logError?.("getAppConfig (manual confirm) failed", {
               err: String(cfgError),
             });
           }
@@ -1789,7 +1790,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
               const displayMessage = t("files.messages.describeImageFailed");
               notifyProgress("describe-image", "error", displayMessage);
               message.error(displayMessage);
-              window.electronAPI?.logError?.("describe-image (manual confirm) failed", {
+              electronAPI.logError?.("describe-image (manual confirm) failed", {
                 err: String(e),
                 path: savedPath,
               });
@@ -1850,7 +1851,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
               } else {
                 message.warning(displayMessage);
               }
-              window.electronAPI?.logError?.("importToRag (manual confirm) failed", {
+              electronAPI.logError?.("importToRag (manual confirm) failed", {
                 err: String(e),
                 conversionMessage: conversionMessage ?? undefined,
               });
@@ -1867,7 +1868,7 @@ const FileImport = forwardRef<FileImportRef, FileImportProps>(
         }
       } catch (error) {
         message.error(t("files.messages.fileSaveFailed"));
-        window.electronAPI?.logError?.(
+        electronAPI.logError?.(
           "handleManualSelectConfirm saveFile failed",
           { err: String(error) }
         );

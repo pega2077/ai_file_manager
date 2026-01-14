@@ -14,6 +14,7 @@ import {
   type ThemeFollowSystemOptions,
   type ThemeMode,
 } from "./context";
+import { electronAPI } from "../electronAPI";
 
 import { useTranslation } from "../i18n/I18nProvider";
 import zhCN from "antd/locale/zh_CN";
@@ -62,16 +63,14 @@ const ThemeProvider = ({ children }: PropsWithChildren) => {
           updates.theme = undefined;
         }
 
-        await window.electronAPI.updateAppConfig(updates);
+        await electronAPI.updateAppConfig(updates);
       } catch (error) {
-        if (window.electronAPI?.logError) {
-          void window.electronAPI.logError(
-            "Failed to persist theme preference",
-            {
-              error: error instanceof Error ? error.message : String(error),
-            }
-          );
-        }
+        void electronAPI.logError(
+          "Failed to persist theme preference",
+          {
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
         throw error;
       }
     },
@@ -170,7 +169,7 @@ const ThemeProvider = ({ children }: PropsWithChildren) => {
 
     const loadThemePreference = async () => {
       try {
-        const config = (await window.electronAPI.getAppConfig()) as
+        const config = (await electronAPI.getAppConfig()) as
           | AppConfig
           | undefined;
         if (cancelled) {
@@ -196,11 +195,9 @@ const ThemeProvider = ({ children }: PropsWithChildren) => {
         if (cancelled) {
           return;
         }
-        if (window.electronAPI?.logError) {
-          void window.electronAPI.logError("Failed to load theme preference", {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        void electronAPI.logError("Failed to load theme preference", {
+          error: error instanceof Error ? error.message : String(error),
+        });
         setFollowSystemState(true);
         if (!cancelled) {
           applySystemPreference();

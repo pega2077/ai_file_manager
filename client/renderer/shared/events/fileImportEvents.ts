@@ -50,8 +50,8 @@ export const dispatchFileImportNotification = (
     return;
   }
 
-  if (window.electronAPI?.sendFileImportNotification) {
-    window.electronAPI.sendFileImportNotification(detail);
+  if (electronAPI.sendFileImportNotification) {
+    electronAPI.sendFileImportNotification(detail);
     return;
   }
 
@@ -73,8 +73,8 @@ export const subscribeFileImportNotifications = (
     return () => undefined;
   }
 
-  if (window.electronAPI?.onFileImportNotification) {
-    return window.electronAPI.onFileImportNotification(listener);
+  if (electronAPI.onFileImportNotification) {
+    return electronAPI.onFileImportNotification(listener);
   }
 
   const handler = (event: Event) => {
