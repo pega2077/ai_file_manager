@@ -669,7 +669,8 @@
       "selectDirectory": "选择目录",
       "startConversion": "开始转换",
       "openFile": "打开文件",
-      "openDirectory": "打开所在目录"
+      "openDirectory": "打开所在目录",
+      "saveConfig": "保存配置"
     },
     "sections": {
       "settings": "转换设置",
@@ -684,12 +685,22 @@
       "sourceFileLabel": "源文件：",
       "targetFormatLabel": "目标格式：",
       "fileSize": "文件大小：",
-      "conversionInfo": "转换信息："
+      "conversionInfo": "转换信息：",
+      "conversionMode": "转换模式",
+      "pandocPath": "Pandoc 路径"
+    },
+    "modes": {
+      "local": "本地模式",
+      "remote": "远程模式"
     },
     "placeholders": {
       "selectFile": "请选择要转换的文件",
       "selectFormat": "请选择目标格式",
-      "defaultDirectory": "默认使用系统转换目录"
+      "defaultDirectory": "默认使用系统转换目录",
+      "pandocPath": "留空则使用系统 PATH 中的 pandoc"
+    },
+    "hints": {
+      "pandocPath": "本地模式使用本地安装的 pandoc 进行文件转换。如果 pandoc 已在系统 PATH 中，可留空此字段。"
     },
     "alerts": {
       "noFormats": "尚未获取到转换格式，请刷新后重试",
@@ -707,7 +718,9 @@
       "conversionSuccess": "文件转换成功",
       "conversionFailed": "文件转换失败",
       "cannotOpenFile": "无法打开文件",
-      "cannotOpenDirectory": "无法打开所在目录"
+      "cannotOpenDirectory": "无法打开所在目录",
+      "configSaved": "配置已保存",
+      "configSaveFailed": "配置保存失败"
     }
   },
   "files": {
