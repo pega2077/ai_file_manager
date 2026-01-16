@@ -664,7 +664,8 @@
       "selectDirectory": "Select Directory",
       "startConversion": "Start Conversion",
       "openFile": "Open File",
-      "openDirectory": "Open Directory"
+      "openDirectory": "Open Directory",
+      "saveConfig": "Save Configuration"
     },
     "sections": {
       "settings": "Conversion Settings",
@@ -679,12 +680,22 @@
       "sourceFileLabel": "Source File:",
       "targetFormatLabel": "Target Format:",
       "fileSize": "File Size:",
-      "conversionInfo": "Conversion Info:"
+      "conversionInfo": "Conversion Info:",
+      "conversionMode": "Conversion Mode",
+      "pandocPath": "Pandoc Path"
+    },
+    "modes": {
+      "local": "Local Mode",
+      "remote": "Remote Mode"
     },
     "placeholders": {
       "selectFile": "Please select the file to convert",
       "selectFormat": "Please select target format",
-      "defaultDirectory": "Default uses system conversion directory"
+      "defaultDirectory": "Default uses system conversion directory",
+      "pandocPath": "Leave empty to use pandoc from system PATH"
+    },
+    "hints": {
+      "pandocPath": "Local mode uses locally installed pandoc for file conversion. If pandoc is in system PATH, you can leave this field empty."
     },
     "alerts": {
       "noFormats": "Conversion formats not yet retrieved, please refresh and try again",
@@ -702,7 +713,9 @@
       "conversionSuccess": "File conversion successful",
       "conversionFailed": "File conversion failed",
       "cannotOpenFile": "Cannot open file",
-      "cannotOpenDirectory": "Cannot open directory"
+      "cannotOpenDirectory": "Cannot open directory",
+      "configSaved": "Configuration saved successfully",
+      "configSaveFailed": "Failed to save configuration"
     }
   },
   "files": {

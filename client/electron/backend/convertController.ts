@@ -7,6 +7,7 @@ import { ensureTempDir } from "./utils/pathHelper";
 import { convertFileViaService } from "./utils/fileConversion";
 import { configManager } from "../configManager";
 import { httpGetJson } from "./utils/httpClient";
+import { checkPandocAvailable, getPandocFormats, convertFileWithPandoc, mapToPandocFormat } from "./utils/pandocConverter";
 
 type FormatsData = {
   inputs: string[];
@@ -246,12 +247,56 @@ function normalizeFormats(list: unknown): string[] {
   return normalized;
 }
 
+async function loadLocalPandocFormats(): Promise<FormatsData> {
+  const cfg = configManager.getConfig();
+  const pandocPath = cfg.pandocPath;
+  
+  // Check if pandoc is available
+  const available = await checkPandocAvailable(pandocPath);
+  if (!available) {
+    const err: ServiceError = new Error("pandoc_not_available");
+    err.code = "PANDOC_NOT_AVAILABLE";
+    throw err;
+  }
+  
+  // Get supported formats from pandoc
+  const formats = await getPandocFormats(pandocPath);
+  const inputs = normalizeFormats(formats.inputs);
+  const outputs = normalizeFormats(formats.outputs);
+  const combined = Array.from(new Set([...inputs, ...outputs])).sort();
+  const defaultDir = await ensureTempDir();
+  
+  const data: FormatsData = {
+    inputs,
+    outputs,
+    input_formats: inputs,
+    output_formats: outputs,
+    combined,
+    service_endpoint: null,
+    default_output_directory: defaultDir,
+    pandoc_available: true,
+    markitdown_available: outputs.some((fmt) => fmt === "md" || fmt === "markdown"),
+  };
+  
+  return data;
+}
+
 async function loadServiceFormats(): Promise<FormatsData> {
   if (cachedFormats && Date.now() - cachedFormats.ts < CACHE_TTL_MS) {
     return cachedFormats.data;
   }
 
   const cfg = configManager.getConfig();
+  const mode = cfg.fileConvertMode || 'remote';
+  
+  // Use local pandoc mode
+  if (mode === 'local') {
+    const data = await loadLocalPandocFormats();
+    cachedFormats = { data, ts: Date.now() };
+    return data;
+  }
+  
+  // Use remote service mode
   const baseRaw = (cfg.fileConvertEndpoint || "").trim();
   if (!baseRaw) {
     const err: ServiceError = new Error("converter_service_not_configured");
@@ -308,7 +353,20 @@ export function registerConversionRoutes(appExp: Express): void {
     } catch (err) {
       const serviceErr = err as ServiceError;
       const code = serviceErr.code || "REMOTE_FETCH_FAILED";
-      const status = code === "SERVICE_NOT_CONFIGURED" ? 503 : 502;
+      let status = 502;
+      let message = "fetch_failed";
+      let errorMessage = "Failed to retrieve formats from converter service.";
+      
+      if (code === "SERVICE_NOT_CONFIGURED") {
+        status = 503;
+        message = "service_not_configured";
+        errorMessage = "File converter service endpoint not configured.";
+      } else if (code === "PANDOC_NOT_AVAILABLE") {
+        status = 503;
+        message = "pandoc_not_available";
+        errorMessage = "Pandoc is not available. Please install pandoc or configure the correct path.";
+      }
+      
       logger.error("/api/files/convert/formats failed", {
         code,
         status,
@@ -316,14 +374,11 @@ export function registerConversionRoutes(appExp: Express): void {
       });
       res.status(status).json({
         success: false,
-        message: code === "SERVICE_NOT_CONFIGURED" ? "service_not_configured" : "fetch_failed",
+        message,
         data: null,
         error: {
           code,
-          message:
-            code === "SERVICE_NOT_CONFIGURED"
-              ? "File converter service endpoint not configured."
-              : "Failed to retrieve formats from converter service.",
+          message: errorMessage,
           details: serviceErr?.status ?? null,
         },
         timestamp: new Date().toISOString(),
@@ -579,13 +634,26 @@ export function registerConversionRoutes(appExp: Express): void {
 
       let finalOut = "";
       try {
+        const cfg = configManager.getConfig();
+        const mode = cfg.fileConvertMode || 'remote';
         const srcExt = path.extname(filePath).replace(/^\./, "").toLowerCase() || "txt";
-        const tempResultPath = await convertFileViaService(filePath, srcExt, targetFormat);
-        await fsp.copyFile(tempResultPath, outPath);
-        finalOut = outPath;
+        
+        if (mode === 'local') {
+          // Use local pandoc
+          const srcFmt = mapToPandocFormat(srcExt);
+          const tgtFmt = mapToPandocFormat(targetFormat);
+          const tempResultPath = await convertFileWithPandoc(filePath, srcFmt, tgtFmt, cfg.pandocPath);
+          await fsp.copyFile(tempResultPath, outPath);
+          finalOut = outPath;
+        } else {
+          // Use remote service
+          const tempResultPath = await convertFileViaService(filePath, srcExt, targetFormat);
+          await fsp.copyFile(tempResultPath, outPath);
+          finalOut = outPath;
+        }
       } catch (e) {
         const messageText = e instanceof Error ? e.message : String(e);
-        logger.error("/api/files/convert conversion service failed", {
+        logger.error("/api/files/convert conversion failed", {
           source: filePath,
           targetFormat,
           error: messageText,
@@ -601,11 +669,22 @@ export function registerConversionRoutes(appExp: Express): void {
           });
           return;
         }
+        if (messageText.toLowerCase().includes("pandoc")) {
+          res.status(503).json({
+            success: false,
+            message: "pandoc_not_available",
+            data: null,
+            error: { code: "PANDOC_NOT_AVAILABLE", message: "Pandoc is not available or not configured correctly.", details: messageText },
+            timestamp: new Date().toISOString(),
+            request_id: "",
+          });
+          return;
+        }
         res.status(502).json({
           success: false,
           message: "conversion_failed",
           data: null,
-          error: { code: "CONVERSION_FAILED", message: "Failed to convert file via remote service", details: messageText },
+          error: { code: "CONVERSION_FAILED", message: "Failed to convert file", details: messageText },
           timestamp: new Date().toISOString(),
           request_id: "",
         });

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Layout, Card, Button, Select, Input, Switch, Space, Typography, Alert, message } from 'antd';
-import { ReloadOutlined, FolderOpenOutlined, FileDoneOutlined } from '@ant-design/icons';
+import { Layout, Card, Button, Select, Input, Switch, Space, Typography, Alert, message, Radio } from 'antd';
+import { ReloadOutlined, FolderOpenOutlined, FileDoneOutlined, SaveOutlined } from '@ant-design/icons';
 import Sidebar from '../components/Sidebar';
 import { apiService } from '../services/api';
 import { useTranslation } from '../shared/i18n/I18nProvider';
@@ -51,6 +51,49 @@ const FileConversion: React.FC = () => {
   const [overwrite, setOverwrite] = useState(false);
   const [converting, setConverting] = useState(false);
   const [conversionResult, setConversionResult] = useState<ConversionResult | null>(null);
+  const [convertMode, setConvertMode] = useState<'local' | 'remote'>('remote');
+  const [pandocPath, setPandocPath] = useState('');
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  // Load configuration on mount
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const response = await apiService.getConfig();
+        if (response.success) {
+          const config = response.data;
+          setConvertMode(config.fileConvertMode || 'remote');
+          setPandocPath(config.pandocPath || '');
+        }
+      } catch (error) {
+        console.error('Failed to load config:', error);
+      }
+    };
+    void loadConfig();
+  }, []);
+
+  // Save configuration
+  const handleSaveConfig = async () => {
+    setSavingConfig(true);
+    try {
+      const response = await apiService.updateConfig({
+        fileConvertMode: convertMode,
+        pandocPath: pandocPath.trim() || undefined,
+      });
+      if (response.success) {
+        message.success(t('convert.messages.configSaved'));
+        // Invalidate cache and reload formats
+        void fetchFormats();
+      } else {
+        message.error(response.message || t('convert.messages.configSaveFailed'));
+      }
+    } catch (error) {
+      console.error(error);
+      message.error(t('convert.messages.configSaveFailed'));
+    } finally {
+      setSavingConfig(false);
+    }
+  };
 
   const fetchFormats = useCallback(async () => {
     setLoadingFormats(true);
@@ -281,6 +324,47 @@ const FileConversion: React.FC = () => {
 
             <Card title={t('convert.sections.settings')} loading={loadingFormats}>
               <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                {/* Conversion Mode Selection */}
+                <div>
+                  <Text strong>{t('convert.labels.conversionMode')}</Text>
+                  <Radio.Group 
+                    value={convertMode} 
+                    onChange={(e) => setConvertMode(e.target.value)}
+                    style={{ width: '100%', marginTop: 8 }}
+                  >
+                    <Radio value="remote">{t('convert.modes.remote')}</Radio>
+                    <Radio value="local">{t('convert.modes.local')}</Radio>
+                  </Radio.Group>
+                </div>
+
+                {/* Pandoc Path (only shown in local mode) */}
+                {convertMode === 'local' && (
+                  <div>
+                    <Text strong>{t('convert.labels.pandocPath')}</Text>
+                    <Input 
+                      value={pandocPath}
+                      placeholder={t('convert.placeholders.pandocPath')}
+                      onChange={(e) => setPandocPath(e.target.value)}
+                      style={{ marginTop: 8 }}
+                    />
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
+                      {t('convert.hints.pandocPath')}
+                    </Text>
+                  </div>
+                )}
+
+                {/* Save Configuration Button */}
+                <div>
+                  <Button 
+                    icon={<SaveOutlined />} 
+                    onClick={handleSaveConfig} 
+                    loading={savingConfig}
+                    type="dashed"
+                  >
+                    {t('convert.actions.saveConfig')}
+                  </Button>
+                </div>
+
                 <div>
                   <Text strong>{t('convert.labels.sourceFile')}</Text>
                   <Space style={{ width: '100%', marginTop: 8 }}>

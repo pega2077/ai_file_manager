@@ -130,6 +130,10 @@ export interface AppConfig {
   bailianVisionModel?: string;
   /** Optional HTTP endpoint for third-party file conversion service */
   fileConvertEndpoint?: string;
+  /** File conversion mode: 'local' uses local pandoc, 'remote' uses remote service */
+  fileConvertMode?: 'local' | 'remote';
+  /** Path to local pandoc executable (only used when fileConvertMode is 'local') */
+  pandocPath?: string;
   /** Relative or absolute path to the local SQLite database file */
   sqliteDbPath: string;
   /** UI language preference, e.g., 'en' | 'zh' */
@@ -241,6 +245,8 @@ const DEFAULT_CONFIG: AppConfig = {
     llamacppServerArgs: undefined,
   },
   fileConvertEndpoint: "https://converter.pegamob.com",
+  fileConvertMode: 'remote',
+  pandocPath: undefined,
   // Default to repository-standard SQLite location; can be overridden in config.json
   sqliteDbPath: "database/files.db",
   // App defaults (override in config.json)
