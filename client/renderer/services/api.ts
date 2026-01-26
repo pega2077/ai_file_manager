@@ -418,6 +418,11 @@ class ApiService {
     this.locale = locale;
   }
 
+  getBaseUrl(): string {
+    return ROOT_BASE_URL;
+  }
+
+
   private mergeHeaders(headers?: HeadersInit): HeadersInit {
     const baseHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
