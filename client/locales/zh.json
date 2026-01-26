@@ -710,6 +710,41 @@
       "cannotOpenDirectory": "无法打开所在目录"
     }
   },
+  "agent": {
+    "pageTitle": "智能助手",
+    "pageDescription": "输入模糊指令，AI助手将自动分析并选择合适的工具完成任务",
+    "labels": {
+      "enterInstruction": "输入指令",
+      "executionProcess": "执行过程",
+      "executionResult": "执行结果",
+      "error": "错误"
+    },
+    "placeholders": {
+      "instruction": "例如：帮我导入并分析这个PDF文件，提取关键标签..."
+    },
+    "actions": {
+      "execute": "执行",
+      "executing": "执行中..."
+    },
+    "messages": {
+      "analyzingTask": "正在分析任务...",
+      "taskCompleted": "任务完成",
+      "processing": "处理中...",
+      "executionFailed": "执行失败",
+      "enterInstruction": "请输入指令",
+      "toolExecuting": "执行工具",
+      "toolExecutedSuccess": "工具执行成功",
+      "toolExecutionFailed": "工具执行失败",
+      "maxIterationsReached": "达到最大迭代次数",
+      "taskIncomplete": "任务未完成（达到最大迭代次数）"
+    },
+    "steps": {
+      "tool": "工具",
+      "parameters": "参数",
+      "result": "结果",
+      "completed": "✓ 完成"
+    }
+  },
   "files": {
     "pageTitle": "文件管理",
     "pageDescription": "查看和管理已导入到系统的文件",

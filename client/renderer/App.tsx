@@ -11,6 +11,7 @@ import LLMSetup from './pages/LLMSetup';
 import Settings from './pages/Settings';
 import Bot from './pages/Bot';
 import Convert from './pages/Convert';
+import Agent from './pages/Agent';
 import PegaAuth from './pages/PegaAuth';
 import OllamaConfig from './pages/providers/OllamaConfig';
 import OpenAIConfig from './pages/providers/OpenAIConfig';
@@ -62,6 +63,7 @@ function App() {
           <Route path="/home" element={<Directories />} />
           <Route path="/files" element={<Files />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/agent" element={<Agent />} />
           <Route path="/llm-setup" element={<LLMSetup />} />
           <Route path="/setup" element={<Setup />} />
           <Route path="/settings" element={<Settings />} />

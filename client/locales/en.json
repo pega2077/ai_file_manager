@@ -705,6 +705,41 @@
       "cannotOpenDirectory": "Cannot open directory"
     }
   },
+  "agent": {
+    "pageTitle": "AI Agent",
+    "pageDescription": "Enter a vague instruction, and the AI agent will automatically analyze and select appropriate tools to complete the task",
+    "labels": {
+      "enterInstruction": "Enter Instruction",
+      "executionProcess": "Execution Process",
+      "executionResult": "Execution Result",
+      "error": "Error"
+    },
+    "placeholders": {
+      "instruction": "e.g., Import and analyze this PDF file, extract key tags..."
+    },
+    "actions": {
+      "execute": "Execute",
+      "executing": "Executing..."
+    },
+    "messages": {
+      "analyzingTask": "Analyzing task...",
+      "taskCompleted": "Task completed",
+      "processing": "Processing...",
+      "executionFailed": "Execution failed",
+      "enterInstruction": "Please enter an instruction",
+      "toolExecuting": "Executing tool",
+      "toolExecutedSuccess": "Tool executed successfully",
+      "toolExecutionFailed": "Tool execution failed",
+      "maxIterationsReached": "Maximum iterations reached",
+      "taskIncomplete": "Task incomplete (max iterations reached)"
+    },
+    "steps": {
+      "tool": "Tool",
+      "parameters": "Parameters",
+      "result": "Result",
+      "completed": "✓ Completed"
+    }
+  },
   "files": {
     "pageTitle": "File Management",
     "pageDescription": "View and manage files imported into the system",

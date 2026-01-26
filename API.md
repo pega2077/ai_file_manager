@@ -77,6 +77,7 @@
 | 系统管理 | 系统配置 | GET | `/api/system/config` | 获取系统配置信息 |
 | 系统管理 | 更新配置 | POST | `/api/system/config/update` | 更新系统配置 |
 | 系统管理 | 清除数据 | POST | `/api/system/clear-data` | 清空应用数据（删除 SQLite 表数据与向量索引） |
+| 智能代理 | 执行任务 | POST | `/api/agent/execute` | 接收自然语言指令，自动分析并执行多步骤任务 |
 
 ## 1. 文件管理模块接口
 
@@ -1623,3 +1624,92 @@
   }
 }
 ```
+
+## 9. 智能代理模块接口
+
+### 9.1 执行智能任务
+
+**接口**: `POST /api/agent/execute`
+
+**功能说明**:
+接收用户的自然语言指令，通过 LLM 自动分析任务需求，选择合适的工具，分步骤执行任务，并实时返回执行过程和结果。
+
+**适用场景**:
+- 用户输入模糊或复杂的指令，不确定需要哪些具体操作
+- 需要多步骤自动化处理文件
+- 希望系统智能推理并自动完成任务
+
+**请求参数**:
+```json
+{
+  "instruction": "string",     // 必填，用户指令，支持自然语言
+  "language": "zh|en",         // 可选，默认 "zh"
+  "provider": "string",        // 可选，指定 LLM 提供商
+  "temperature": 0.7,          // 可选，LLM 温度参数
+  "max_tokens": 2000,          // 可选，最大 token 数
+  "stream": true               // 可选，是否启用流式响应，默认 false
+}
+```
+
+**响应格式**:
+
+非流式响应:
+```json
+{
+  "success": true,
+  "message": "agent_execution_complete",
+  "data": {
+    "instruction": "string",      // 原始指令
+    "steps": [                    // 执行步骤列表
+      {
+        "type": "planning|tool_execution|complete|error",
+        "message": "string",      // 步骤描述
+        "tool": "string",         // 使用的工具名称（仅 tool_execution）
+        "parameters": {},         // 工具参数（仅 tool_execution）
+        "result": {},            // 执行结果（仅 tool_execution）
+        "timestamp": "string"     // ISO 8601 时间戳
+      }
+    ],
+    "finalResult": "string",      // 最终结果描述
+    "success": true               // 任务是否成功完成
+  },
+  "error": null,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "request_id": "uuid"
+}
+```
+
+**可用工具列表**:
+
+代理可以自动选择以下工具来完成任务：
+
+1. **import_file** - 导入文件到系统
+2. **list_files** - 列出系统中的文件
+3. **convert_file** - 转换文件格式
+4. **extract_tags** - 从文件提取标签
+5. **describe_image** - 图像识别和描述
+6. **semantic_search** - 语义搜索
+7. **recommend_directory** - 推荐文件保存目录
+8. **ask_question** - RAG 智能问答
+9. **update_file_tags** - 更新文件标签
+10. **list_directory** - 列出目录内容
+11. **get_file_details** - 获取文件详情
+
+**使用示例**:
+
+```bash
+# 示例: 导入并分析文件
+curl -X POST http://localhost:8000/api/agent/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instruction": "帮我导入 /path/to/document.pdf 并提取关键标签",
+    "language": "zh",
+    "stream": false
+  }'
+```
+
+**注意事项**:
+- 代理最多执行 10 次迭代，避免无限循环
+- 建议使用流式响应以实时查看执行进度
+- 代理会根据任务需求自动选择最合适的工具组合
+- 支持多语言指令（中文/英文）

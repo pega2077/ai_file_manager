@@ -1,0 +1,41 @@
+.agent-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.agent-header {
+  margin-bottom: 24px;
+}
+
+.agent-input-card {
+  margin-bottom: 24px;
+}
+
+.agent-execution-card {
+  margin-bottom: 16px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.agent-result-card {
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+}
+
+.agent-error-card {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+}
+
+/* Dark theme support */
+html[data-theme="dark"] .agent-result-card {
+  background: #162312;
+  border-color: #274916;
+}
+
+html[data-theme="dark"] .agent-error-card {
+  background: #2a1215;
+  border-color: #58181c;
+}

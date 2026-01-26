@@ -10,6 +10,7 @@ import { authenticateDB, initializeDB } from "./backend/db";
 import {getGlobalIndexPath} from "./backend/utils/vectorStore";
 import { registerChatRoutes } from "./backend/chatController";
 import { registerConversionRoutes } from "./backend/convertController";
+import { registerAgentRoutes } from "./backend/agentController";
 
 let server: Server | null = null;
 
@@ -64,6 +65,7 @@ export const startServer = async (): Promise<void> => {
   registerChatRoutes(app);
   registerConversionRoutes(app);
   registerSystemTagsRoutes(app);
+  registerAgentRoutes(app);
 
     // Generic error handler (last middleware)
     app.use(

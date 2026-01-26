@@ -13,6 +13,7 @@ A smart file manager powered by AI. It automatically classifies your imported fi
 - 🏷️ **Intelligent Classification** - Automatically classifies and tags documents
 - 🔍 **Semantic Search** - Intelligent document retrieval based on vector database
 - 💬 **Intelligent Q&A** - Document content Q&A based on RAG technology
+- 🤖 **AI Agent** - Natural language task automation with automatic tool selection and execution
 - 🗄️ **Local Storage** - All data stored locally, protecting privacy and security
 - 🖥️ **Cross-Platform Support** - Supports Windows and macOS systems
 
@@ -61,6 +62,13 @@ ai_file_manager/
 - SQLite stores document metadata
 - Vector database stores document embeddings
 - Local model deployment, data not uploaded
+
+### 5. Agentic Task Automation
+- Natural language instruction processing
+- Automatic tool selection and execution
+- Multi-step workflow orchestration
+- Real-time progress tracking
+- See [Agent Feature Guide](docs/AGENT_FEATURE.md) for details
 
 ## Development Status
 
