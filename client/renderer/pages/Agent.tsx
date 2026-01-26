@@ -169,7 +169,7 @@ const Agent: React.FC = () => {
             </pre>
           </details>
         )}
-        {step.result && (
+        {step.result ? (
           <details style={{ marginTop: 8 }}>
             <summary style={{ cursor: "pointer", color: "#1890ff" }}>
               {locale === "zh" ? "结果" : "Result"}
@@ -190,7 +190,7 @@ const Agent: React.FC = () => {
                 : JSON.stringify(step.result ?? {}, null, 2)}
             </pre>
           </details>
-        )}
+        ) : null}
         <Text type="secondary" style={{ fontSize: 12 }}>
           {new Date(step.timestamp).toLocaleTimeString()}
         </Text>
