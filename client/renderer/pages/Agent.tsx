@@ -143,6 +143,13 @@ const Agent: React.FC = () => {
   };
 
   const renderStepContent = (step: ExecutionStep): React.ReactElement => {
+    const formatResult = (result: unknown): string => {
+      if (typeof result === "string") {
+        return result;
+      }
+      return JSON.stringify(result ?? {}, null, 2);
+    };
+
     return (
       <Space direction="vertical" size="small" style={{ width: "100%" }}>
         <Text strong>{step.message}</Text>
@@ -185,9 +192,7 @@ const Agent: React.FC = () => {
                 overflow: "auto",
               }}
             >
-              {typeof step.result === "string"
-                ? step.result
-                : JSON.stringify(step.result ?? {}, null, 2)}
+              {formatResult(step.result)}
             </pre>
           </details>
         ) : null}

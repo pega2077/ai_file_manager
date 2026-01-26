@@ -148,6 +148,10 @@ type AgentWorkflowResult = {
   success: boolean;
 };
 
+// Configuration constants
+const MAX_AGENT_ITERATIONS = 10;
+const MAX_CONTEXT_SIZE = 5000; // characters
+
 /**
  * Core agent workflow execution logic
  */
@@ -161,7 +165,6 @@ async function executeAgentWorkflow(
 ): Promise<AgentWorkflowResult> {
   const steps: AgentExecutionStep[] = [];
   let currentContext = instruction;
-  const maxIterations = 10; // Prevent infinite loops
   let iteration = 0;
 
   // Send initial planning step
@@ -171,7 +174,7 @@ async function executeAgentWorkflow(
     timestamp: new Date().toISOString(),
   });
 
-  while (iteration < maxIterations) {
+  while (iteration < MAX_AGENT_ITERATIONS) {
     iteration++;
 
     // Ask LLM to decide next action
@@ -227,6 +230,11 @@ async function executeAgentWorkflow(
         // Execute the tool
         const toolResult = await tool.execute(toolCall.parameters);
 
+        // Truncate large results for context to avoid memory issues
+        const resultSummary = typeof toolResult === "string" 
+          ? toolResult.substring(0, MAX_CONTEXT_SIZE)
+          : JSON.stringify(toolResult).substring(0, MAX_CONTEXT_SIZE);
+
         const stepRecord: AgentExecutionStep = {
           type: "tool_execution",
           message: `${language === "zh" ? "工具执行成功" : "Tool executed successfully"}: ${tool.display_name[language]}`,
@@ -242,8 +250,8 @@ async function executeAgentWorkflow(
           message: `${language === "zh" ? "✓ 完成" : "✓ Completed"}: ${tool.display_name[language]}`,
         });
 
-        // Update context with result
-        currentContext = `Previous instruction: ${instruction}\n\nLast action: Used ${tool.name}\nResult: ${JSON.stringify(toolResult)}`;
+        // Update context with truncated result
+        currentContext = `Previous instruction: ${instruction}\n\nLast action: Used ${tool.name}\nResult: ${resultSummary}`;
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : "Unknown error";
         logger.error(`Tool execution error: ${tool.name}`, error);
