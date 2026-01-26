@@ -53,16 +53,17 @@ async function callLocalAPI(method: "GET" | "POST", endpoint: string, data?: unk
   const port = config.localServicePort || 8000;
   const baseUrl = `http://${host}:${port}`;
   const url = `${baseUrl}${endpoint}`;
+  const timeoutMs = 60000; // 60 second timeout for tool execution
   
   try {
     if (method === "GET") {
-      const response = await httpGetJson(url);
+      const response = await httpGetJson(url, undefined, timeoutMs);
       if (!response.ok) {
         throw new Error(`API call failed: ${method} ${endpoint} - ${response.error?.message || 'Unknown error'}`);
       }
       return response.data;
     } else {
-      const response = await httpPostJson(url, data);
+      const response = await httpPostJson(url, data, undefined, timeoutMs);
       if (!response.ok) {
         throw new Error(`API call failed: ${method} ${endpoint} - ${response.error?.message || 'Unknown error'}`);
       }

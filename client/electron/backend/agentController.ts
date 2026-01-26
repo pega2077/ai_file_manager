@@ -153,6 +153,16 @@ const MAX_AGENT_ITERATIONS = 10;
 const MAX_CONTEXT_SIZE = 5000; // characters
 
 /**
+ * Truncate large results to prevent memory issues
+ */
+function truncateResult(result: unknown, maxLength: number = MAX_CONTEXT_SIZE): string {
+  if (typeof result === "string") {
+    return result.substring(0, maxLength);
+  }
+  return JSON.stringify(result).substring(0, maxLength);
+}
+
+/**
  * Core agent workflow execution logic
  */
 async function executeAgentWorkflow(
@@ -231,9 +241,7 @@ async function executeAgentWorkflow(
         const toolResult = await tool.execute(toolCall.parameters);
 
         // Truncate large results for context to avoid memory issues
-        const resultSummary = typeof toolResult === "string" 
-          ? toolResult.substring(0, MAX_CONTEXT_SIZE)
-          : JSON.stringify(toolResult).substring(0, MAX_CONTEXT_SIZE);
+        const resultSummary = truncateResult(toolResult);
 
         const stepRecord: AgentExecutionStep = {
           type: "tool_execution",

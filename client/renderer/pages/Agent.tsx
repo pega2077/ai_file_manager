@@ -8,6 +8,14 @@ import "./Agent.css";
 const { TextArea } = Input;
 const { Title, Text, Paragraph } = Typography;
 
+// Helper function to format step results
+const formatStepResult = (result: unknown): string => {
+  if (typeof result === "string") {
+    return result;
+  }
+  return JSON.stringify(result ?? {}, null, 2);
+};
+
 type ExecutionStep = {
   type: "planning" | "tool_execution" | "complete" | "error";
   message: string;
@@ -143,13 +151,6 @@ const Agent: React.FC = () => {
   };
 
   const renderStepContent = (step: ExecutionStep): React.ReactElement => {
-    const formatResult = (result: unknown): string => {
-      if (typeof result === "string") {
-        return result;
-      }
-      return JSON.stringify(result ?? {}, null, 2);
-    };
-
     return (
       <Space direction="vertical" size="small" style={{ width: "100%" }}>
         <Text strong>{step.message}</Text>
@@ -192,7 +193,7 @@ const Agent: React.FC = () => {
                 overflow: "auto",
               }}
             >
-              {formatResult(step.result)}
+              {formatStepResult(step.result)}
             </pre>
           </details>
         ) : null}
