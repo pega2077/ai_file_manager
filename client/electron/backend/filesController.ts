@@ -1200,9 +1200,28 @@ export async function importToRagHandler(req: Request, res: Response): Promise<v
         usedContentSource = "existing_summary";
         logger.info("importToRagHandler: using existing summary for image", { fileId, path: filePath });
       } else {
-        // Read image and send to vision model
-        const buf = await fsp.readFile(filePath);
-        const base64 = buf.toString("base64");
+        // Read image, compress it, then send to vision model
+        let base64: string;
+        try {
+          const nativeImg = nativeImage.createFromPath(filePath);
+          if (!nativeImg.isEmpty()) {
+            const { width, height } = nativeImg.getSize();
+            const maxDim = 1024;
+            let resized = nativeImg;
+            if (width > maxDim || height > maxDim) {
+              const scale = maxDim / Math.max(width, height);
+              resized = nativeImg.resize({ width: Math.round(width * scale), height: Math.round(height * scale) });
+            }
+            base64 = resized.toJPEG(85).toString("base64"); // 85 balances file size vs. visual quality for LLM vision input
+          } else {
+            const buf = await fsp.readFile(filePath);
+            base64 = buf.toString("base64");
+          }
+        } catch (compressErr) {
+          logger.warn("Image compression failed, falling back to original bytes", { filePath, error: String(compressErr) });
+          const buf = await fsp.readFile(filePath);
+          base64 = buf.toString("base64");
+        }
         let description = "";
         const cfg = configManager.getConfig();
         const language = normalizeLanguage(cfg.language ?? "zh", "zh");
