@@ -10,6 +10,8 @@ import { authenticateDB, initializeDB } from "./backend/db";
 import {getGlobalIndexPath} from "./backend/utils/vectorStore";
 import { registerChatRoutes } from "./backend/chatController";
 import { registerConversionRoutes } from "./backend/convertController";
+import { dialog, BrowserWindow } from "electron";
+import { i18n } from "./languageHelper";
 
 let server: Server | null = null;
 
@@ -81,6 +83,22 @@ export const startServer = async (): Promise<void> => {
 
     srv.on("error", (err: unknown) => {
       logger.error("Express server failed to start", err);
+      const nodeErr = err as NodeJS.ErrnoException;
+      if (nodeErr.code === "EADDRINUSE") {
+        const focusedWin = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null;
+        const title = i18n.t("dialogs.portInUseTitle", "Port Already in Use");
+        const message = i18n.t(
+          "dialogs.portInUseMessage",
+          `Port ${port} is already in use. Please close the other application occupying this port and restart.`,
+          { port }
+        );
+        const options = { type: "error" as const, buttons: ["OK"], defaultId: 0, title, message, noLink: true };
+        if (focusedWin && !focusedWin.isDestroyed()) {
+          void dialog.showMessageBox(focusedWin, options);
+        } else {
+          void dialog.showMessageBox(options);
+        }
+      }
     });
     server = srv;
   } catch (error) {
